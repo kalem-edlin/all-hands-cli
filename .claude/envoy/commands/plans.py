@@ -1,4 +1,25 @@
-"""Plan lifecycle management commands."""
+"""Plan lifecycle management commands.
+
+Direct Mode Branches
+--------------------
+Certain branches skip planning functionality entirely ("direct mode"):
+
+- **Protected branches**: main, master, staging, production
+  These are deployment/integration branches where work should already
+  be planned and reviewed before merging.
+
+- **Quick branches**: quick/*
+  Rapid iteration branches (e.g., quick/hotfix, quick/typo) that
+  intentionally skip planning overhead for small, focused changes.
+
+When on a direct mode branch:
+- No plan directories are created
+- Query capture is skipped
+- File reference tracking is disabled
+
+This keeps the planning system focused on feature development branches
+where structured planning provides the most value.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +34,10 @@ from typing import Optional
 
 from .base import BaseCommand
 
+# Direct mode configuration - branches that skip planning
+DIRECT_MODE_BRANCHES = {"main", "master", "staging", "production"}
+DIRECT_MODE_PREFIXES = ("quick/",)
+
 
 def get_branch() -> str:
     """Get current git branch name."""
@@ -25,6 +50,26 @@ def get_branch() -> str:
         return result.stdout.strip() or "main"
     except Exception:
         return "main"
+
+
+def is_direct_mode_branch(branch: str) -> bool:
+    """Check if branch should use direct mode (no planning).
+    
+    Direct mode branches include:
+    - Protected branches: main, master, staging, production
+    - Quick branches: quick/* prefix
+    
+    Returns:
+        True if planning should be skipped for this branch.
+    """
+    if not branch:
+        return True
+    if branch in DIRECT_MODE_BRANCHES:
+        return True
+    for prefix in DIRECT_MODE_PREFIXES:
+        if branch.startswith(prefix):
+            return True
+    return False
 
 
 def sanitize_branch(branch: str) -> str:
@@ -59,6 +104,14 @@ class PlansCaptureCommand(BaseCommand):
                 return self.error("invalid_input", "No prompt provided and stdin empty")
         else:
             cwd = "."
+
+        # Skip capture on direct mode branches
+        branch = get_branch()
+        if is_direct_mode_branch(branch):
+            return self.success({
+                "captured": False,
+                "reason": f"direct mode branch ({branch})",
+            })
 
         if not prompt:
             return self.success({"captured": False, "reason": "empty prompt"})
@@ -141,11 +194,22 @@ class PlansStatusCommand(BaseCommand):
         pass
 
     def execute(self, **kwargs) -> dict:
+        branch = get_branch()
+        
+        # Check for direct mode branches first
+        if is_direct_mode_branch(branch):
+            return self.success({
+                "branch": branch,
+                "mode": "direct",
+                "has_plan": False,
+                "message": "Direct mode - planning disabled",
+            })
+        
         plan_dir = get_plan_dir()
 
         if not plan_dir.exists():
             return self.success({
-                "branch": get_branch(),
+                "branch": branch,
                 "has_plan": False,
             })
 

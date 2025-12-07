@@ -14,7 +14,6 @@ fi
 
 # Auto-create venv if missing (for manual testing outside Claude session)
 if [ ! -d "$VENV_DIR" ]; then
-    echo "Creating virtual environment..." >&2
     python3 -m venv "$VENV_DIR"
     "$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
 fi
