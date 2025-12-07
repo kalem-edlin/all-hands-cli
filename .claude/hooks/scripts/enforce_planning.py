@@ -50,7 +50,9 @@ def main():
 
     # No plan exists yet
     if not plan_data.get("exists"):
-        print("No plan file. Run /plan to create one.")
+        print("<system-reminder>")
+        print("BLOCKING: No plan file exists. You MUST run /plan IMMEDIATELY.")
+        print("</system-reminder>")
         return
 
     frontmatter = plan_data.get("frontmatter", {})
@@ -58,14 +60,16 @@ def main():
     plan_path = plan_data.get("path", "")
 
     if status == "draft":
-        print("PLANNING REQUIRED: Plan status is draft.")
-        print(f"Plan file: {plan_path}")
-        print("Run /plan to begin planning workflow.")
-        print("To skip planning this session, decline when prompted.")
+        print("<system-reminder>")
+        print(f"BLOCKING: Plan status is draft. You MUST run /plan IMMEDIATELY.")
+        print(f"Plan: {plan_path}")
+        print("</system-reminder>")
 
     elif status == "active":
-        print(f"Plan status: active | Plan file: {plan_path}")
-        print("IMPORTANT: If this prompt is NOT related to the current plan, you MUST run /plan to challenge the user to follow workflow best practices.")
+        print("<system-reminder>")
+        print(f"ACTIVE PLAN: {plan_path}")
+        print("If plan not in context, read it first. If prompt unrelated to plan, run /plan.")
+        print("</system-reminder>")
 
     elif status == "deactivated":
         # User opted out - no enforcement, silent pass
