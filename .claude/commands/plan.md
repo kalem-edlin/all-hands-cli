@@ -39,7 +39,10 @@ Check agent descriptions for relevant specialists (exclude researcher/planner).
   - Query explorer: "What code structure/implementation relevant to: {prompt}?"
 - **None found**: Use **AskUserQuestion**:
   - Question: "No specialist for this domain. How to proceed?"
-  - Options: ["Create specialist", "Proceed without", "Cancel"]
+  - Options: ["Spawn worker to create specialist", "Proceed without specialist", "Cancel"]
+  - On "Spawn worker to create specialist" → Run `/curation-fix Create specialist agent for {domain} using specialist-builder skill`, then continue to Step 3
+  - On "Proceed without specialist" → Continue to Step 3
+  - On "Cancel" → End workflow
 
 ## Step 3: Delegate to Planner
 

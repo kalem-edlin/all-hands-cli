@@ -23,6 +23,8 @@ def get_project_root() -> Path:
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        raise RuntimeError(f"Not a git repository or git not found: {result.stderr.strip()}")
     return Path(result.stdout.strip())
 
 
@@ -37,8 +39,22 @@ def get_worker_path(worker_name: str) -> Path:
 
 
 def sanitize_branch_name(name: str) -> str:
-    """Sanitize string for use in branch/worker names."""
-    return name.replace("/", "-").replace(" ", "-").lower()
+    """Sanitize string for use in branch/worker names.
+
+    Git branch names cannot contain: ~ ^ : ? * [ \\ @{ consecutive dots (..)
+    Also removes control characters and leading/trailing dots/slashes.
+    """
+    import re
+    # Replace forbidden characters with dash
+    result = re.sub(r'[~^:?*\[\]\\@{}\s/]', '-', name)
+    # Remove consecutive dots
+    result = re.sub(r'\.{2,}', '.', result)
+    # Remove consecutive dashes
+    result = re.sub(r'-{2,}', '-', result)
+    # Remove leading/trailing dots, dashes, slashes
+    result = result.strip('.-/')
+    # Lowercase
+    return result.lower()
 
 
 class SpawnCommand(BaseCommand):
@@ -49,8 +65,17 @@ class SpawnCommand(BaseCommand):
         parser.add_argument("--branch", required=True, help="Branch name for worker (auto-prefixed if needed)")
         parser.add_argument("--task", required=True, help="Task description for the worker")
         parser.add_argument("--from", dest="from_branch", default="HEAD", help="Base branch (default: HEAD)")
+        parser.add_argument("--tools", help="Comma-separated allowed tools (default: all tools)")
 
-    def execute(self, branch: str, task: str, from_branch: str = "HEAD", **kwargs) -> dict:
+    def execute(self, branch: str, task: str, from_branch: str = "HEAD", tools: Optional[str] = None, **kwargs) -> dict:
+        # Check for nested worker prevention
+        if os.environ.get("PARALLEL_WORKER_DEPTH"):
+            return self.error(
+                "nesting_blocked",
+                "Cannot spawn workers from within a worker",
+                suggestion="Use Task tool for subagents if needed"
+            )
+
         # Check worker limit
         existing = self._list_workers()
         if len(existing) >= PARALLEL_MAX_WORKERS:
@@ -90,17 +115,30 @@ class SpawnCommand(BaseCommand):
             # Launch headless Claude session in background
             log_file = worker_path / ".claude-worker.log"
             with open(log_file, "w") as log:
+                # Build command - no tool restrictions by default
+                cmd = ["claude", "--print"]
+                if tools:
+                    cmd.extend(["--allowedTools", tools])
+
+                # Prepend anti-nesting directive to task
+                worker_prompt = (
+                    "IMPORTANT: Do not use `envoy parallel spawn` - nested workers are not allowed. "
+                    "You may use Task tool for subagents if needed.\n\n"
+                    f"{task}"
+                )
+                cmd.append(worker_prompt)
+
+                # Set worker depth env var to prevent nesting
+                worker_env = os.environ.copy()
+                worker_env["PARALLEL_WORKER_DEPTH"] = "1"
+
                 process = subprocess.Popen(
-                    [
-                        "claude",
-                        "--print",
-                        "--allowedTools", "Bash,Read,Write,Edit,Glob,Grep",
-                        task,
-                    ],
+                    cmd,
                     cwd=str(worker_path),
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,  # Detach from parent
+                    env=worker_env,
                 )
 
             # Save worker metadata
