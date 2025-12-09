@@ -37,33 +37,33 @@ Read each sentence aloud. If it starts with:
 - "You" or agent name - Incorrect
 - "If you" or "When you" - Rephrase
 
-## Third-Person Description Format
+## Direct Description Format
 
-The frontmatter `description` field uses third person.
+The frontmatter `description` field uses direct format with trigger phrases.
 
 ### Correct Format
 
 ```yaml
-description: This skill should be used when the user asks to "create X", "configure Y", "build Z". Provides [capability].
+description: Use when user asks to "create X", "configure Y", "build Z". Provides [capability].
 ```
 
 ### Incorrect Formats
 
 ```yaml
-# Wrong: Second person
-description: Use this skill when you want to create X.
+# Wrong: Too verbose
+description: This skill should be used when the user asks to create X.
 
 # Wrong: First person
 description: I help with creating X.
 
-# Wrong: Imperative (body style, not description style)
+# Wrong: No triggers
 description: Create X, configure Y, build Z.
 ```
 
 ### Description Structure
 
 ```
-This skill should be used when the user asks to [TRIGGERS]. [CAPABILITY SUMMARY].
+Use when user asks to [TRIGGERS]. [CAPABILITY SUMMARY].
 ```
 
 ## Word Count Guidance
