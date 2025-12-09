@@ -2,7 +2,9 @@
 
 ## Core Rule
 
-**MANDATORY DELEGATION**: Main agent MUST NEVER READ/FIND FILES (or use skills) - delegate ALL context-consuming work to subagents. Match task to agent descriptions. Curator handles ALL `.claude/` work including external pattern research for adoption.
+**MANDATORY DELEGATION**: Main agent MUST NEVER READ/FIND FILES (or use skills) - delegate ALL context-consuming work to subagents. Match task to agent descriptions.
+
+**CURATOR SCOPE**: ANY task involving `.claude/`, hooks, agents, skills, CLAUDE.md, claude-envoy, or external pattern research → delegate to curator. This includes evaluating external repos for adoption patterns.
 
 Main agent: SOLE code modifier WRITE ONLY, get implementation from subagents.
 Subagent: READ-ONLY, return needed information/implementation to main agent.

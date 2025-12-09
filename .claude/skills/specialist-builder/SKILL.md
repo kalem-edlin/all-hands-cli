@@ -1,6 +1,6 @@
 ---
 name: specialist-builder
-description: Use when user wants to create a new specialist agent for their repository. Guides agent creation with structured questions about domain, responsibilities, and skills.
+description: Use when user asks to "create an agent", "add a subagent", or needs guidance on agent frontmatter, triggering examples, system prompts, tools, or colors.
 ---
 
 # Specialist Builder
@@ -12,6 +12,7 @@ Build specialist agents tailored to repository domains.
 Main agent calls curator with this skill when:
 - No existing specialists match user's prompt domain
 - User confirms they want to architect a specialist
+- User says "create an agent", "add an agent", "write a subagent"
 
 ## Process
 
@@ -40,6 +41,12 @@ After user selects, use **AskUserQuestion** for each:
 - Option B: [broader scope]
 - Option C: Custom
 
+**Agent Pattern**: "What type of agent is this?"
+- Analysis (code review, security audit, research)
+- Generation (code, tests, docs)
+- Validation (linting, checking, verification)
+- Orchestration (multi-step workflows)
+
 **Skills**: "What skills should this specialist have access to?"
 - research-tools (web search, documentation)
 - claude-code-patterns (Claude Code best practices)
@@ -48,39 +55,161 @@ After user selects, use **AskUserQuestion** for each:
 **Tools**: "What tools does this specialist need?"
 - Read-only (Read, Glob, Grep) - for analysis/research
 - With Bash - for running commands
-- Custom set
+- Full access - omit tools field to inherit all
 
 ### 4. Generate Agent Definition
-Return to main agent with proposed agent file:
-
-```yaml
-# .claude/agents/<name>.md
----
-name: <domain>-specialist
-description: <domain> expert. Use for [specific triggers]. [capabilities summary].
-skills: [selected-skills]
-allowed-tools: [selected-tools]
-model: inherit
----
-
-You are the <domain> specialist for this repository.
-
-## Expertise
-- [specific knowledge area 1]
-- [specific knowledge area 2]
-
-## When Called
-[triggers and use cases]
-
-## Output Format
-[how to structure responses for main agent]
-```
+Return to main agent with proposed agent file following the structure below.
 
 ### 5. Offer Skill Creation
 If custom skill selected, ask:
 "This specialist needs a custom skill. Would you like to define it now?"
-- If yes → use skill-builder skill to create it
-- If no → note as TODO in agent file
+- If yes: use skill-development skill to create it
+- If no: note as TODO in agent file
+
+## Agent File Structure
+
+### Complete Format
+
+```markdown
+---
+name: agent-identifier
+description: Use this agent when [triggering conditions]. Examples:
+
+<example>
+Context: [Situation description]
+user: "[User request]"
+assistant: "[How assistant should respond and use this agent]"
+<commentary>
+[Why this agent should be triggered]
+</commentary>
+</example>
+
+<example>
+[Additional example...]
+</example>
+
+model: inherit
+color: blue
+tools: Read, Glob, Grep
+skills: skill-name
+---
+
+You are [agent role description]...
+
+**Your Core Responsibilities:**
+1. [Responsibility 1]
+2. [Responsibility 2]
+
+**Process:**
+[Step-by-step workflow]
+
+**Output Format:**
+[What to return]
+```
+
+## Frontmatter Fields
+
+### name (required)
+
+Agent identifier used for namespacing and invocation.
+
+**Format:** lowercase, numbers, hyphens only
+**Length:** 3-50 characters
+**Pattern:** Must start and end with alphanumeric
+
+**Good examples:**
+- `code-reviewer`
+- `test-generator`
+- `api-docs-writer`
+
+**Bad examples:**
+- `helper` (too generic)
+- `-agent-` (starts/ends with hyphen)
+- `my_agent` (underscores not allowed)
+- `ag` (too short)
+
+### description (required)
+
+Defines when Claude should trigger this agent. **Most critical field.**
+
+**Must include:**
+1. Triggering conditions ("Use this agent when...")
+2. Multiple `<example>` blocks showing usage
+3. Context, user request, and assistant response in each example
+4. `<commentary>` explaining why agent triggers
+
+See `references/triggering-examples.md` for detailed patterns.
+
+### model (required)
+
+Which model the agent should use.
+
+**Options:**
+- `inherit` - Use same model as parent (recommended)
+- `sonnet` - Claude Sonnet (balanced)
+- `opus` - Claude Opus (most capable)
+- `haiku` - Claude Haiku (fast)
+
+### color (required)
+
+Visual identifier for agent in UI.
+
+**Guidelines:**
+| Color | Use For |
+|-------|---------|
+| blue/cyan | Analysis, review |
+| green | Success-oriented tasks |
+| yellow | Caution, validation |
+| red | Critical, security |
+| magenta | Creative, generation |
+
+### tools (optional)
+
+Restrict agent to specific tools. **Principle of least privilege.**
+
+**Common tool sets:**
+- Read-only analysis: `Read, Grep, Glob`
+- Code generation: `Read, Write, Grep`
+- Testing: `Read, Bash, Grep`
+- Full access: Omit field to inherit all
+
+### skills (optional)
+
+Skills to auto-load when agent starts. Comma-separated list.
+
+## System Prompt Patterns
+
+Four patterns for agent system prompts. See `references/system-prompt-patterns.md` for templates.
+
+| Pattern | Use When |
+|---------|----------|
+| Analysis | Reviewing, auditing, researching |
+| Generation | Creating code, tests, docs |
+| Validation | Checking, verifying, linting |
+| Orchestration | Multi-step workflows |
+
+## AI-Assisted Agent Generation
+
+For complex agents, use this prompt template:
+
+```json
+{
+  "request": "[USER DESCRIPTION]",
+  "requirements": {
+    "core_intent": "Extract primary purpose",
+    "persona": "Define expert role for domain",
+    "system_prompt": {
+      "behavioral_boundaries": true,
+      "specific_methodologies": true,
+      "edge_case_handling": true,
+      "output_format": true
+    },
+    "identifier": "lowercase-hyphens, 3-50 chars",
+    "description": "triggering conditions + 2-3 examples",
+    "examples": "2-3 <example> blocks"
+  }
+}
+```
 
 ## Key Principles
 
@@ -88,15 +217,21 @@ If custom skill selected, ask:
 - Description must include WHEN to trigger (main agent uses this for dispatch)
 - Keep scope focused - better to have multiple narrow specialists than one broad one
 - Skills determine what knowledge/capabilities the specialist has access to
+- Include 2-4 triggering examples in description
 
-## Reference Patterns
+## Reference Files
 
-See `docs/agent-catalog.md` for agent design patterns and responsibility mapping.
+| File | Content |
+|------|---------|
+| `references/triggering-examples.md` | Example block anatomy and patterns |
+| `references/system-prompt-patterns.md` | Four agent pattern templates |
+| `examples/complete-agent-examples.md` | Full working agent examples |
+| `scripts/validate-agent.sh` | Validate agent file structure and content |
 
 ## Agent-Skill Workflow Pattern
 
 When an agent has workflow skills, the agent profile should:
-- Define the prompt pattern that triggers the skill (e.g., "build a specialist")
+- Define the prompt pattern that triggers the skill
 - Direct to "use" the skill (skills are automatically loaded into context)
 - NOT duplicate the workflow steps
 
@@ -106,5 +241,11 @@ Example in agent file:
 
 When main agent asks to [prompt pattern], use the [skill-name] skill.
 ```
+
+**Why this works:**
+- Agent's `skills:` frontmatter lists skills to auto-load into context
+- Main agent triggers agent based on description examples
+- Agent body references skill by name - skill content already available
+- No duplication: skill owns workflow logic, agent owns triggering conditions
 
 This keeps agent files lean and workflow logic centralized in skills.

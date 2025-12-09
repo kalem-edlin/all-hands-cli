@@ -6,8 +6,8 @@ import shutil
 import sys
 
 RULES = [
-    (r"\bgrep\b(?!.*\|)", "Use 'rg' (ripgrep) instead of 'grep'"),
-    (r"\bfind\s+\S+\s+-name\b", "Use 'rg --files -g pattern' instead of 'find -name'"),
+    (r"\bgrep\b(?!.*\|)", "Ensure you use Bash with 'rg <pattern>' (ripgrep) instead of grep."),
+    (r"\bfind\s+\S+\s+-name\b", "Ensure you use Bash with 'rg --files -g \"<pattern>\" <path>' instead of find -name."),
 ]
 
 data = json.load(sys.stdin)

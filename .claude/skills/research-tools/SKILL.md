@@ -1,6 +1,6 @@
 ---
 name: research-tools
-description: External research via claude-envoy. Covers web search, URL extraction, and deep research. Only for curator/researcher agents.
+description: Use when need to "search the web", "research [topic]", "extract URL content", or "find sources". Provides web search (Tavily), deep research (Perplexity), and X/Twitter insights (Grok). Only for curator/researcher agents.
 ---
 
 # Research Tools

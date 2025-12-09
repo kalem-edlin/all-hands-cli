@@ -68,7 +68,7 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash(*grep*)|Bash(*find*)",
         "hooks": [
           {
             "type": "command",
