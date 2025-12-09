@@ -7,40 +7,15 @@ Working examples of different agent patterns with full frontmatter and system pr
 ```markdown
 ---
 name: code-reviewer
-description: Use this agent when code needs quality review, security check, or best practices validation. Examples:
+description: |
+  Use when code needs quality review, security check, or best practices validation.
 
-<example>
-Context: User just implemented a new feature
-user: "I've added the user registration feature"
-assistant: "Great! Let me review the code quality."
-<commentary>
-Code written, proactively trigger code-reviewer agent to check quality and security.
-</commentary>
-assistant: "I'll use the code-reviewer agent to analyze the implementation."
-</example>
-
-<example>
-Context: User explicitly requests review
-user: "Can you review my changes for issues?"
-assistant: "I'll use the code-reviewer agent to perform a thorough review."
-<commentary>
-Explicit review request triggers the agent.
-</commentary>
-</example>
-
-<example>
-Context: User preparing to commit
-user: "I'm ready to commit this code"
-assistant: "Let me review it first."
-<commentary>
-Before commit, proactively review for issues.
-</commentary>
-assistant: "I'll use the code-reviewer agent to check for any issues before commit."
-</example>
-
+  <example>
+  user: "Review my code | Can you check my implementation? | I'm ready to commit"
+  </example>
 model: inherit
 color: cyan
-tools: Read, Grep, Glob, Bash
+allowed-tools: Read, Grep, Glob, Bash
 ---
 
 You are a senior code reviewer ensuring high standards of code quality and security.
@@ -95,39 +70,15 @@ You are a senior code reviewer ensuring high standards of code quality and secur
 ```markdown
 ---
 name: test-generator
-description: Use this agent when tests need to be created for new or existing code. Examples:
+description: |
+  Use when tests need to be created for new or existing code.
 
-<example>
-Context: User implemented functions without tests
-user: "I've added the data processing functions"
-assistant: "Great! Let me generate tests for these."
-<commentary>
-New code without tests, proactively trigger test-generator.
-</commentary>
-assistant: "I'll use the test-generator agent to create comprehensive tests."
-</example>
-
-<example>
-Context: User explicitly asks for tests
-user: "Generate tests for my code"
-assistant: "I'll use the test-generator agent to create a complete test suite."
-<commentary>
-Direct test generation request triggers the agent.
-</commentary>
-</example>
-
-<example>
-Context: User wants to improve coverage
-user: "We need better test coverage for the auth module"
-assistant: "I'll use the test-generator agent to add tests for the auth module."
-<commentary>
-Coverage improvement request triggers test generation.
-</commentary>
-</example>
-
+  <example>
+  user: "Generate tests for my code | I've added the data processing functions | We need better test coverage"
+  </example>
 model: inherit
 color: green
-tools: Read, Write, Grep, Glob
+allowed-tools: Read, Write, Grep, Glob
 ---
 
 You are an expert test engineer specializing in creating comprehensive, maintainable test suites.
@@ -186,40 +137,15 @@ Create test file at `[appropriate path based on conventions]` with:
 ```markdown
 ---
 name: security-analyzer
-description: Use this agent when code needs security review, vulnerability scanning, or security best practices validation. Examples:
+description: |
+  Use when code needs security review, vulnerability scanning, or security best practices validation.
 
-<example>
-Context: User implemented authentication
-user: "I've added the login flow"
-assistant: "Let me check it for security issues."
-<commentary>
-Auth code requires security review, proactively trigger security-analyzer.
-</commentary>
-assistant: "I'll use the security-analyzer agent to audit the authentication implementation."
-</example>
-
-<example>
-Context: User asks about security
-user: "Is this code secure?"
-assistant: "I'll use the security-analyzer agent to perform a security audit."
-<commentary>
-Direct security question triggers security analysis.
-</commentary>
-</example>
-
-<example>
-Context: User working with sensitive data
-user: "I've added the payment processing logic"
-assistant: "I'll audit this for security vulnerabilities."
-<commentary>
-Payment code is high-risk, proactively trigger security review.
-</commentary>
-assistant: "I'll use the security-analyzer agent to check the payment implementation."
-</example>
-
+  <example>
+  user: "Is this code secure? | I've added the login flow | I've added the payment processing logic"
+  </example>
 model: inherit
 color: red
-tools: Read, Grep, Glob
+allowed-tools: Read, Grep, Glob
 ---
 
 You are a security expert specializing in identifying vulnerabilities and ensuring secure coding practices.
@@ -269,11 +195,11 @@ You are a security expert specializing in identifying vulnerabilities and ensuri
 
 ## Key Takeaways
 
-1. **Description examples match the pattern**: Each example shows a triggering scenario with context, user message, and commentary explaining why the agent activates.
+1. **Description uses compressed format**: ONE `<example>` block with `|` separating trigger variants.
 
 2. **System prompts follow the pattern structure**: Role definition, responsibilities, process steps, quality standards, output format, edge cases.
 
-3. **Tools match responsibilities**: Read-only agents get read tools, generation agents get write tools.
+3. **allowed-tools match responsibilities**: Read-only agents get read tools, generation agents get write tools.
 
 4. **Colors signal purpose**: cyan=analysis, green=success/generation, red=security, magenta=creative/orchestration.
 

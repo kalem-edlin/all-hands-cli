@@ -81,7 +81,7 @@ description: |
   </example>
 model: inherit
 color: blue
-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep
 skills: skill-name
 ---
 
@@ -179,7 +179,7 @@ Visual identifier for agent in UI.
 | red | Critical, security |
 | magenta | Creative, generation |
 
-### tools (optional)
+### allowed-tools (optional)
 
 Restrict agent to specific tools. **Principle of least privilege.**
 
