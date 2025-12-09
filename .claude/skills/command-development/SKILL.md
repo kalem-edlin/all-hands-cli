@@ -97,7 +97,7 @@ Generate docs for @$1
 
 ## Bash Execution
 
-Execute bash commands inline using exclamation-backtick syntax. Requires `allowed-tools` with Bash.
+Execute bash commands inline with exclamation-backtick syntax. Requires `allowed-tools` with Bash.
 
 ```markdown
 ---
