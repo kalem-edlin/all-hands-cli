@@ -30,7 +30,7 @@ Subagent: READ-ONLY, return needed information/implementation to main agent.
 ## Project Rules
 
 - Never leave comments that mark a update in code given a user prompt to change code.
-- When deleting files/functions, use Explore agent to find and update all references.
+- When deleting files/functions, use Grep tool to find and update all references.
 
 ## Git
 

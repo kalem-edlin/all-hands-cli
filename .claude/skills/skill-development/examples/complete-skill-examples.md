@@ -13,7 +13,7 @@ Simple skill with no supporting files.
 ```yaml
 ---
 name: code-review
-description: This skill should be used when the user asks to "review code", "check this PR", "analyze code quality", or needs feedback on code changes. Provides structured code review guidance.
+description: Use when user asks to "review code", "check this PR", "analyze code quality", or needs feedback on code changes. Provides structured code review guidance.
 ---
 
 # Code Review
@@ -108,7 +108,7 @@ api-integration/
 ```yaml
 ---
 name: api-integration
-description: This skill should be used when the user asks to "integrate with API", "make API calls", "handle API authentication", or needs guidance on REST API integration patterns.
+description: Use when user asks to "integrate with API", "make API calls", "handle API authentication", or needs guidance on REST API integration patterns.
 ---
 
 # API Integration
@@ -193,7 +193,7 @@ db-migration/
 ```yaml
 ---
 name: db-migration
-description: This skill should be used when the user asks to "create migration", "migrate database", "rollback migration", or needs guidance on safe database schema modifications.
+description: Use when user asks to "create migration", "migrate database", "rollback migration", or needs guidance on safe database schema modifications.
 ---
 
 # Database Migration

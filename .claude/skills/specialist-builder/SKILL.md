@@ -73,24 +73,15 @@ If custom skill selected, ask:
 ```markdown
 ---
 name: agent-identifier
-description: Use this agent when [triggering conditions]. Examples:
+description: |
+  [Role description with trigger keywords and responsibility scope].
 
-<example>
-Context: [Situation description]
-user: "[User request]"
-assistant: "[How assistant should respond and use this agent]"
-<commentary>
-[Why this agent should be triggered]
-</commentary>
-</example>
-
-<example>
-[Additional example...]
-</example>
-
+  <example>
+  user: "trigger1 | trigger2 | trigger3"
+  </example>
 model: inherit
 color: blue
-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep
 skills: skill-name
 ---
 
@@ -133,12 +124,37 @@ Agent identifier used for namespacing and invocation.
 Defines when Claude should trigger this agent. **Most critical field.**
 
 **Must include:**
-1. Triggering conditions ("Use this agent when...")
-2. Multiple `<example>` blocks showing usage
-3. Context, user request, and assistant response in each example
-4. `<commentary>` explaining why agent triggers
+1. Concise description with trigger keywords and responsibility scope
+2. ONE `<example>` block with variant syntax for compression
 
-See `references/triggering-examples.md` for detailed patterns.
+**Format (condensed pattern):**
+```yaml
+description: |
+  [Role description with trigger keywords].
+
+  <example>
+  user: "trigger1 | trigger2 | trigger3"
+  </example>
+```
+
+**Variant syntax:** Use `|` to separate trigger phrase variants within a single example. This compresses multiple triggering scenarios into minimal context.
+
+**Example:**
+```yaml
+description: |
+  Research specialist for web search, documentation lookup, external info gathering.
+
+  <example>
+  user: "Research [topic] | Find docs for [library] | What are best practices for [pattern]?"
+  </example>
+```
+
+**Do NOT include:**
+- Multiple `<example>` blocks (use variant syntax instead)
+- `<commentary>` blocks (description conveys reasoning)
+- Context or assistant response lines
+
+See `references/triggering-examples.md` for additional patterns.
 
 ### model (required)
 
@@ -163,7 +179,7 @@ Visual identifier for agent in UI.
 | red | Critical, security |
 | magenta | Creative, generation |
 
-### tools (optional)
+### allowed-tools (optional)
 
 Restrict agent to specific tools. **Principle of least privilege.**
 
@@ -205,8 +221,8 @@ For complex agents, use this prompt template:
       "output_format": true
     },
     "identifier": "lowercase-hyphens, 3-50 chars",
-    "description": "triggering conditions + 2-3 examples",
-    "examples": "2-3 <example> blocks"
+    "description": "trigger keywords + ONE condensed example block",
+    "example": "ONE <example> with variant syntax (trigger1 | trigger2 | trigger3)"
   }
 }
 ```
@@ -217,7 +233,7 @@ For complex agents, use this prompt template:
 - Description must include WHEN to trigger (main agent uses this for dispatch)
 - Keep scope focused - better to have multiple narrow specialists than one broad one
 - Skills determine what knowledge/capabilities the specialist has access to
-- Include 2-4 triggering examples in description
+- Use ONE condensed `<example>` block with variant syntax (`|`) for trigger phrases
 
 ## Reference Files
 

@@ -1,6 +1,6 @@
 ---
 description: Trigger this when the plan file requests its use WITHOUT USER INPUT
-args: [--last-commit]
+argument-hint: [--last-commit]
 ---
 
 Delegate checkpoint review to planner agent.

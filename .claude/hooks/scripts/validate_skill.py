@@ -52,8 +52,8 @@ def validate_skill_file(file_path):
     # Validate description
     if "description" not in fm:
         errors.append("Missing 'description' field in frontmatter")
-    elif len(fm["description"]) > 300:
-        errors.append(f"'description' exceeds 300 chars ({len(fm['description'])})")
+    elif len(fm["description"]) > 1024:
+        errors.append(f"'description' exceeds 1024 chars ({len(fm['description'])})")
 
     return errors
 

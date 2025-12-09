@@ -1,6 +1,6 @@
 ---
 name: skill-development
-description: This skill should be used when the user asks to "create a skill", "build a new skill", "write skill instructions", "improve skill description", "organize skill content", or needs guidance on skill structure, progressive disclosure, or skill development best practices.
+description: Use when user asks to "create a skill", "build a new skill", "write skill instructions", "improve skill description", "organize skill content", or needs guidance on skill structure, progressive disclosure, or skill development best practices. (project)
 ---
 
 # Skill Development
@@ -74,9 +74,9 @@ description: [trigger description, max 1024 chars]
 ---
 ```
 
-**Description format** (third-person with triggers):
+**Description format** (direct with triggers):
 ```yaml
-description: This skill should be used when the user asks to "create X", "configure Y", "build Z", or needs guidance on [domain]. Provides [capability summary].
+description: Use when user asks to "create X", "configure Y", "build Z", or needs guidance on [domain]. Provides [capability summary].
 ```
 
 #### Body Writing Style
@@ -124,7 +124,7 @@ Step-by-step procedures for main use cases.
 - [ ] Referenced files exist
 
 **Description Quality**:
-- [ ] Third person ("This skill should be used when...")
+- [ ] Direct format ("Use when...")
 - [ ] Specific trigger phrases ("create X", "configure Y")
 - [ ] Not vague or generic
 
@@ -164,7 +164,7 @@ description: Provides guidance for working with hooks.
 
 **Good**:
 ```yaml
-description: This skill should be used when the user asks to "create a hook", "add a PreToolUse hook", "validate tool use". Provides hooks API guidance.
+description: Use when user asks to "create a hook", "add a PreToolUse hook", "validate tool use". Provides hooks API guidance.
 ```
 
 ### Too Much in SKILL.md

@@ -1,6 +1,6 @@
 ---
 description: Begin planning workflow for current feature branch
-args: [user-prompt]
+argument-hint: [user-prompt]
 ---
 
 # Planning Workflow

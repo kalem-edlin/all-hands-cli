@@ -1,6 +1,6 @@
 ---
 description: Review implementation against plan
-args: [branch-name]
+argument-hint: [branch-name]
 ---
 
 If the branch name is not provided, you MUST use AskUserQuestion to ask for the branch name.

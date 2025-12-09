@@ -61,7 +61,7 @@ Dynamic task redistribution from overloaded to underutilized agents.
 
 ## When to Research Deeper
 
-Use deep-research skill with these URLs when:
+Use research-tools skill with these URLs when:
 - Implementing specific patterns (need exact structures)
 - Adapting memory/reasoning systems
 - Building new agent types
