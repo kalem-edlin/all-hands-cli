@@ -107,11 +107,8 @@
     "allow": [
       "Write",
       "Edit",
-      "Bash(gh api:*)",
-      "Bash(gh pr create:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
       "Bash(cat:*)",
       "Bash(.claude/envoy/envoy tavily search:*)",
       "Bash(.claude/envoy/envoy tavily extract:*)",

@@ -59,7 +59,7 @@ Planner returns with status:
 - **plan_ready**: Use AskUserQuestion:
   - Question: "Plan ready. Approve to begin implementation?"
   - Options: ["Approve", "Needs changes"]
-  - On "Approve" → Read `.claude/plans/<branch>/plan.md`, begin implementation
+  - On "Approve" → Read `.claude/plans/<branch>/plan.md`, then run `/parallel-orchestration` to check for parallel work streams
   - On "Needs changes" → User provides feedback via Other, re-delegate to planner with feedback
 
 - **Planning declined** → Proceed with user's original request without planning

@@ -83,13 +83,14 @@ This is SYSTEM validation only (not user approval). Handle the `validation_resul
 ### 6. Activate and Return
 
 After validation passes:
-1. Run: `envoy plans set-status active`
-2. Run: `envoy plans clear-queries`
+1. Run: `.claude/envoy/envoy plans set-status active`
+2. Run: `.claude/envoy/envoy plans clear-queries`
 3. Return to main agent:
    ```
    Status: plan_ready
    AskUser: "Plan ready. Approve to begin implementation?"
    Options: ["Approve", "Needs changes"]
+   OnApprove: Run `/parallel-orchestration` (always - it determines parallelization feasibility)
    ```
 
 Main agent handles user prompt, re-delegates with feedback if needed.
