@@ -28,26 +28,38 @@ Types: feat, fix, chore, refactor, docs, test, style, perf, ci, build
 
 ## PR Creation
 
+### Pre-PR Checklist
+1. Check if README/docs need updates for this change
+2. Find reviewer: `gh pr list --author @me --limit 5`
+
+### PR Body Patterns
+- Inline source links: `[path/file.ext:line](path/file.ext#Lline)`
+- For refactors: include before/after code blocks
+- Self-assign: `gh pr create -a @me`
+
+### Template
 ```bash
-gh pr create --title "<title>" --body "$(cat <<'EOF'
+gh pr create -a @me --title "<title>" --body "$(cat <<'EOF'
 ## Summary
 <derived from plan specs>
 
 ## Changes
 <from git log main..<branch> --oneline>
+- [file.ext:42](file.ext#L42) - description of change
 
 ## Plan Reference
 `.claude/plans/<branch>/plan.md`
 
-## Test Plan
-<from plan testing requirements>
+## Test Plan (if applicable)
+<from plan testing requirements, omit for trivial changes>
 EOF
 )"
 ```
 
 ### Planner Auto-Derive
 1. Title: Plan name or branch description
-2. Body: Specs summary, commits, plan ref, test plan from plan file
+2. Body: Specs summary, commits with inline links, plan ref
+3. Test plan: include for significant changes, omit for trivial
 
 ### Main Agent Direct Mode
 - If plan exists: derive from plan

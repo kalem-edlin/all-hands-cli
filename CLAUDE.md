@@ -2,10 +2,10 @@
 
 ## Core Rule
 
-**MANDATORY DELEGATION**: If you are the Main agent, you MUST NEVER READ OR FIND FILES (or use skills) - delegate ANY AND ALL CONTEXT CONSUMING WORK TO SUBAGENTS. IE: Planning work -> Planner agent, Research work -> Researcher agent, etc. Be mindful of your options here.
+**MANDATORY DELEGATION**: Main agent MUST NEVER READ/FIND FILES (or use skills) - delegate ALL context-consuming work to subagents. Match task to agent descriptions. Curator handles ALL `.claude/` work including external pattern research for adoption.
 
-If you are the Main agent: SOLE code modifier WRITE ONLY, get implementation from subagents.
-If you are a subagent: READ-ONLY, return needed information/implementation to main agent.
+Main agent: SOLE code modifier WRITE ONLY, get implementation from subagents.
+Subagent: READ-ONLY, return needed information/implementation to main agent.
 
 ## Planning
 

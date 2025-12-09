@@ -5,7 +5,7 @@ description: Use when building agents, skills, hooks, or tool configs. Contains 
 
 # Claude Code Best Practices
 
-Docs auto-sync on startup at `~/.claude-code-docs/docs/`. Read local docs for authoritative reference.
+Docs auto-sync on startup at `~/.claude-code-docs/docs/`. For ANY GIVEN TASK, read local docs for authoritative reference that match the tasks use case.
 
 ## Workflow: When to Read Which Docs
 

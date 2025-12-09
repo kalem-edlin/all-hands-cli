@@ -5,7 +5,7 @@ description: Use when designing agent orchestration, memory systems, or multi-ag
 
 # Idol Repository Patterns
 
-Patterns from production agent orchestration systems. Use doc URLs below for deeper research when implementing specific features.
+Patterns from production agent orchestration systems. Use doc URLs below for deeper research when implementing specific features that should be inspired by these patterns.
 
 ## wshobson/agents
 

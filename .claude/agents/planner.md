@@ -114,7 +114,7 @@ When main agent delegates "checkpoint" task:
    Files: <which files need changes>
    ```
 
-4. **If review passes**: Execute git ops using git-ops skill:
+4. **If review passes**: Execute git ops using the **git-ops** skill:
    - Non-final (`--last-commit`): Commit
    - Final (no flag): Commit + PR
 
