@@ -34,7 +34,9 @@ Run: `.claude/envoy/envoy plans frontmatter`
 
 Check agent descriptions for relevant specialists (exclude researcher/planner).
 
-- **Specialists found**: Dispatch in parallel, query: "What repo context/patterns relevant to: {prompt}?"
+- **Specialists found**: Use `/parallel-discovery` to dispatch specialists + explorer simultaneously
+  - Query specialists: "What repo context/patterns relevant to: {prompt}?"
+  - Query explorer: "What code structure/implementation relevant to: {prompt}?"
 - **None found**: Use **AskUserQuestion**:
   - Question: "No specialist for this domain. How to proceed?"
   - Options: ["Create specialist", "Proceed without", "Cancel"]
