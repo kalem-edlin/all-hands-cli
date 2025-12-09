@@ -97,14 +97,14 @@ See `docs/agent-catalog.md` for agent design patterns and responsibility mapping
 
 When an agent has workflow skills, the agent profile should:
 - Define the prompt pattern that triggers the skill (e.g., "build a specialist")
-- Direct to load the skill and follow its process
+- Direct to "use" the skill (skills are automatically loaded into context)
 - NOT duplicate the workflow steps
 
 Example in agent file:
 ```markdown
 ## [Workflow Name]
 
-When main agent asks to [prompt pattern], load [skill-name] skill and follow its process.
+When main agent asks to [prompt pattern], use the [skill-name] skill.
 ```
 
 This keeps agent files lean and workflow logic centralized in skills.

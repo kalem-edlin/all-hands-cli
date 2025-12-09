@@ -104,7 +104,6 @@
     "allow": [
       "Bash(gh api:*)",
       "Bash(cat:*)",
-      "Bash(envoy:*)",
       "Bash(.claude/envoy/envoy tavily search:*)",
       "Bash(.claude/envoy/envoy tavily extract:*)",
       "Bash(.claude/envoy/envoy vertex ask:*)",
