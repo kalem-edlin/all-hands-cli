@@ -7,6 +7,9 @@ description: Use when user asks to "create an agent", "add a subagent", or needs
 
 Build specialist agents tailored to repository domains.
 
+For initial research this is a great researouce of specialist plugins (which ship agents with their commands and skills) (see their agent.md files):
+**https://github.com/wshobson/agents/tree/main/plugins**
+
 ## When Triggered
 
 Main agent calls curator with this skill when:

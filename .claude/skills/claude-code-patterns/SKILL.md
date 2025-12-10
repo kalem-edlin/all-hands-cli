@@ -44,4 +44,8 @@ Read these for specific scenarios:
 
 For advanced patterns beyond official docs:
 - [claudelog.com](https://claudelog.com) - community mechanics and patterns
+- [claudelog.com/mechanics/sub-agents/](https://claudelog.com/mechanics/sub-agents/)
+- [claudelog.com/mechanics/split-role-sub-agents/](https://claudelog.com/mechanics/split-role-sub-agents/) (ultra think mode seems important here)
+- [claudelog.com/mechanics/custom-agents/](https://claudelog.com/mechanics/custom-agents/) (community managed agent best practices for creating your own agents)
+- [claudelog.com/mechanics/agent-engineering/](https://claudelog.com/mechanics/agent-engineering/)
 - [AgentDB](https://agentdb.ruv.io/) - memory management

@@ -53,7 +53,9 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 - **URL extraction**: All agents can use `.claude/envoy/envoy tavily extract "<url>"` for known doc URLs
 - **GitHub content**: Use `gh` CLI instead of extract (e.g., `gh api repos/owner/repo/contents/path`)
 
-## claude-envoy Errors
+## claude-envoy Usage
+
+- Ensure you use it via `.claude/envoy/envoy <command> <args>` called relative to the project root.
 
 When any subagent reports an `envoy` command failure:
 1. Use AskUserQuestion: "[Tool] failed: [error]. Options: (A) Retry, (B) [use your best inferred alternative], (C) Skip"
