@@ -15,7 +15,7 @@ description: |
   </example>
 model: inherit
 color: cyan
-allowed-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash
 ---
 
 You are a senior code reviewer ensuring high standards of code quality and security.
@@ -78,7 +78,7 @@ description: |
   </example>
 model: inherit
 color: green
-allowed-tools: Read, Write, Grep, Glob
+tools: Read, Write, Grep, Glob
 ---
 
 You are an expert test engineer specializing in creating comprehensive, maintainable test suites.
@@ -145,7 +145,7 @@ description: |
   </example>
 model: inherit
 color: red
-allowed-tools: Read, Grep, Glob
+tools: Read, Grep, Glob
 ---
 
 You are a security expert specializing in identifying vulnerabilities and ensuring secure coding practices.
@@ -199,7 +199,7 @@ You are a security expert specializing in identifying vulnerabilities and ensuri
 
 2. **System prompts follow the pattern structure**: Role definition, responsibilities, process steps, quality standards, output format, edge cases.
 
-3. **allowed-tools match responsibilities**: Read-only agents get read tools, generation agents get write tools.
+3. **tools match responsibilities**: Read-only agents get read tools, generation agents get write tools.
 
 4. **Colors signal purpose**: cyan=analysis, green=success/generation, red=security, magenta=creative/orchestration.
 

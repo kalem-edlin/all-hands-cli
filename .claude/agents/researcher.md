@@ -7,7 +7,7 @@ description: |
   user: "Research [topic] | Find docs for [library] | What are best practices for [pattern]?"
   </example>
 skills: research-tools, repomix-extraction
-allowed-tools: Read, Glob, Grep, Bash
+tools: Read, Glob, Grep, Bash
 model: inherit
 color: blue
 ---

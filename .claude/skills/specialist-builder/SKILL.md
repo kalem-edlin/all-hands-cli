@@ -205,7 +205,7 @@ description: |
   </example>
 model: inherit
 color: blue
-allowed-tools: Read, Glob, Grep
+tools: Read, Glob, Grep
 skills: repomix-extraction, skill-name
 ---
 
@@ -277,7 +277,7 @@ description: |
 | red | Critical, security |
 | magenta | Creative, generation |
 
-### allowed-tools (optional)
+### tools (optional)
 
 | Tool Set | Use Case |
 |----------|----------|

@@ -6,7 +6,7 @@ description: |
   <example>
   user: "Run these tasks in parallel worker | Spawn worker for [isolated tasks] | Execute implementation in worktree"
   </example>
-allowed-tools: Read, Edit, Bash(.claude/envoy/envoy parallel:*)
+tools: Read, Edit, Bash(.claude/envoy/envoy parallel:*)
 model: inherit
 color: yellow
 ---

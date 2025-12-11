@@ -7,7 +7,7 @@ description: |
   user: "Analyze [directory] | Understand how [subsystem] works | What patterns are used in [path]?"
   </example>
 skills: repomix-extraction
-allowed-tools: Read, Glob, Grep, Bash
+tools: Read, Glob, Grep, Bash
 model: inherit
 color: green
 ---

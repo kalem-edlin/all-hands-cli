@@ -7,7 +7,7 @@ description: |
   user: "Extend claude-envoy for a new external use case | Create a skill for [X] | Update CLAUDE.md | How do I create a hook? | Add a specialist agent for [X]"
   </example>
 skills: claude-code-patterns, skill-development, specialist-builder, command-development, hook-development, research-tools, claude-envoy-curation, claude-envoy-usage, orchestration-idols, repomix-extraction
-allowed-tools: Read, Glob, Grep, Bash
+tools: Read, Glob, Grep, Bash
 model: inherit
 color: cyan
 ---
