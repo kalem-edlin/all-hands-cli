@@ -350,6 +350,15 @@ class PlansSetStatusCommand(BaseCommand):
         })
 
 
+def is_worker_subprocess() -> bool:
+    """Check if running inside a parallel worker subprocess."""
+    depth = os.environ.get("PARALLEL_WORKER_DEPTH", "0")
+    try:
+        return int(depth) > 0
+    except ValueError:
+        return False
+
+
 class PlansFrontmatterCommand(BaseCommand):
     """Get plan frontmatter as JSON."""
 
@@ -361,6 +370,19 @@ class PlansFrontmatterCommand(BaseCommand):
 
     def execute(self, **kwargs) -> dict:
         branch = get_branch()
+
+        # Worker subprocess mode - planning disabled, use injected plan
+        if is_worker_subprocess():
+            plan_file = get_plan_dir() / "plan.md"
+            return self.success({
+                "mode": "worker",
+                "exists": plan_file.exists(),
+                "path": str(plan_file) if plan_file.exists() else None,
+                "branch": branch,
+                "message": "/plan command disabled in worker subprocess. Use injected plan file.",
+                "planning_disabled": True,
+            })
+
         if is_direct_mode_branch(branch):
             return self.success({
                 "mode": "direct",

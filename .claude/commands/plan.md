@@ -34,7 +34,9 @@ Run: `.claude/envoy/envoy plans frontmatter`
 
 Check agent descriptions for relevant specialists (exclude researcher/planner/explorer).
 
-- **Specialists found**: Dispatch in parallel, query: "What repo context/patterns relevant to: {prompt}?"
+- **Specialists found**: Use `/parallel-discovery` to dispatch specialists + explorer simultaneously
+  - Query specialists: "What repo context/patterns relevant to: {prompt}?"
+  - Query explorer: "What code structure/implementation relevant to: {prompt}?"
 - **None found**: Dispatch **explorer** agent to analyze relevant directories:
   - Query: "Analyze codebase patterns relevant to: {prompt}"
   - Explorer uses repomix-extraction to gather context
@@ -55,7 +57,7 @@ Planner returns with status:
 - **plan_ready**: Use AskUserQuestion:
   - Question: "Plan ready. Approve to begin implementation?"
   - Options: ["Approve", "Needs changes"]
-  - On "Approve" → Read `.claude/plans/<branch>/plan.md`, begin implementation
+  - On "Approve" → Read `.claude/plans/<branch>/plan.md`, then run `/parallel-orchestration` to check for parallel work streams
   - On "Needs changes" → User provides feedback via Other, re-delegate to planner with feedback
 
 - **Planning declined** → Proceed with user's original request without planning

@@ -58,10 +58,25 @@ def get_plan_status() -> dict:
         return {"error": "invalid json"}
 
 
+def is_worker_subprocess() -> bool:
+    """Check if running inside a parallel worker subprocess."""
+    import os
+    depth = os.environ.get("PARALLEL_WORKER_DEPTH", "0")
+    try:
+        return int(depth) > 0
+    except ValueError:
+        return False
+
+
 def main():
     try:
         input_data = json.load(sys.stdin)
     except (json.JSONDecodeError, EOFError):
+        return
+
+    # Worker subprocess - return hint about injected plan file
+    if is_worker_subprocess():
+        print("Worker subprocess: /plan disabled. Use injected plan at .claude/plans/<branch>/plan.md")
         return
 
     # Early return for direct mode branches (skip envoy call)

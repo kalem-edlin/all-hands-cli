@@ -3,6 +3,17 @@
 # Initialize claude-envoy (creates venv if needed)
 "$CLAUDE_PROJECT_DIR/.claude/envoy/envoy" info > /dev/null 2>&1
 
+# Check if running in worker subprocess
+if [ -n "$PARALLEL_WORKER_DEPTH" ] && [ "$PARALLEL_WORKER_DEPTH" -gt 0 ]; then
+    branch=$(git branch --show-current 2>/dev/null)
+    plan_id=$(echo "$branch" | sed 's/[^a-zA-Z0-9_-]/-/g')
+    plan_file=".claude/plans/$plan_id/plan.md"
+    echo "Worker subprocess mode"
+    echo "Plan file: $plan_file"
+    echo "/plan command disabled - use injected plan"
+    exit 0
+fi
+
 # Sync claude-code-docs (clone if missing, pull if behind)
 DOCS_DIR="$HOME/.claude-code-docs"
 if [ ! -d "$DOCS_DIR" ]; then

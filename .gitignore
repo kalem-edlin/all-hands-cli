@@ -1,5 +1,6 @@
 .env
 .claude/envoy/.venv/
 .claude/plans/**/*
+.trees/
 node_modules/
 .DS_Store

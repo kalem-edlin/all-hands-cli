@@ -1,5 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "PARALLEL_MAX_WORKERS": "3"
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -102,8 +105,10 @@
   "enableAllProjectMcpServers": false,
   "permissions": {
     "allow": [
-      "Bash(gh:*)",
+      "Write",
+      "Edit",
       "Bash(git:*)",
+      "Bash(gh:*)",
       "Bash(cat:*)",
       "Read(~/.claude-code-docs/docs/*)",
       "Bash(.claude/envoy/envoy tavily search:*)",
@@ -120,7 +125,11 @@
       "Bash(.claude/envoy/envoy plans frontmatter:*)",
       "Bash(.claude/envoy/envoy plans clear-queries:*)",
       "Bash(.claude/envoy/envoy xai search:*)",
-      "Bash(.claude/envoy/envoy perplexity research:*)"
+      "Bash(.claude/envoy/envoy perplexity research:*)",
+      "Bash(.claude/envoy/envoy parallel spawn:*)",
+      "Bash(.claude/envoy/envoy parallel status:*)",
+      "Bash(.claude/envoy/envoy parallel results:*)",
+      "Bash(.claude/envoy/envoy parallel cleanup:*)"
     ],
     "deny": [],
     "ask": []

@@ -53,6 +53,14 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 - **URL extraction**: All agents can use `.claude/envoy/envoy tavily extract "<url>"` for known doc URLs
 - **GitHub content**: Use `gh` CLI instead of extract (e.g., `gh api repos/owner/repo/contents/path`)
 
+## Parallel Execution
+
+**Discovery (read-only, in-session):**
+`/parallel-discovery <task>` - runs multiple subagents simultaneously
+
+**Implementation (write-capable, cross-session):**
+@.claude/docs/parallel-orchestration.md
+
 ## claude-envoy Usage
 
 - Ensure you use it via `.claude/envoy/envoy <command> <args>` called relative to the project root.
