@@ -6,6 +6,7 @@
     ".claude/commands/**",
     ".claude/hooks/**",
     ".claude/envoy/**",
+    ".claude/output-styles/**",
     ".claude/settings.json",
     ".claude/docs/**",
     ".husky/**",
@@ -15,11 +16,13 @@
     "**/.venv/**",
     "**/__pycache__/**",
     "**/*.pyc",
-    "**/.git/**"
+    "**/.git/**",
+    ".claude/settings.local.json"
   ],
   "internal": [
     "scripts/allhands/**",
     "scripts/allhands.sh",
+    "scripts/hooks/**",
     ".allhands-manifest.json",
     ".github/**",
     "README.md",

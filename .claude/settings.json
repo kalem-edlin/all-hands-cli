@@ -1,7 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-    "PARALLEL_MAX_WORKERS": "3"
+    "PARALLEL_MAX_WORKERS": "3",
+    "PROJECT_NAME": "test-target"
   },
   "hooks": {
     "SessionStart": [
@@ -101,7 +102,9 @@
       }
     ]
   },
-  "companyAnnouncements": ["Kalem's AI Agent Framework Rules!"],
+  "companyAnnouncements": [
+    "Kalem's AI Agent Framework Rules!"
+  ],
   "enableAllProjectMcpServers": false,
   "permissions": {
     "allow": [
@@ -130,7 +133,8 @@
       "Bash(.claude/envoy/envoy parallel spawn:*)",
       "Bash(.claude/envoy/envoy parallel status:*)",
       "Bash(.claude/envoy/envoy parallel results:*)",
-      "Bash(.claude/envoy/envoy parallel cleanup:*)"
+      "Bash(.claude/envoy/envoy parallel cleanup:*)",
+      "Bash(docker:*)"
     ],
     "deny": [],
     "ask": []

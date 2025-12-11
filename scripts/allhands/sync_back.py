@@ -9,6 +9,8 @@ from typing import List, Tuple
 from .manifest import Manifest, is_ignored, load_ignore_patterns
 
 
+# Protected branches trigger auto sync-back via post-merge hook
+# All branches can use manual sync-back
 PROTECTED_BRANCHES = {"main", "master", "develop", "staging", "production"}
 
 
@@ -238,6 +240,10 @@ def create_or_update_pr(
 def cmd_sync_back(auto: bool = False, auto_yes: bool = False) -> int:
     """Sync changes back to allhands as PR.
 
+    Any branch can sync back - each creates its own PR: [repo]/[branch]
+    Auto mode (hook) triggers on protected branch merges.
+    Manual mode works on any branch.
+
     Args:
         auto: Non-interactive mode (for hooks) - skip conflicts, don't prompt
         auto_yes: Skip confirmation prompts but still show summary
@@ -251,9 +257,18 @@ def cmd_sync_back(auto: bool = False, auto_yes: bool = False) -> int:
 
     current_branch = get_current_branch(target_root)
 
-    # In auto mode, only run on protected branches
+    # Validate branch name
+    if not current_branch:
+        if auto:
+            return 0  # Silent exit - no branch (detached HEAD or new repo)
+        print("Error: Could not determine current branch", file=sys.stderr)
+        print("Ensure you have at least one commit and are on a branch", file=sys.stderr)
+        return 1
+
+    # In auto mode (hook), only run on protected branches
+    # Manual mode (no --auto flag) works on ANY branch
     if auto and current_branch not in PROTECTED_BRANCHES:
-        # Silent exit - not on a protected branch
+        # Silent exit - hook only triggers on protected branches
         return 0
 
     allhands_root_env = os.environ.get("ALLHANDS_PATH")
@@ -294,12 +309,30 @@ def cmd_sync_back(auto: bool = False, auto_yes: bool = False) -> int:
         print("No changes to sync back")
         return 0
 
-    print(f"\nFound {len(files_to_sync)} files with changes:")
+    repo_name = get_repo_name(target_root)
+    pr_branch = f"{repo_name}/{current_branch}"
+
+    print(f"\n{'='*60}")
+    print(f"SYNC-BACK TO CLAUDE-ALL-HANDS")
+    print(f"{'='*60}")
+    print(f"PR Branch: {pr_branch}")
+    print(f"Files to include ({len(files_to_sync)}):")
+    print()
     for f in files_to_sync:
-        print(f"  - {f}")
+        print(f"  → {f}")
+    print()
+    print(f"{'─'*60}")
+    print("To EXCLUDE files from sync-back, add patterns to .allhandsignore")
+    print("Example: .claude/agents/my-project-agent.md")
+    print()
+    print("Target-specific vs All-Hands:")
+    print("  • Target-specific: project agents, local configs → add to .allhandsignore")
+    print("  • All-Hands: framework improvements, bug fixes → include in sync")
+    print(f"{'─'*60}")
 
     if auto:
         # Auto mode: attempt sync, skip on any error
+        print("\n[AUTO MODE] Proceeding with sync...")
         try:
             create_or_update_pr(
                 allhands_root, target_root, files_to_sync, current_branch, auto=True

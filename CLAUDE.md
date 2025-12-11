@@ -68,3 +68,10 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 When any subagent reports an `envoy` command failure:
 1. Use AskUserQuestion: "[Tool] failed: [error]. Options: (A) Retry, (B) [use your best inferred alternative], (C) Skip"
 2. In auto-accept mode: Infer best alternative and proceed
+
+## Project-Specific Rules (TEST TARGET REPO)
+
+This section is specific to this test target repository.
+
+- Use PostgreSQL for database
+- API endpoints at /api/v2/

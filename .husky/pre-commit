@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Manifest coverage check (SOURCE repo only)
+# Only runs if .allhands-manifest.json exists at root
+if [ -f ".allhands-manifest.json" ]; then
+    python3 scripts/hooks/manifest-check.py 2>&1 || true
+fi
+
+# Sync-back warning (TARGET repos only)
+# Warns about changes that will sync to claude-all-hands on merge
+if [ -f ".allhandsignore" ]; then
+    . "$(dirname "$0")/claude/sync-warning.sh"
+fi

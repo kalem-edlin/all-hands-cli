@@ -105,14 +105,34 @@ def cmd_init(target: Path, auto_yes: bool = False) -> int:
     # Create .allhandsignore template
     ignore_file = target / ".allhandsignore"
     if not ignore_file.exists():
-        ignore_content = """# AllHands Ignore - files excluded from sync-back
-# Uses gitignore-style patterns
+        ignore_content = """# AllHands Ignore - Exclude files from sync-back to claude-all-hands
+# Uses gitignore-style patterns (globs supported)
+#
+# ┌─────────────────────────────────────────────────────────────────┐
+# │ TARGET-SPECIFIC (add here - stays in THIS repo only):          │
+# │   • Project-specific agents, skills, commands                   │
+# │   • Local configurations and settings                           │
+# │   • Domain-specific hooks                                       │
+# │   • Any file that only makes sense for THIS project             │
+# ├─────────────────────────────────────────────────────────────────┤
+# │ SYNC BACK (do NOT add here - benefits ALL repos):              │
+# │   • Bug fixes to existing framework files                       │
+# │   • New reusable patterns/skills discovered during development  │
+# │   • Documentation improvements                                  │
+# │   • Hook/envoy enhancements                                     │
+# └─────────────────────────────────────────────────────────────────┘
 
-# Example: project-specific agents
-# .claude/agents/my-project-agent.md
+# Project-specific agents
+# .claude/agents/my-project-specialist.md
 
-# Example: local settings
-# .claude/settings.local.json
+# Project-specific skills
+# .claude/skills/my-domain-skill/**
+
+# Local settings (never sync)
+.claude/settings.local.json
+
+# Project-specific commands
+# .claude/commands/my-project-command.md
 """
         ignore_file.write_text(ignore_content)
         print("Created .allhandsignore template")
