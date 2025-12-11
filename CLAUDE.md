@@ -50,7 +50,7 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 ## Research Policy
 
 - **Web search**: Only curator/researcher agents (others blocked by hook)
-- **URL extraction**: All agents can use `.claude/envoy/envoy tavily extract "<url>"` for known doc URLs
+- **URL extraction**: All agents can use `envoy tavily extract "<url>"` for known doc URLs
 - **GitHub content**: Use `gh` CLI instead of extract (e.g., `gh api repos/owner/repo/contents/path`)
 
 ## Parallel Execution
@@ -66,7 +66,7 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 
 ## claude-envoy Usage
 
-- Ensure you use it via `.claude/envoy/envoy <command> <args>` called relative to the project root.
+Use `envoy <command> <args>` - it's available in PATH via ~/bin symlink.
 
 When any subagent reports an `envoy` command failure:
 1. Use AskUserQuestion: "[Tool] failed: [error]. Options: (A) Retry, (B) [use your best inferred alternative], (C) Skip"

@@ -13,18 +13,18 @@ claude-envoy is self-documenting. Always discover available commands dynamically
 
 ```bash
 # List all commands and API status
-.claude/envoy/envoy info
+envoy info
 
 # Get help for a command group
-.claude/envoy/envoy <group> --help
+envoy <group> --help
 
 # Get help for specific command
-.claude/envoy/envoy <group> <command> --help
+envoy <group> <command> --help
 ```
 
 ## Integration
 
-1. Run `.claude/envoy/envoy info` to see available command groups
+1. Run `envoy info` to see available command groups
 2. Run `--help` on relevant commands to learn arguments
 3. Include specific invocations in skill workflow sections
 4. Parse JSON response - all commands return `{"status": "success|error", "data": {...}}`

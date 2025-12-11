@@ -9,7 +9,7 @@ Analyze plan for parallelization opportunities.
 
 ## Step 1: Check Plan Status
 
-Run: `.claude/envoy/envoy plans frontmatter`
+Run: `envoy plans frontmatter`
 
 - **{exists: false}** or **status != active** → Go to Step 4 (Fallback)
 - **active** → Continue to Step 2

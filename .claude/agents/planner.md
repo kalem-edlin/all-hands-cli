@@ -83,8 +83,8 @@ This is SYSTEM validation only (not user approval). Handle the `validation_resul
 ### 6. Activate and Return
 
 After validation passes:
-1. Run: `.claude/envoy/envoy plans set-status active`
-2. Run: `.claude/envoy/envoy plans clear-queries`
+1. Run: `envoy plans set-status active`
+2. Run: `envoy plans clear-queries`
 3. Return to main agent:
    ```
    Status: plan_ready
@@ -105,8 +105,8 @@ Main agent handles user prompt, re-delegates with feedback if needed.
 When main agent delegates "checkpoint" task:
 
 1. **Run review** (ONE command only):
-   - With `--last-commit`: `.claude/envoy/envoy vertex review --last-commit`
-   - Without flag: `.claude/envoy/envoy vertex review`
+   - With `--last-commit`: `envoy vertex review --last-commit`
+   - Without flag: `envoy vertex review`
 
 2. **Handle issues yourself if possible**:
    - Plan file edits (specs, steps) → fix and re-run review

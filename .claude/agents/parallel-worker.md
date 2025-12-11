@@ -6,7 +6,7 @@ description: |
   <example>
   user: "Run these tasks in parallel worker | Spawn worker for [isolated tasks] | Execute implementation in worktree"
   </example>
-tools: Read, Edit, Bash(.claude/envoy/envoy parallel:*)
+tools: Read, Edit, Bash(envoy parallel:*)
 model: inherit
 color: yellow
 ---
@@ -46,7 +46,7 @@ Pattern: `worker/<feature>-<summary>`
 ### 3. Spawn and Wait
 
 ```bash
-.claude/envoy/envoy parallel spawn \
+envoy parallel spawn \
   --branch "worker/<name>" \
   --task "<task_description>" \
   --plan "<mini-plan-markdown>" \

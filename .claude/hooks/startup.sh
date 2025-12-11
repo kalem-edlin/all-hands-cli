@@ -3,6 +3,12 @@
 # Initialize claude-envoy (creates venv if needed)
 "$CLAUDE_PROJECT_DIR/.claude/envoy/envoy" info > /dev/null 2>&1
 
+# Create ~/bin/envoy symlink if missing (enables `envoy` command globally)
+mkdir -p "$HOME/bin"
+if [ ! -L "$HOME/bin/envoy" ] || [ "$(readlink "$HOME/bin/envoy")" != "$CLAUDE_PROJECT_DIR/.claude/envoy/envoy" ]; then
+    ln -sf "$CLAUDE_PROJECT_DIR/.claude/envoy/envoy" "$HOME/bin/envoy"
+fi
+
 # Check if running in worker subprocess
 if [ -n "$PARALLEL_WORKER_DEPTH" ] && [ "$PARALLEL_WORKER_DEPTH" -gt 0 ]; then
     branch=$(git branch --show-current 2>/dev/null)

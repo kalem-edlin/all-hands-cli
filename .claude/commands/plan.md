@@ -7,7 +7,7 @@ argument-hint: [user-prompt]
 
 ## Step 1: Status Check
 
-Run: `.claude/envoy/envoy plans frontmatter`
+Run: `envoy plans frontmatter`
 
 
 - **{exists: false}**: Use AskUserQuestion:

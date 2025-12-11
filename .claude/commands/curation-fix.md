@@ -37,7 +37,7 @@ Gather context for the worker:
 ### Step 3: Spawn Worker
 
 ```bash
-.claude/envoy/envoy parallel spawn \
+envoy parallel spawn \
   --branch "curation/$(echo '$ARGUMENTS' | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-30)" \
   --from main \
   --task "CURATOR TASK: $ARGUMENTS

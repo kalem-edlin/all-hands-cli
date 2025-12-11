@@ -5,9 +5,9 @@ CLI for agent-scoped external tool access. Keeps file contents OUT of Claude's c
 ## Usage
 
 ```bash
-.claude/envoy/envoy <group> <command> [args]
-.claude/envoy/envoy --help
-.claude/envoy/envoy <group> --help
+envoy <group> <command> [args]
+envoy --help
+envoy <group> --help
 ```
 
 ## Tools
@@ -69,8 +69,8 @@ These tools read files directly and pass to external LLMs. Claude only receives 
 
 ```bash
 # List all commands and API status
-.claude/envoy/envoy info
+envoy info
 
 # Get help for any command
-.claude/envoy/envoy vertex ask --help
+envoy vertex ask --help
 ```
