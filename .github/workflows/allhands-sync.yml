@@ -1,6 +1,7 @@
 name: AllHands Sync
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -84,11 +85,7 @@ jobs:
           SYNC_PR_URL="${{ steps.sync.outputs.pr_url }}"
 
           if [ -n "$SYNC_PR_URL" ]; then
-            COMMENT="🔄 **AllHands Sync**: Changes synced to upstream!
-
-PR created/updated: $SYNC_PR_URL"
+            gh pr comment "$PR_NUMBER" --body "🔄 **AllHands Sync**: Changes synced to upstream! PR: $SYNC_PR_URL"
           else
-            COMMENT="🔄 **AllHands Sync**: Sync completed (PR may already exist)"
+            gh pr comment "$PR_NUMBER" --body "🔄 **AllHands Sync**: Sync completed (PR may already exist)"
           fi
-
-          gh pr comment "$PR_NUMBER" --body "$COMMENT"
