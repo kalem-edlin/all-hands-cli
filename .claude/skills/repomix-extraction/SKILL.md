@@ -17,32 +17,29 @@ Pack directory contents into AI-friendly format for comprehensive pattern analys
 ## Quick Reference
 
 ```bash
-# Pack directory (outputs repomix-output.xml)
-npx repomix@latest path/to/directory
+# Pack directory to stdout (NO FILES CREATED)
+npx repomix@latest --stdout path/to/directory
 
 # Include specific patterns
-npx repomix@latest --include "**/*.ts,**/*.md" path/to/directory
+npx repomix@latest --stdout --include "**/*.ts,**/*.md" path/to/directory
 
 # Exclude noise
-npx repomix@latest --ignore "**/*.log,node_modules/" path/to/directory
+npx repomix@latest --stdout --ignore "**/*.log,node_modules/" path/to/directory
 
 # Compress for large directories (tree-sitter extraction)
-npx repomix@latest --compress path/to/directory
-
-# Output to stdout (for piping)
-npx repomix@latest --stdout path/to/directory
+npx repomix@latest --stdout --compress path/to/directory
 ```
 
 ## Extraction Process
 
-### 1. Pack Directory
+### 1. Pack Directory to Stdout
 ```bash
-npx repomix@latest path/to/directory
+npx repomix@latest --stdout path/to/directory
 ```
-Output: `repomix-output.xml` in current directory
+Output streams directly - NO FILE CREATED.
 
-### 2. Read Output
-Read the XML file to analyze:
+### 2. Analyze Output
+From the stdout output, identify:
 - File structure conventions
 - Directory organization patterns
 - Naming conventions (files, functions, variables)
@@ -61,11 +58,10 @@ Extract actionable patterns:
 
 | Flag | Use |
 |------|-----|
+| `--stdout` | REQUIRED - Output to stdout, no file |
 | `--include "glob"` | Include specific file patterns |
 | `--ignore "glob"` | Exclude patterns |
 | `--compress` | Tree-sitter extraction (large dirs) |
-| `--stdout` | Output to stdout instead of file |
-| `--remote URL` | Pack remote repo (GitHub shorthand) |
 
 ## Output Format
 
@@ -87,3 +83,7 @@ Return extracted patterns as:
 ### Recommendations
 [Actionable guidance based on patterns]
 ```
+
+## IMPORTANT: No File Output
+
+NEVER use repomix without `--stdout`. Default behavior creates files in project root that pollute the repository. Always stream to stdout.

@@ -30,6 +30,30 @@ Run: `.claude/envoy/envoy plans frontmatter`
     - Options: ["Add to plan", "New branch for this work", "Proceed without planning"]
     - Handle each appropriately
 
+## Step 1.5: Intake Gate (New Plans Only)
+
+**Trigger**: When creating a new plan AND user prompt lacks specifics.
+
+**Skip if**: Continuing draft (context exists) or prompt already detailed.
+
+**Structured questioning** via AskUserQuestion:
+
+1. **Scope**: "What specifically needs to be built/changed?"
+   - Options based on inferred type: [Feature, Bug fix, Refactor, Research, Other]
+
+2. **Constraints**: "Any constraints or requirements?"
+   - Options: [Performance critical, Must maintain backwards compat, Specific tech stack, None/flexible]
+
+3. **Dependencies**: "Dependencies or blockers?"
+   - Options: [Depends on external API, Needs design review, Blocked by other work, None]
+
+4. **Success criteria**: "How will we know it's done?"
+   - Options: [Tests pass, User can X, Performance target, Manual verification]
+
+**Package intake answers** with original prompt for planner delegation.
+
+---
+
 ## Step 2: Gather Specialist Context
 
 Check agent descriptions for relevant specialists (exclude researcher/planner/explorer).
@@ -47,6 +71,7 @@ Check agent descriptions for relevant specialists (exclude researcher/planner/ex
 Send to planner agent:
 - Directive: "create new plan" | "continue draft" | "add to plan"
 - User's original prompt
+- **Intake answers** (scope, constraints, dependencies, success criteria) if gathered
 - Current branch name
 - Specialist findings
 

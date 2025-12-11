@@ -43,6 +43,16 @@ Use AskUserQuestion before:
 - Creating/modifying agents, skills, hooks → delegate to curator for implementation
 - External API calls, architectural decisions
 
+## Workflow Issues (Heal Pattern)
+
+When user spots issues with .claude/ artifacts or workflow:
+1. **Delegate to curator** with the complaint
+2. Curator investigates → proposes fix with before/after diff
+3. Get user approval before applying
+4. Curator applies fix and commits
+
+Never attempt to fix workflow issues directly - curator handles all .claude/ maintenance.
+
 ## CLAUDE.md Maintenance
 
 This file MUST only be edited via curator agent consultation. Changes require curator approval.
@@ -52,6 +62,14 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 - **Web search**: Only curator/researcher agents (others blocked by hook)
 - **URL extraction**: All agents can use `.claude/envoy/envoy tavily extract "<url>"` for known doc URLs
 - **GitHub content**: Use `gh` CLI instead of extract (e.g., `gh api repos/owner/repo/contents/path`)
+
+## Context Budget (50% Rule)
+
+Claude quality degrades at ~50% context usage. Mitigations:
+- **Plans**: 2-3 tasks max per implementation step
+- **Context gathering**: Delegate to subagents (keeps main agent lean)
+- **Large files**: Use repomix `--compress` or targeted reads
+- **Session handoff**: Use `/whats-next` before context exhaustion
 
 ## Parallel Execution
 

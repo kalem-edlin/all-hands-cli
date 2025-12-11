@@ -40,7 +40,13 @@ Use research-tools skill for:
 - Best practices for unfamiliar patterns
 - Documentation for external dependencies
 
-### 4. Write Plan
+### 4. Write Plan (Context-Aware)
+
+**50% Context Rule**: Claude quality degrades at ~50% context. Apply aggressive atomicity:
+- **2-3 tasks max** per implementation step
+- Break complex steps into smaller checkpointed phases
+- Each step should be independently executable
+
 Write to the plan file (ONLY file you can write to):
 
 ```markdown
@@ -100,6 +106,18 @@ Main agent handles user prompt, re-delegates with feedback if needed.
 - Complete validation loop before returning
 - If validation fails, fix issues and re-validate
 
+# Deviation Rules (During Implementation)
+
+When discoveries occur that weren't in the plan:
+
+1. **Auto-fix bugs** → Fix immediately, document in PR description
+2. **Auto-add missing critical** → Security/correctness gaps, fix immediately
+3. **Auto-fix blockers** → Can't proceed without, fix immediately
+4. **ASK about architectural** → Major structural changes, return to main agent for user decision
+5. **Log enhancements** → Nice-to-haves go to root `ISSUES.md`, continue with plan
+
+Rules 1-3 and 5 are autonomous. Only rule 4 requires human checkpoint.
+
 # Plan Checkpoint Workflow
 
 When main agent delegates "checkpoint" task:
@@ -108,9 +126,12 @@ When main agent delegates "checkpoint" task:
    - With `--last-commit`: `.claude/envoy/envoy vertex review --last-commit`
    - Without flag: `.claude/envoy/envoy vertex review`
 
-2. **Handle issues yourself if possible**:
+2. **Handle issues yourself if possible** (apply Deviation Rules):
    - Plan file edits (specs, steps) → fix and re-run review
    - Documentation clarity → fix and re-run review
+   - Bugs/blockers/critical gaps → auto-fix per deviation rules 1-3
+   - Architectural changes → return to main agent (rule 4)
+   - Enhancements → log to ISSUES.md (rule 5)
    - Loop until review passes OR issue requires code changes
 
 3. **If issue requires code changes**: Return to main agent with:
