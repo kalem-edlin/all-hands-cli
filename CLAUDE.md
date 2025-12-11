@@ -63,8 +63,20 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 
 ## claude-envoy Usage
 
-- Ensure you use it via `.claude/envoy/envoy <command> <args>` called relative to the project root.
+- Ensure you use it via `.claude/envoy/envoy <command> <args>` (NEVER use it via `/Users/[path_to_project]/.claude/envoy/envoy <command> <args>`).
 
 When any subagent reports an `envoy` command failure:
 1. Use AskUserQuestion: "[Tool] failed: [error]. Options: (A) Retry, (B) [use your best inferred alternative], (C) Skip"
 2. In auto-accept mode: Infer best alternative and proceed
+
+## Project-Specific Rules (TEST TARGET REPO)
+
+This section is specific to this test target repository.
+
+- Use PostgreSQL for database
+- API endpoints at /api/v2/
+
+## Sync-Back Test
+
+This section was added in a target repo to test sync-back flow.
+Framework improvements discovered during development should sync back.
