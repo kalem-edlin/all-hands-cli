@@ -113,7 +113,7 @@ Step-by-step procedures for main use cases.
 - **`examples/working-example.sh`** - Annotated example
 ```
 
-**Keep body lean**: Only move to references/ when content exceeds ~2,000 words or requires separate file format.
+**Keep body lean**: Only move to references/ when content exceeds ~700 words or requires separate file format.
 
 ### Step 5: Validate
 
