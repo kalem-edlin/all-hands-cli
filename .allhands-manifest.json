@@ -17,6 +17,7 @@
     "**/__pycache__/**",
     "**/*.pyc",
     "**/.git/**",
+    "**/.DS_Store",
     ".claude/settings.local.json",
     ".claude/plans/**",
     "pnpm-lock.yaml"
