@@ -19,7 +19,8 @@
     "**/*.pyc",
     "**/.git/**",
     ".claude/settings.local.json",
-    ".claude/plans/**"
+    ".claude/plans/**",
+    "pnpm-lock.yaml"
   ],
   "internal": [
     "scripts/allhands/**",
