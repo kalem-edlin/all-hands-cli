@@ -24,7 +24,6 @@ ALLHANDS_PATH=/path/to/source ./scripts/allhands.sh update
 ├── commands/     # /plan, /parallel-discovery, /plan-checkpoint
 ├── hooks/        # SessionStart, PreToolUse, PostToolUse automation
 ├── envoy/        # External tools (tavily, perplexity, vertex, parallel)
-├── docs/         # Architecture, allhands, parallel-orchestration
 └── plans/        # Per-branch planning artifacts
 ```
 
@@ -85,7 +84,7 @@ Bidirectional sync for distributing framework across repos.
 | `allhands update` | Pull latest from source |
 | `allhands sync-back` | Sync improvements back as PR |
 
-See `.claude/docs/allhands.md` for details.
+See `docs/allhands.md` for details.
 
 ## Configuration
 

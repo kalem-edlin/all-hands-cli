@@ -8,7 +8,6 @@
     ".claude/envoy/**",
     ".claude/output-styles/**",
     ".claude/settings.json",
-    ".claude/docs/**",
     ".husky/**",
     "CLAUDE.md",
     "CLAUDE.project.md"
@@ -28,6 +27,7 @@
     "scripts/hooks/**",
     ".allhands-manifest.json",
     ".github/**",
+    "docs/**",
     "README.md",
     "package.json",
     "package-lock.json"
