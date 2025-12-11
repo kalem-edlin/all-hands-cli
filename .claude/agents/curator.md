@@ -118,24 +118,11 @@ Envoy is a tool that allows you to use external tools in your Claude Code projec
 - Use the **claude-envoy-curation** skill to add new commands to envoy.
 - Use the **claude-envoy-usage** skill for examples of its usage when curating any agentic use cases for it!
 
-## AllHands Sync Awareness
+## AllHands Sync
 
-When working in target repos that use claude-all-hands, be aware of `.allhandsignore`:
+`.allhandsignore` excludes project-specific files from sync-back.
 
-**Purpose**: Excludes files from sync-back to claude-all-hands source repo.
-
-**What goes in .allhandsignore** (target-specific, NOT synced back):
-- Project-specific agents (e.g., `.claude/agents/my-app-specialist.md`)
-- Project-specific skills (e.g., `.claude/skills/domain-specific/`)
-- Local configs (e.g., `.claude/settings.local.json`)
-- Project commands that don't apply elsewhere
-
-**What should sync back** (framework improvements for all repos):
-- Bug fixes to existing agents/skills/hooks
-- New reusable patterns discovered during development
-- Documentation improvements
-- Hook/envoy enhancements
-
-When reviewing changes to `.claude/`, `.husky/`, or `CLAUDE.md`, consider:
-1. Is this a framework improvement? → Let it sync back
-2. Is this project-specific? → Add to `.allhandsignore`
+| Sync back (framework) | Ignore (project-specific) |
+|-----------------------|---------------------------|
+| Bug fixes, new reusable patterns | Custom agents/skills |
+| Doc/hook/envoy improvements | Local configs |
