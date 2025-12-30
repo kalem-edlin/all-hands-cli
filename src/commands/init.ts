@@ -1,10 +1,10 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, renameSync } from 'fs';
-import { join, dirname, resolve } from 'path';
 import { spawnSync } from 'child_process';
-import { Manifest } from '../lib/manifest.js';
-import { isGitRepo, git, ghCli } from '../lib/git.js';
-import { getAllhandsRoot } from '../lib/paths.js';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { dirname, join, resolve } from 'path';
 import * as readline from 'readline';
+import { git, isGitRepo } from '../lib/git.js';
+import { Manifest } from '../lib/manifest.js';
+import { getAllhandsRoot } from '../lib/paths.js';
 
 const MIGRATION_MAP: Record<string, string> = {
   'CLAUDE.md': 'CLAUDE.project.md',
@@ -20,6 +20,51 @@ const HUSKY_HOOKS = [
   'post-checkout',
   'post-rewrite',
 ];
+
+function syncGitignore(allhandsRoot: string, target: string): { added: string[]; unchanged: boolean } {
+  const sourceGitignore = join(allhandsRoot, '.gitignore');
+  const targetGitignore = join(target, '.gitignore');
+
+  if (!existsSync(sourceGitignore)) {
+    return { added: [], unchanged: true };
+  }
+
+  const sourceContent = readFileSync(sourceGitignore, 'utf-8');
+  const sourceLines = sourceContent
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+
+  let targetLines: string[] = [];
+  let targetContent = '';
+
+  if (existsSync(targetGitignore)) {
+    targetContent = readFileSync(targetGitignore, 'utf-8');
+    targetLines = targetContent
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+  }
+
+  const targetSet = new Set(targetLines);
+  const linesToAdd = sourceLines.filter((line) => !targetSet.has(line));
+
+  if (linesToAdd.length === 0) {
+    return { added: [], unchanged: true };
+  }
+
+  // Add missing lines with a header comment
+  const additions = [
+    '',
+    '# AllHands framework ignores',
+    ...linesToAdd,
+  ].join('\n');
+
+  const newContent = targetContent.trimEnd() + additions + '\n';
+  writeFileSync(targetGitignore, newContent);
+
+  return { added: linesToAdd, unchanged: false };
+}
 
 async function confirm(message: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -181,7 +226,19 @@ export async function cmdInit(target: string, autoYes: boolean = false): Promise
     copied++;
   }
 
-  // Step 4: Create .allhandsignore template
+  // Step 4: Sync .gitignore entries
+  console.log('\nSyncing .gitignore entries...');
+  const gitignoreResult = syncGitignore(allhandsRoot, resolvedTarget);
+  if (gitignoreResult.unchanged) {
+    console.log('  .gitignore already contains all required entries');
+  } else {
+    console.log(`  Added ${gitignoreResult.added.length} entries to .gitignore:`);
+    for (const entry of gitignoreResult.added) {
+      console.log(`    + ${entry}`);
+    }
+  }
+
+  // Step 5: Create .allhandsignore template
   const ignoreFile = join(resolvedTarget, '.allhandsignore');
   if (!existsSync(ignoreFile)) {
     const ignoreContent = `# AllHands Ignore - Exclude files from sync-back to claude-all-hands
@@ -219,7 +276,7 @@ CLAUDE.project.md
     console.log('Created .allhandsignore template');
   }
 
-  // Step 5: Setup husky
+  // Step 6: Setup husky
   console.log('\nSetting up husky...');
   const result = spawnSync('npx', ['husky', 'install'], {
     cwd: resolvedTarget,
@@ -234,7 +291,7 @@ CLAUDE.project.md
     }
   }
 
-  // Step 6: Offer auto-sync setup (if GitHub repo)
+  // Step 7: Offer auto-sync setup (if GitHub repo)
   if (!autoYes) {
     const remoteResult = git(['remote', 'get-url', 'origin'], resolvedTarget);
     const hasGitHubRemote = remoteResult.success && remoteResult.stdout.includes('github.com');

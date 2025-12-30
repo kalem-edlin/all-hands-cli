@@ -1,0 +1,1779 @@
+## **Key Principles:**
+* Workflows live and die on success_criteria and must be heavily documented for ALL AI Orchestration rule FILES (skills, protocols, commands, agent declarations etc)
+* Capabilities over roles: instead of a long list of named specialists, define capabilities (e.g., frontend_ui, backend_api, data_model, observability, infra) and have the main agent route based on capabilities. You can still keep human‑friendly names, but the routing logic uses capabilities.
+    * Main agent routing: (1) Extract required capabilities from task, (2) Score specialists by (matching_capabilities / total_required) * (1 / domain_file_breadth), (3) Select highest-scoring or fallback to surveyor/worker
+* Agent Workflow Architecture:
+    | Agent Type | Mode |
+    |------------|------|
+    | planner, documentor | Non-protocol (workflows ARE primary) |
+    | All others | Protocol-compatible (internal = fallback) |
+    * Protocol-compatible rules: core capabilities OUTSIDE workflows; internal workflows prefixed "fallback only", REFERENCE capabilities
+    * **Ad-hoc fallback execution**: Protocol-compatible agents' fallback workflows do NOT use envoy plan commands - they execute direct ad-hoc tasks from main agent and return results directly (no discovery/implementation protocol integration)
+
+Required .claude/settings.json ENV Variables:
+BASH_MAX_TIMEOUT_MS = 3600000 // we will need to prompt larger timeouts for tool calls for BLOCK envoy commands
+N_PARALLEL_WORKERS = 1 // the value used as the default (when not overriden using param) in `envoy plan next` command
+SEARCH_SIMILARITY_THRESHOLD
+SEARCH_CONTEXT_TOKEN_LIMIT
+SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD
+BASE_BRANCH = "main"
+
+## **Plan directory:**
+```
+.claude/plans/ (everything below this is NOT tracked by git)
+	[branch-name]/
+		plan.md                    # YAML front matter + freetext
+		user_input.md              # freetext only (append-only log)
+		curator.md                 # freetext only (append-only notes)
+		prompts/
+			N.md                   # YAML front matter + freetext
+			N{_V}.md               # YAML front matter + freetext (variants)
+		findings/
+			[specialist].yaml      # fully YAML
+		design/
+			manifest.yaml          # fully YAML
+			[any_unique_name].png
+		user_feedback/
+			(ephemeral .yaml files - created by block commands, deleted after processing)
+		summary.md                 # freetext only
+```
+
+## **Plan File Schemas:**
+
+All plan files live in `.claude/plans/{plan_name}/` directory. They are persistent throughout the plan lifecycle.
+
+### **plan.md** (YAML front matter + freetext)
+Top-level plan metadata and high-level context.
+```yaml
+---
+# Lifecycle stage of this plan
+stage: draft  # draft | in_progress | completed
+
+# Git branch for this plan's work
+branch_name: ""
+
+# Audit history (Gemini context reviews)
+audits:
+  - review_context: ""
+    decision: ""  # approved | needs_clarification | rejected
+    total_questions: 0
+    were_changes_suggested: false
+
+# Review history (implementation reviews)
+reviews:
+  - review_context: ""
+    decision: ""  # approved | needs_changes | rejected
+    total_questions: 0
+    were_changes_suggested: false
+---
+
+# High-Level Context
+
+Free text describing the overall plan objective, scope, and approach.
+This section is appended to / edited as planning evolves.
+```
+
+### **user_input.md** (freetext only)
+Append-only log of user thoughts, refinements, and feedback.
+```markdown
+# User Input Log
+
+All user thoughts, refinements, and feedback are appended here chronologically.
+Content is automatically appended by:
+- Input gate processing (thoughts field from user_feedback files)
+- Direct user_feedback file processing
+```
+
+### **curator.md** (freetext only)
+Append-only curation workflow notes.
+```markdown
+# Curation Notes
+
+Free text updates from curation workflows to be included in PR.
+Content is appended to bottom as curation progresses.
+```
+
+### **prompts/{N}.md** or **prompts/{N}{V}.md** (YAML front matter + freetext)
+Individual prompt specification with front matter and freetext approach section.
+```yaml
+---
+# Prompt identifier
+number: 1
+variant: null  # null | A | B | ... | Z
+
+# Human-readable summary (3 sentences: what it solves, approach elected, key considerations)
+description: ""
+
+# Prompt classification
+kind: feature  # debug | feature
+
+# Files this prompt will modify or create
+relevant_files:
+  - "src/components/Example.tsx"
+  - "src/lib/utils.ts"
+
+# Measurable criteria for completion
+success_criteria: ""
+
+# Prompt dependencies (must be completed first)
+depends_on: []  # list of prompt numbers
+
+# Does this require manual user testing?
+requires_manual_testing: false
+
+# Is an agent currently working on this prompt?
+in_progress: false
+
+# Tracks which iteration for re-implementation loops
+current_iteration: 1
+
+# Review history for this prompt's implementation
+reviews:
+  - review_context: ""
+    decision: ""  # approved | needs_changes | rejected
+    total_questions: 0
+    were_changes_suggested: false
+
+# Which specialist is assigned (if applicable)
+delegated_to: null  # frontend | backend | fullstack | null
+
+# Git worktree branch for parallel work
+worktree_branch_name: null
+
+# Prompt lifecycle status
+status: unimplemented  # unimplemented | implemented | reviewed | tested | merged
+
+# Variant resolution (only for variant prompts)
+# main = merged to feature branch
+# alternative = not merged, worktree preserved for manual feature-flagging
+# discard = rejected, branch archived
+variant_solution: null  # main | alternative | discard | null
+
+# Design file references
+design_files:
+  - path: "designs/mockup.png"
+    description: ""
+
+# Implementation walkthrough (accumulated across iterations, used by documentor agent)
+walkthrough:
+  - iteration: 1
+    type: initial  # initial | review-refinement | testing-refinement
+    refinement_reason: null  # null for initial, describes what triggered re-implementation
+    approach: ""
+    changes:
+      - file: "src/example.ts"
+        description: ""
+    decisions:
+      - decision: ""
+        rationale: ""
+
+# Has documentor agent processed this prompt's walkthrough?
+documentation_extracted: false
+
+# When this prompt was written/planned
+planned_at: "2024-01-15T10:30:00Z"  # ISO 8601 timestamp
+
+# Merge commit hash when worktree is merged back to feature branch
+# Used by get-prompt-walkthrough for precise git diff
+merge_commit_hash: null
+---
+
+# Approach & Plan
+
+Free text describing the implementation approach, design considerations, and technical details.
+May reference specific files where implementation should occur.
+May reference design files where visual specifications are important.
+```
+
+### **findings/{specialist}.yaml** (fully YAML)
+Specialist discovery notes with structured approaches.
+```yaml
+# Which specialist created these findings
+specialist_name: frontend  # frontend | backend | fullstack
+
+# General notes on key practices, stack, technologies, APIs, dependencies
+notes: |
+  Free text notes on codebase patterns, conventions, and important context.
+  Include stack details, API patterns, security considerations, etc.
+
+# Discovered implementation approaches
+approaches:
+  - number: 1
+    # Variant letter (A, B, C, etc.) - null for primary approach
+    variant: null
+    # Brief label of what this approach solves (3 sentences)
+    description: ""
+    # Files relevant to this approach
+    relevant_files:
+      - "src/lib/auth.ts"
+    # Internal: Questions needing user clarification (not returned in reads)
+    required_clarifying_questions:
+      - question: ""
+    # Only populated after user answers questions in gate (only answered ones returned)
+    user_addressed_questions:
+      - question: ""
+        answer: ""
+    # User directive for agent to re-investigate this approach
+    user_requested_changes: ""
+    # Detailed approach with pseudo-code and key findings
+    # Include file names, embed best practices as comments
+    approach_detail: |
+      Detailed implementation approach with pseudo-code.
+      
+      ```typescript
+      // src/lib/auth.ts
+      // Best practice: Always validate tokens before processing
+      function validateAuth() {
+        // implementation details...
+      }
+      ```
+```
+
+### **design_manifest.yaml** (fully YAML)
+Registry of design files and their descriptions.
+```yaml
+designs:
+  - screenshot_file_name: "login-flow-step1.png"
+    description: "Initial login screen with email input and SSO options"
+  - screenshot_file_name: "login-flow-step2.png"
+    description: "Password entry screen after email validation"
+  - screenshot_file_name: "dashboard-main.png"
+    description: "Main dashboard layout showing user widgets"
+```
+
+## **User Feedback File Schemas:**
+All user feedback files live in `user_feedback/` directory. They are ephemeral - created by block commands, deleted after processing. All user input (thoughts, changes) is persisted to `user_input.md` before deletion.
+
+### **Base Schema (all feedback files include these)**
+```yaml
+# Set to true when finished providing feedback
+done: false
+
+# Optional message to the agent (persisted to user_input.md)
+thoughts: ""
+```
+
+### **findings_gate.yaml** (`envoy plan block-findings-gate`)
+Created when discoveries need user review before planning.
+```yaml
+done: false
+thoughts: ""
+
+# User directives for specific approaches
+# Key format: {specialist}_{number} (standalone) or {specialist}_{number}_{variant} (variants)
+# NOTE: An approach is EITHER standalone OR has variants - never both
+# Leave empty to accept approach as-is
+# Set rejected: true to reject variant approaches (at least one variant must NOT be rejected)
+approach_feedback:
+  # Standalone approach (no variants) - no rejected field
+  backend_1:
+    user_required_changes: ""
+  # Variant approaches - all have rejected field, at least one must be false
+  frontend_1_A:
+    user_required_changes: ""
+    rejected: false
+    question_answers:
+      - question: "Should we use SSR or CSR for this component?"
+        answer: ""
+  frontend_1_B:
+    user_required_changes: ""
+    rejected: false  # Can reject B if keeping A, but can't reject ALL
+```
+
+### **plan_gate.yaml** (`envoy plan block-plan-gate`)
+Created when plan/prompts need user review before implementation.
+```yaml
+done: false
+thoughts: ""
+
+# User directive for top-level plan changes
+user_required_plan_changes: ""
+
+# User directives for specific prompts (by number and optional variant)
+prompt_feedback:
+  1:
+    user_required_changes: ""
+  2_A:
+    user_required_changes: ""
+  2_B:
+    user_required_changes: ""
+```
+
+### **audit_questions.yaml** (`envoy gemini audit`)
+Created internally by gemini audit when clarifying questions are needed.
+```yaml
+done: false
+thoughts: ""
+
+# Questions from the audit (answer each)
+questions:
+  - question: "The plan includes both SSR and CSR approaches - is this intentional redundancy?"
+    answer: ""
+  - question: "Prompt 3 has no success criteria - what defines done?"
+    answer: ""
+```
+
+### **{N}{V}_review_questions.yaml** or **full_review_questions.yaml** (`envoy gemini review`)
+Created internally by gemini review when clarifying questions are needed.
+```yaml
+done: false
+thoughts: ""
+
+# Questions from the review (answer each)
+questions:
+  - question: "The auth flow seems to bypass rate limiting - is this intentional?"
+    answer: ""
+  - question: "Should error messages expose internal IDs?"
+    answer: ""
+
+# Optional: suggest implementation changes based on review findings
+suggested_changes: ""
+```
+
+### **{N}{V}_testing.yaml** (`envoy plan block-prompt-testing-gate`)
+Created when a prompt requires manual user testing.
+```yaml
+done: false
+thoughts: ""
+
+# Did the implementation pass your testing?
+test_passed: null  # true | false
+
+# If test_passed is false, describe what needs to be fixed
+user_required_changes: ""
+
+# Optional: paste relevant logs or output
+logs: |
+```
+
+### **{N}_variants.yaml** (`envoy plan block-prompt-variants-gate`)
+Created when variant prompts need user selection (only after ALL variants reach tested status).
+```yaml
+done: false
+thoughts: ""
+
+# Multi-variant acceptance: exactly ONE must be 'main', others can be 'accepted' (alternative) or 'rejected'
+# main = merged to feature branch
+# accepted = NOT merged, worktree preserved for manual feature-flagging later
+# rejected = branch archived (git branch -m <b> archive/<b>), worktree removed
+# For debug prompts: 'accepted' (non-main) treated as 'rejected' - only one fix can be main
+variants:
+  A:
+    decision: null  # main | accepted | rejected (exactly ONE must be 'main')
+    reason: ""
+  B:
+    decision: null
+    reason: ""
+```
+
+### **{N}{V}_logging.yaml** (`envoy plan block-debugging-logging-gate`)
+Created when debug logging has been implemented and user needs to capture output.
+```yaml
+done: false
+thoughts: ""
+
+# Paste the captured debug log output here
+logs: |
+```
+
+## **Command Based Workflows:**
+
+### **/plan [user prompt] [--quick | --create | --refine]:**
+* —quick mode 
+    * No additional questions
+    * No delegation -> Main agent makes inference itself
+    * Call `envoy plan check` to determine context:
+        * If plan exists (status = in_progress or completed):
+            * Add user prompt to the user_input.md branch 
+            * Call planning agent to modify plan to include minimal prompts on top of everything (either at end if plan completed, or against most relevant prompt file and will only depend on tasks that are completed -> meaning it will be implemented on NEXT with a —quick modifier
+            * Final user gate like the original planning workflow to start implementation
+            * Pass back to main agent and implement regularly where /continue supports
+        * If no plan exists:
+            * Create a new branch for autogenerated plan file structure
+            * Add user prompt to the user_input.md branch 
+            * Call planning agent to create a very simple plan to include a simple prompt set with a —quick modifier to planner
+            * Final user gate like the original planning workflow to start implementation
+            * Pass back to main agent and implement regularly where /continue supports
+1. Accept User Initial Prompt for the feature / amendment to existing plan
+2. Call `envoy plan check`
+    1. If no plan: but user_input.md contains answers, continue to top-level step 3 after reading user_input.md to ask any more required questions
+    2. If no plan: Create new branch automatically infered from user prompt —create mode from this point forward
+    3. If plan and prompt is not relevant / complimentary: Ask user if they wish to continue
+        1. If yes: set to  —refine mode
+        2. If no: create new branch off of base branch
+    4. If plan and prompt is relevant: set to  —refine mode
+3. Input Gate: 
+    1. Ask input gate questions that CANNOT be inferred from initial prompt -> if asked, each can be skipped to be automatically inferred based on wider context
+    2. Only questions that are relevant to the initial prompt when in —refine mode are asked
+    3. Use the progressive disclosure approach for input gate questions starting with the following:
+        1. What type of change is this - UI / Frontend - Backend / API - Full-stack - Observability / Monitoring - Developer Experience (DX) - Infrastructure / DevOps - Other (describe) (only if not already inferred)
+        2. Any additional constraints? (always ask this)
+        3. Then allow the user to continue (for easy tasks, or receive more questions from the LLM infered from information banks that its recommended for the LLM to know that the LLM will build questions from  (ask 3, continue with current context)
+        4. Refer to recommended feature knowledge bank for input gate to build these questions from
+4. Tell user that if there is a UX feature involved that they can add UX screenshots with context labels to the filesystem
+    1. Ask a user the question of if would like to include any UI screenshots / design material in the manifest
+    2. We will need a new design file with a manifest to describe screenshots and what tasks  / responsibilities they are used for
+    3. These will be added to context of discovery (via delegation) and implementation (via prompt approach reference) agents
+    4. Main agent reads this and is aware of the manifest information for delegation (use envoy to get context of design resources without actually reading the file)
+5. Write all user generated context, including initial user prompt to user_input.md file using `envoy plan append-user-input "<content>"`
+6. Specialist Delegation
+    1. Internally extract Atomic Requirements from user prompt + answered questions and cluster by primary domain
+    2. If confidence on a given segment's assignment to specialist is lacking: 
+        1. Ask user if they want to /create-specialist before continuing
+    3. If no specialist found and create specialist not run: choose "surveyor" agent instead
+    4. For each segment, delegate to appropriate specialist:
+        * "Run `envoy protocol discovery` and follow the steps. INPUTS: `{ agent_name: <specialist_name>[_N], segment_context: <requirements_for_segment> }`"
+        * If multiple segments fit the same specialist: add {_N} suffix to agent_name
+        * OUTPUTS: `{ success: true }`
+7. Call `envoy plan get-findings` to get a list of all approaches (to determine research delegation needs)
+8. Research Delegation
+    1. For each distinct research objective, delegate to **researcher agent**:
+        * "Run `envoy protocol discovery` and follow the steps. INPUTS: `{ agent_name: "researcher"[_N], segment_context: <research_objectives_with_approach_references> }`"
+        * If multiple research agents needed: add {_N} suffix to agent_name
+        * OUTPUTS: `{ success: true }`
+9.  Findings Gate:
+    1. Ask user all clarifying questions from approach documents
+    2. Ask user if they want top-level redirection (hard-reset delegation with specific requirements)?
+        1. If chosen: clear all findings files, return to step 6
+    3. Call `envoy plan block-findings-gate`
+        * Returns: { thoughts, affected_approaches: [{ specialist_name, approach_number }] }
+    4. If any affected_approaches returned:
+        1. Re-delegate to affected specialists:
+            * "Run `envoy protocol discovery` and follow the steps. INPUTS: `{ agent_name: <specialist_name>, segment_context: <thoughts>, approach_references: [{ specialist_name, approach_num }] }`"
+        2. Rerun findings gate before proceeding
+10. Planner Delegation:
+    * Delegate to **planner agent** with **planning-workflow**
+    * INPUTS: `{ mode: "create" | "refine", workflow_type: "feature", feature_branch: <current_branch> }`
+    * OUTPUTS: `{ success: true }`
+11. Call /continue command
+
+### **/continue**
+1. Call `envoy plan next [-n <count>]` to get next prompts (if count > 1 then tasks returned are independent with no dependencies)
+    1. If the prompt is a variant, must return ALL variants to be run in parallel (done regardless of count)
+2. Call to next retrieves:
+    1. Description
+    2. Relevant file list
+3. Delegate to specialist
+    1. For each next prompt, delegate to appropriate specialist:
+        * If prompt is debug: "Run `envoy protocol debugging` and follow the steps. INPUTS: `{ prompt_num: <N>, variant: <V>, feature_branch: <current_branch> }`"
+        * Otherwise: "Run `envoy protocol implementation` and follow the steps. INPUTS: `{ prompt_num: <N>, variant: <V>, feature_branch: <current_branch> }`"
+    2. If no suitable specialist found: 
+        1. Ask user if they would like to /create-specialist to fill the need of this task
+        2. else: choose "worker" agent instead
+4. After specialist returns (prompt merged), delegate to documentor for that prompt:
+    * Delegate to **documentor agent** with **extract-workflow**
+    * INPUTS: `{ mode: "extract", prompt_num: <N>, variant: <V>, feature_branch: <current_branch> }`
+    * OUTPUTS: `{ success: true }`
+5. Rerun loop (steps 1-4) after each prompt+documentation cycle until no more prompts and no prompts in progress
+6. Call `envoy gemini review --full`
+    * Returns: { verdict, thoughts?, answered_questions?, suggested_fixes? }
+    * Full review examines all prompts, curator.md, user_input.md against feature branch git diff
+7. If full feature review fails (verdict = failed or suggested_fixes exist):
+    1. Delegate to relevant specialists to implement suggested_fixes, passing `thoughts` and answered_questions as context
+    2. Commit changes and rerun full review until passes
+8. Mandatory documentation auditor (single documentor in audit mode):
+    * Delegate to **documentor agent** with **audit-workflow**
+    * INPUTS: `{ mode: "audit", feature_branch: <current_branch> }`
+    * OUTPUTS: `{ success: true }`
+9.  Call `envoy plan complete` to generate summary, create PR, and mark plan as completed
+10. Call /whats-next command
+
+### **/whats-next**
+1. Call `envoy plan check`
+    * Returns: { status, context based on status }
+    * If in_progress: tell user to run /plan —refine or /continue, then break thread
+    * If completed: continue with returned summary context
+2. Use returned context (user_input.md, summary.md, plan.md, prompt descriptions) for suggestions
+3. Using the domains below, generate **3-5 concrete suggestions** for what could come next. Prioritize based on: 1. Explicitly mentioned follow-ups from user_input.md 2. Natural extensions of what was built 3. Quality/hardening improvements 4. New capabilities enabled by what exists
+4. **Ready to continue?** - `/plan {suggestion}` - Start planning one of these - `/plan {your own idea}` - Plan something else - `/plan --refine` - Add to the current plan instead of starting fresh - `/debug {issue}` - If you found a bug to fix first ```
+
+### **/debug [user bug description] [—create | —refine | -quick]:**
+* —quick mode 
+    * No additional questions
+    * No specialist delegation -> Main agent makes inference itself
+    * Creates no observability prompt because that question was not asked
+    1. Call `envoy plan check` to determine context
+    2. If no plan exists: Create new branch automatically inferred from bug description
+    3. Add user bug description to the user_input.md file using `envoy plan append-user-input "<content>"`
+    4. Planner Delegation (Quick Debug Plan):
+        * Delegate to **planner agent** with **planning-workflow**
+        * INPUTS: `{ mode: "quick", workflow_type: "debug", feature_branch: <current_branch>, plan_status: <status_from_check> }`
+        * OUTPUTS: `{ success: true }`
+    5. Call /continue command
+* —create / —refine mode
+1. Accept User Initial Bug Description (symptoms, error messages, reproduction steps, expected vs actual behavior)
+2. Call `envoy plan check`
+    1. If no plan: but user_input.md contains answers, continue to top-level step 3 after reading user_input.md to ask any more required questions
+    2. If no plan: Create new branch automatically inferred from bug description —create mode from this point forward
+    3. If plan and bug is unrelated to current work: Ask user if they wish to continue
+        1. If yes: set to —refine mode
+        2. If no: create new branch off of base branch, set to —create mode
+    4. If plan and bug is related to current work (potentially introduced by current plan): set to —refine mode
+3. Input Gate:
+    1. Ask input gate questions that CANNOT be inferred from initial bug description -> if asked, each can be skipped to be automatically inferred based on wider context
+    2. Only questions that are relevant to the bug context when in —refine mode are asked
+    3. Use the progressive disclosure approach for input gate questions starting with the following:
+        1. Asks a specific question of how we would like to manage observability for this bug once identified for future safety (always ask - critical for debug workflow)
+        2. Can you share the exact error message and the steps to reproduce it? (if not already provided)
+        3. When did this start happening? (recent deploy, always, after specific change)
+        4. Any suspected area of code or recent changes to related areas? (if not already inferred)
+        5. What is the severity / urgency? (blocks release, can workaround, nice to fix)
+        6. Then allow the user to continue (for easy tasks), or receive more questions from the LLM inferred from information banks that its recommended for the LLM to know (ask 3 questions, continue with current context)
+        7. Refer to recommended debugging knowledge bank for input gate to build these questions from
+4. Write all user generated context, including initial bug description to user_input.md file using `envoy plan append-user-input "<content>"`
+5. Specialist Delegation (Bug Discovery)
+    1. Internally extract bug symptoms, suspected areas, and reproduction context and cluster by primary domain
+    2. If confidence on a given segment's assignment to specialist is lacking:
+        1. Ask user if they want to /create-specialist before continuing
+    3. If no specialist found and create specialist not run: choose "surveyor" agent instead
+    4. For each segment, delegate to appropriate specialist:
+        * "Run `envoy protocol bug-discovery` and follow the steps. INPUTS: `{ agent_name: <specialist_name>[_N], segment_context: <bug_context_for_segment> }`"
+        * If multiple segments fit the same specialist: add {_N} suffix to agent_name
+        * OUTPUTS: `{ success: true }`
+6. Call `envoy plan get-findings` to get a list of all bug hypotheses/approaches (to determine research delegation needs)
+7. Research Delegation (Bug Research)
+    1. For each distinct research objective, delegate to **researcher agent**:
+        * "Run `envoy protocol bug-discovery` and follow the steps. INPUTS: `{ agent_name: "researcher"[_N], segment_context: <research_objectives_with_approach_references> }`"
+        * Research objectives should focus on: known issues in libraries/frameworks, similar error messages, anti-patterns
+        * If multiple research agents needed: add {_N} suffix to agent_name
+        * OUTPUTS: `{ success: true }`
+8. Findings Gate (Bug Hypotheses Review):
+    1. Ask user all clarifying questions from approach documents (bug hypotheses)
+    2. Ask user if they want top-level redirection (hard-reset delegation with specific requirements)?
+        1. If chosen: clear all findings files, return to step 5
+    3. Call `envoy plan block-findings-gate`
+        * Returns: { thoughts, affected_approaches: [{ specialist_name, approach_number }] }
+    4. If any affected_approaches returned:
+        1. Re-delegate to affected specialists:
+            * "Run `envoy protocol bug-discovery` and follow the steps. INPUTS: `{ agent_name: <specialist_name>, segment_context: <thoughts>, approach_references: [{ specialist_name, approach_num }] }`"
+        2. Rerun findings gate before proceeding
+9. Planner Delegation (Debug Plan):
+    * Delegate to **planner agent** with **planning-workflow**
+    * INPUTS: `{ mode: "create" | "refine", workflow_type: "debug", feature_branch: <current_branch> }`
+    * OUTPUTS: `{ success: true }`
+10. Call /continue command (implementation handled by debugging protocol for --debug prompts, implementation protocol for observability prompt)
+
+### **/create-specialist [initial context]**
+* Initial context = from manual user invocation or automatic call based on specialist need workflow call
+* Create a curator/ branch on top of current branch
+* Will not follow any planning material
+* Input gate
+    * Responsibility of agent (which will infer what skills it uses)
+    * Area of expertise (code base files / areas)
+    * Specific skills it should have access to that exist
+    * Any new skills that the user requires be implemented and URLs it should store as references / core to skill
+    * Claude envoy usage (what claude envoy commands should it use - must run envoy help command to show all commands available)
+* Delegate to **curator agent** with **curation-workflow**
+    * INPUTS: `{ mode: "create", artifact_type: "specialist", initial_context: <input_gate_summary> }`
+    * OUTPUTS: `{ success: true, clarifying_questions?: [string] }`
+* If clarifying_questions returned: present to user, then continue
+* Commit changes
+* Delegate to **curator agent** with **curation-audit-workflow**
+    * INPUTS: `{ mode: "audit", branch_name: <current_branch> }`
+    * OUTPUTS: `{ success: true, amendments_made: boolean }`
+* Ask user how they wish to test the agent
+* Ask user to mark when completed testing (any feedback or good to merge)
+* Commit changes
+    * If parent branch is not base branch and had plan matter: merge back, add updates to curator.md
+    * If parent branch is base branch (check via `envoy git is-base-branch`): call `envoy git create-pr --title "<title>" --body "<body>"`
+
+### **/create-skill [user prompt]**
+* Initial context = from manual user invocation or automatic call based on specialist need workflow call
+* Create a curator/ branch on top of current branch (with inferred name)
+* Input gate
+    * Goals of this skill
+    * Which agents will use this (important for understanding its use case)
+    * URLs it should store as references / core to skill
+    * Directory to serve as documentation for
+* Delegate to **curator agent** with **curation-workflow**
+    * INPUTS: `{ mode: "create", artifact_type: "skill", initial_context: <input_gate_summary> }`
+    * OUTPUTS: `{ success: true, clarifying_questions?: [string] }`
+* If clarifying_questions returned: present to user, then continue
+* Commit changes
+* Delegate to **curator agent** with **curation-audit-workflow**
+    * INPUTS: `{ mode: "audit", branch_name: <current_branch> }`
+    * OUTPUTS: `{ success: true, amendments_made: boolean }`
+* Ask user how they wish to test the skill
+* Ask user to mark when completed testing (any feedback or good to merge)
+* Commit changes
+    * If parent branch is not base branch and had plan matter: merge back, add updates to curator.md
+    * If parent branch is base branch (check via `envoy git is-base-branch`): call `envoy git create-pr --title "<title>" --body "<body>"`
+
+### **/audit-docs […documentation OR codebase directories and paths] [optional user prompt concerns]**
+* Initial context = from user prompt concerns or assumptions from directory and path names
+* Must checkout base branch (via `envoy git checkout-base`)
+* Create a docs/ branch on top of current branch (with inferred name)
+* Main agent intelligently determines from file names how to break up tasks (and if tasks need to be broken up at all)
+* Delegate to **documentor agent(s)** with **audit-workflow** (parallel if multiple)
+    * INPUTS: `{ mode: "audit", feature_branch: <current_branch>, scope_paths: [<paths>], concerns: <user_concerns> }`
+    * OUTPUTS: `{ success: true, findings: [...] }`
+* User accepts findings OR provides extra context/direction
+* Delegate single **documentor agent** with **audit-workflow** to implement all fix requirements and user decisions
+    * INPUTS: `{ mode: "audit", feature_branch: <current_branch>, user_decisions: <decisions> }`
+    * OUTPUTS: `{ success: true }`
+* Commit changes, call `envoy git create-pr --title "<title>" --body "<body>"`
+
+### **/create-docs […optional codebase directories and paths] [optional user prompt context]**
+* Initial context = from user prompt context or assumptions from directory and path names
+* Must checkout base branch (via `envoy git checkout-base`)
+* Create a docs/ branch on top of current branch (with inferred name)
+* If directories and paths are not given, assume the whole codebase needs documentation
+* Delegate to **documentor agent** with **coordination-workflow**
+    * INPUTS: `{ mode: "coordinate", scope_paths: [<paths>] }`
+    * OUTPUTS: `{ success: true, chunks: [{ paths, scope_description }] }`
+* Delegate multiple **documentor agents** in parallel with **extract-workflow**
+    * INPUTS: `{ mode: "create", feature_branch: <current_branch>, scope: <chunk> }`
+    * OUTPUTS: `{ success: true }` per agent
+* Delegate to **documentor agent** with **audit-workflow**
+    * INPUTS: `{ mode: "audit", feature_branch: <current_branch> }`
+    * OUTPUTS: `{ success: true, findings: [...] }`
+* User accepts findings OR provides extra context/direction
+* Delegate single **documentor agent** to implement all fix requirements and user decisions
+* Commit changes, call `envoy git create-pr --title "<title>" --body "<body>"`
+
+
+**recommended feature knowledge bank for input gate**
+```
+  **Generic (all types):** - Core mission / objective in one sentence - Success criteria (how do we know it's done?) - Explicit out-of-scope items - Acceptable level of jank / tech debt - Hard constraints (stack, APIs, security, existing patterns) - Primary users or systems affected - Key scenarios / user flows (1-3) - Happy path for each scenario - Must-do behaviors per scenario - Forbidden behaviors / invariants - Key edge cases - Anticipated follow-up work - Manual testing approach **UI / Frontend specific:** - UX quality bar (scrappy prototype | functional MVP | polished release) - Target devices / viewports - Accessibility requirements - Design references or screenshots available? - State management approach - Error / loading state handling **Backend / API specific:** - Input/output schemas (examples) - Performance targets (latency, throughput) - Data models / entities affected - Database migrations needed? - Authentication / authorization requirements - Rate limiting / quota considerations **Full-stack specific:** - All of the above - API contract between frontend and backend - Deployment coordination needs **Observability / Monitoring specific:** - What signals indicate success/failure? - Log levels and what to capture - Metrics to track - Alerting thresholds - Dashboard requirements **DX specific:** - Who is the developer audience? - Documentation requirements - Error message clarity - Local development impact - CI/CD pipeline changes **Infrastructure / DevOps specific:** - Environments affected (dev, staging, prod) - Rollback strategy - Security / compliance requirements - Scaling considerations - Cost implications **Informational context for LLM:** - The goal is confident delegation to specialists, not exhaustive documentation - Prioritize questions that would change the architectural approach - Questions about edge cases can often wait until findings gate - If the user's description is detailed, fewer questions are needed - Combine related bullets: "What's the success criteria, and how will you manually verify it works?" covers two bullets in one - Skip questions where the answer is obvious from codebase context - For --refine mode, only ask about NEW aspects not covered in existing plan`
+```
+
+recommended debugging knowledge bank for input gate
+```
+**Bug characterization:** - Exact observed behavior (error messages, incorrect output, crash) - Expected behavior - Reproduction steps (numbered) - Frequency (always, sometimes, specific conditions) - When it started (recent deploy, always, after specific change) - Environment details (device, browser, OS, app version, user type) **Investigation context:** - Any logs, errors, or stack traces already captured - Suspected area of code (if any) - Recent changes to related areas - Related features that DO work correctly - Data conditions that trigger it (specific user, specific input) **Constraints:** - Severity / urgency (blocks release, can workaround, nice to fix) - Areas of code that CANNOT be changed - Deadline pressure (quick patch vs proper fix) **Observability planning:** - How should we monitor for this bug recurring? - What signals would indicate the fix worked? - Any existing monitoring that should have caught this? **Informational context for LLM:** - Reproduction steps are critical - push for specifics - "When did it start" often reveals the cause - Stack traces / error messages are gold - ask if user has them - Frequency hints at race conditions vs logic errors - If user has a hypothesis, capture it even if uncertain - For --refine, only ask about NEW information - Combine related bullets: "Can you share the exact error message and the steps to reproduce it?" covers multiple bullets
+```
+
+What’s next suggestion domains:
+```
+**Directly Mentioned:** - Anything in "Anticipated follow-ups" from user_input.md - Items explicitly marked "out of scope for this iteration" - Technical debt the user said was acceptable for now **Natural Extensions:** - Additional user flows that build on implemented features - Edge cases that weren't covered but now matter - Performance optimizations for implemented features - Mobile/responsive versions if only desktop was built - API extensions if backend was built - Admin/management UI if user-facing was built **Quality & Hardening:** - Test coverage for implemented features - Error handling improvements - Accessibility enhancements - Documentation (README, API docs, inline comments) - Logging/monitoring for new features - Security hardening (input validation, auth edge cases) **Developer Experience:** - Local development improvements - CI/CD enhancements - Developer documentation - Code cleanup/refactoring opportunities identified during implementation **New Capabilities:** - Features that are now possible because of what was built - Integrations with other systems - Analytics/reporting on new functionality - User feedback mechanisms **Observability & Operations:** - Dashboards for new features - Alerting for failure modes - Performance baselines - Usage tracking
+```
+
+## **protocols/ directory:**
+
+Protocol files use YAML with inheritance. Extension protocols can:
+- **Replace** a step: declare same step number (e.g., `7:`)
+- **Append** to a step: use `+` suffix (e.g., `6+:`)
+- **Insert** new steps: use dot notation (e.g., `6.1:`, `6.2:`)
+
+The `envoy protocol <name>` command merges base + extension and outputs sequentially numbered steps.
+
+### **Protocol File Schema:**
+```yaml
+name: protocol-name
+description: Brief description
+extends: null  # or base protocol name
+inputs:
+  - name: param_name
+    type: integer | string
+    optional: true | false
+    description: param description
+outputs:
+  - value: "{ success: true, ... }"
+    description: when this output is returned
+steps:
+  1: |
+    Step content with full context preserved.
+    * Sub-bullets supported
+    * Commands in backticks
+  2+: |  # appends to base step 2
+    Additional context appended to base step
+  2.1: |  # new step between base 2 and 3
+    New step content
+```
+
+---
+
+### **implementation.yaml** (base)
+```yaml
+name: implementation
+description: Implementation workflow for feature prompts
+extends: null
+inputs:
+  - name: prompt_num
+    type: integer
+    optional: false
+    description: prompt number
+  - name: variant
+    type: string
+    optional: true
+    description: variant letter
+  - name: feature_branch
+    type: string
+    optional: false
+    description: parent feature branch name
+outputs:
+  - value: "{ success: true, merged: true }"
+    description: implementation merged to feature branch
+  - value: "{ success: true, merged: false, reason: \"rejected\" }"
+    description: variant was rejected by user
+steps:
+  1: |
+    Call `envoy plan read-prompt <prompt_num> [<variant>]` to get full prompt context
+  2: |
+    Derive WORKTREE_BRANCH: `<FEATURE_BRANCH>--implementation-<PROMPT_NUM>[-<VARIANT>]`
+    * Uses `--` separator (not `/`) because git can't create branch/subbranch if branch already exists
+    * This naming convention signals to git checkout hook to skip plan matter creation
+    * All envoy plan commands read from FEATURE_BRANCH's plan directory, not the worktree
+  3: |
+    Call `envoy plan start-prompt <PROMPT_NUM> [<VARIANT>] --specialist "<AGENT_NAME>" --worktree "<WORKTREE_BRANCH>"`
+  4: |
+    Check if worktree branch <WORKTREE_BRANCH> (following `*--implementation-*` naming pattern from step 2) already exists
+    * If branch does NOT exist: Create worktree with branch: <WORKTREE_BRANCH>
+    * If branch EXISTS:
+      * Checkout the existing worktree branch
+      * Call `envoy git diff-base` to read the git diff of this branch against the base branch (main/master)
+      * Review the current implementation shown in the diff to understand what has already been done
+      * Continue implementation ONLY if needed (if work is incomplete or needs refinement)
+      * Resume workflow from the appropriate step based on current state (e.g., if implementation is complete, proceed to review step)
+  5: |
+    **Initialize ITERATION = 1, REFINEMENT_REASON = ""**
+    * If resuming from existing branch: adjust ITERATION and REFINEMENT_REASON based on current state
+  6: |
+    Create todo list with TodoWrite for prompt implementation
+  7: |
+    Implement todo list
+  8: |
+    **Call `envoy plan record-implementation <PROMPT_NUM> [<VARIANT>] --walkthrough "<STRUCTURED_WALKTHROUGH>" --iteration <ITERATION> [--refinement-reason "<REFINEMENT_REASON>"]`**
+    * Generate walkthrough with type = "initial" for ITERATION 1, appropriate refinement type for ITERATION > 1
+  9: |
+    Call `envoy gemini review <PROMPT_NUM> [<VARIANT>]`
+    * Returns: { verdict, thoughts?, answered_questions?, suggested_changes? }
+  10: |
+    If suggested_changes:
+    * **Increment ITERATION, set REFINEMENT_REASON = "Review feedback: {summary of changes}"**
+    * Implement adjustments considering `thoughts`, answered_questions, and suggested_changes
+    * **Call `envoy plan record-implementation <PROMPT_NUM> [<VARIANT>] --walkthrough "<STRUCTURED_WALKTHROUGH>" --iteration <ITERATION> --refinement-reason "<REFINEMENT_REASON>"`**
+    * Generate walkthrough with type = "review-refinement"
+  11: |
+    Commit (repeat review until verdict = passed)
+  12: |
+    If requires_manual_testing, call `envoy plan block-prompt-testing-gate <PROMPT_NUM> [<VARIANT>]`
+    * Returns: { thoughts, passed, user_required_changes?, logs? }
+    * If passed = false:
+      * **Increment ITERATION, set REFINEMENT_REASON = "Testing feedback: {summary of user_required_changes}"**
+      * **Go to step 7** (re-implement from todo list, generate walkthrough with type = "testing-refinement")
+  13: |
+    Call `envoy plan block-prompt-variants-gate <PROMPT_NUM> <VARIANT>`
+    * Returns immediately if not a variant prompt
+    * Returns: { thoughts, variant_solution, reason, unmerged_alternatives?: [branch_names] }
+    * **Multi-variant acceptance model:**
+      * `main`: This variant is merged to feature branch (exactly ONE per prompt number)
+      * `alternative`: Worktree preserved, prompt shows variant_solution="alternative", NOT merged
+        * User can manually cherry-pick/feature-flag later
+      * `discard`: Archive branch (`git branch -m <b> archive/<b>`), remove worktree
+    * If variant_solution = "discard": archive branch, remove worktree, return { merged: false }
+    * If variant_solution = "alternative": preserve worktree, update prompt, return { merged: false }
+    * If variant_solution = "main": continue to merge
+  14: |
+    Commit remaining changes, merge worktree to feature branch (MAIN variant only)
+    * Resolve conflicts based on commit messages
+  15: |
+    Call `envoy plan complete-prompt <PROMPT_NUM> [<VARIANT>]`
+    * Reports unmerged alternative worktrees in response for user awareness
+```
+
+---
+
+### **debugging.yaml** (extends implementation)
+```yaml
+name: debugging
+description: Debugging workflow for debug prompts
+extends: implementation
+inputs: null  # inherits from base
+outputs:
+  - value: "{ success: true, merged: true }"
+    description: fix merged to feature branch
+  - value: "{ success: true, merged: false, reason: \"rejected\" }"
+    description: variant was rejected by user
+steps:
+  6+: |
+    * Prioritize logging tasks first
+  6.1: |
+    Implement logging tasks from todo list using **[DEBUG-TEMP] markers**:
+    ```
+    // [DEBUG-TEMP]
+    console.log("debug output");
+    console.log("more debug");
+
+    // real code here (blank line above preserves this)
+    ```
+    * Marker format: `// [DEBUG-TEMP]` (JS/TS) or `# [DEBUG-TEMP]` (Python)
+    * All log statements MUST be consecutive lines below marker
+    * MUST have blank line before resuming real code
+  6.2: |
+    Call `envoy plan block-debugging-logging-gate <PROMPT_NUM> [<VARIANT>]`
+    * Returns: { thoughts, logs }
+  7: |
+    Implement fix based on prompt hypothesis, user `thoughts`, and returned logs
+  8: |
+    **Call `envoy plan record-implementation <PROMPT_NUM> [<VARIANT>] --walkthrough "<STRUCTURED_WALKTHROUGH>" --iteration <ITERATION> [--refinement-reason "<REFINEMENT_REASON>"]`**
+    * Generate walkthrough with type = "initial" for ITERATION 1, "testing-refinement" for ITERATION > 1
+  12: |
+    Call `envoy plan block-prompt-testing-gate <PROMPT_NUM> [<VARIANT>]`
+    * Returns: { thoughts, passed, user_required_changes?, logs? }
+    * If passed = false:
+      * **Increment ITERATION, set REFINEMENT_REASON = "Testing feedback: {summary of user_required_changes}"**
+      * **Go to step 10** (re-implement fix with refinement context, generate walkthrough with type = "testing-refinement")
+  13: |
+    Call `envoy plan block-prompt-variants-gate <PROMPT_NUM> <VARIANT>`
+    * Returns immediately if not a variant prompt
+    * Returns: { thoughts, variant_solution, reason }
+    * **For debug prompts:** `alternative` (non-main) treated as `discard` - only one fix can be main
+    * If discard: archive branch, remove worktree
+    * If main: continue
+  13.1: |
+    Call `envoy plan cleanup-debug-logs` to remove all [DEBUG-TEMP] markers
+    * Algorithm: find marker → delete marker line → delete all consecutive non-blank lines below → stop at first blank line
+    * Deterministic removal, no AI judgment required
+  14: |
+    Commit remaining changes, merge worktree to feature branch
+```
+
+---
+
+### **discovery.yaml** (base)
+```yaml
+name: discovery
+description: Discovery workflow for feature requirements
+extends: null
+inputs:
+  - name: agent_name
+    type: string
+    optional: false
+    description: assigned specialist name (e.g., "frontend", "backend_1")
+  - name: segment_context
+    type: string
+    optional: false
+    description: segmented requirements from main agent
+  - name: approach_references
+    type: array
+    optional: true
+    description: "[{ specialist_name, approach_num }] for re-delegation"
+outputs:
+  - value: "{ success: true }"
+    description: findings written to file via envoy commands
+steps:
+  1: |
+    **Query documentation first**: Call `envoy knowledge search docs "<focused requirement area as descriptive request>"` (semantic search - full phrases, not keywords)
+    * May run multiple searches if requirements span distinct focus areas
+    * Use returned docs as context for approach building - reference existing patterns rather than reinventing
+    * Note any constraints or anti-patterns documented for this area
+  2: |
+    Read the design manifest for a specific screenshot if needed
+  3: |
+    If re-delegated with approach references:
+    * Call `envoy plan get-finding-approach <specialist_name> <approach_num> [variant]` for each
+    * Returns approach with `user_requested_changes` if user requested changes
+    * Returns `user_addressed_questions` only when populated (questions user has answered)
+    * Address the user_requested_changes in updated approach
+  4: |
+    If available (not research agent) use repomix extraction skill to gather context relevant codebase files over areas of focus to generate approaches
+  5: |
+    Report key notes for all approaches to be aware of (relevant key technologies, stack, patterns, dependencies, known constraints / caveats, existing APIs etc) in notes
+    * Include references to relevant documentation found in step 1
+  6: |
+    Call `envoy plan write-approach <AGENT_NAME> <approach_num> --description "<desc>" [--variant <letter>] --context "<full_context>" --files "<file1>,<file2>" [--questions "<q1>|<q2>"]` for each approach
+    1. For alternative approaches to the SAME problem, use variants: --variant A, --variant B, etc.
+    2. NOTE: An approach is EITHER standalone (no --variant) OR has variants (all use --variant A, B, etc.)
+    3. Include relevant file directories for given approaches (project relative for worktree compatibility)
+    4. Include comments highlighting best practices in pseudocode (reference docs if applicable)
+    5. Include any clarifying questions per approach
+```
+
+---
+
+### **bug-discovery.yaml** (extends discovery)
+```yaml
+name: bug-discovery
+description: Discovery workflow for bug investigation
+extends: discovery
+inputs:
+  - name: agent_name
+    type: string
+    optional: false
+    description: assigned specialist name (e.g., "frontend", "backend_1")
+  - name: segment_context
+    type: string
+    optional: false
+    description: bug context from main agent (symptoms, reproduction steps, suspected areas)
+  - name: approach_references
+    type: array
+    optional: true
+    description: "[{ specialist_name, approach_num }] for re-delegation"
+outputs:
+  - value: "{ success: true }"
+    description: bug hypotheses written to file via envoy commands
+steps:
+  1: |
+    **Query documentation first**: Call `envoy knowledge search docs "<suspected area + symptoms as descriptive phrase>"` (semantic search - full phrases, not keywords)
+    * Check for documented anti-patterns that might explain the bug
+    * Note any constraints that must be preserved in the fix
+  2: |
+    Run compiler/linter commands in domain area to identify compilation errors
+    * Capture any error output as additional context for approach building
+  4+: |
+    over suspected bug areas in codebase relevant files
+  5: |
+    Report key notes for all approaches to be aware of:
+    * Best practices to follow for the bug fix (reference docs if applicable)
+    * Found constraints and limitations
+    * Relevant error messages, stack traces, or symptoms discovered
+    * Related dependencies and APIs
+  6: |
+    Call `envoy plan write-approach <AGENT_NAME> <approach_num> --description "<hypothesis>" [--variant <letter>] --context "<full_context>" --files "<file1>,<file2>" [--questions "<q1>|<q2>"]` for each approach
+    1. Approach description is a **hypothesis** for a specific fix
+    2. For alternative fix strategies, use variants: --variant A, --variant B, etc.
+    3. NOTE: An approach is EITHER standalone (no --variant) OR has variants
+    4. Include relevant file directories for given approaches (project relative for worktree compatibility)
+    5. FREE TEXT context must include:
+        * Problem area analysis
+        * Recommended logging statements to add (to capture debug output)
+        * Potential fixes to investigate based on hypothesis
+    6. Include comments highlighting best practices that should be retained in any fix
+    7. Include any clarifying questions after diving into code
+```
+
+## **CLAUDE.md directives:**
+* choosing specialists (when conflicting) (base off of task relevance to domain, and secondly narrowness of scope of coverage given relevant files, and the specialist in question’s domain files)
+* Main agent MUST NOT EDIT files, nor should it read files unless explicitly told to. Delegation is required for information retrieval and implementation due to main agent context preserval
+* Main agent should NEVER use skills - skills are for subagents only (for scoping context better)
+* Curator subagent is the ONLY agent that can read and edit .claude files, and CLAUDE.md rule files
+* Only curator and research agents can do “web search” tool use (delegate to researcher agent to do research where necessary) 
+* Claude degrades at 50% context usage. Tasking for subagent delegation should always be broken up into tasking that can be run under that limit
+    * Consider discovery tasks, and large file context reads as risks to implementation efficacy
+    * **Self-estimation required**: Agents must continuously estimate their own context consumption throughout execution
+        * Before reading large files: estimate tokens based on file size (rough: 1 token ≈ 4 chars)
+        * After tool calls: mentally track cumulative context growth
+        * If estimated at ~50% capacity: proactively return early with partial results and request re-delegation for remaining work
+        * Discovery agents should return findings in batches rather than accumulating everything
+        * Implementation agents should commit incrementally and report progress if approaching limits
+* **Envoy error handling**: Commands fail via stderr/non-zero exit OR `{ success: false, error: "..." }` response
+    * Timeout errors: Return exit, wait for human instructions
+    * Other errors: Agent infers recovery (re-delegate, retry, skip) based on workflow context
+    * Use AskUserQuestion only if genuinely ambiguous
+* **Documentation-first implementation**: Before any implementation task (feature, fix, refactor), agents MUST call `envoy knowledge search docs "<task focus as descriptive request>"` (semantic search - full phrases, not keywords) to discover:
+    * Existing patterns/practices for similar functionality
+    * Related implementations already in codebase
+    * Most relevant files to read for context pre-implementation
+    * This applies even when planning workflow is bypassed—ensures agents leverage indexed knowledge rather than guessing or re-discovering patterns
+    * Query examples: "how to implement auth middleware validation", "API error handling patterns in this codebase", "React form state management approach"
+
+## **Agents:**
+
+**Skill Assignments**: Each agent declares its skills in frontmatter `skills` field. Skills are explicitly autoloaded into agent context on spawn.
+
+| Agent | Skills |
+|-------|--------|
+| planner | (none) |
+| curator | repomix-extraction, research-tools |
+| researcher | research-tools |
+| surveyor | repomix-extraction |
+| worker | repomix-extraction |
+| documentor | repomix-extraction |
+
+### **planner agent:**
+Expert solutions architect responsible for creating and modifying prompts and high-level plan context.
+
+#### **Workflow: planning-workflow**
+**INPUTS** (from main agent delegation):
+  * `mode`: "create" | "refine" | "quick"
+  * `workflow_type`: "feature" | "debug"
+  * `feature_branch`: branch name (for envoy plan commands)
+  * `plan_status`: (quick mode only) status from `envoy plan check` - "in_progress" | "completed" | "none"
+
+**OUTPUTS** (to main agent):
+  * `{ success: true }` - plan accepted by user gate
+  * `{ success: false, reason: string }` - unrecoverable failure
+
+**WORKFLOW STEPS (mode = "quick"):**
+  1. If plan_status = "none":
+      * Create minimal plan structure via `envoy plan write-plan --title "..." --objective "..." --context "..."`
+      * Write single debug prompt via `envoy plan write-prompt 1 --files "..." --debug --criteria "..." --context "..." --requires-testing`
+  2. If plan_status = "completed":
+      * Retrieve current prompts via `envoy plan get-full-plan`
+      * Append debug prompt at end with no dependencies on incomplete tasks
+      * Write via `envoy plan write-prompt <next_number> --files "..." --debug --criteria "..." --context "..." --requires-testing`
+  3. If plan_status = "in_progress":
+      * Retrieve current prompts via `envoy plan get-full-plan`
+      * Identify most relevant prompt file based on bug context
+      * Append debug prompt that depends only on tasks that are already completed (meaning it will be implemented on NEXT /continue call)
+      * Write via `envoy plan write-prompt <next_number> --files "..." --depends-on "<completed_prompts>" --debug --criteria "..." --context "..." --requires-testing`
+  4. Call `envoy plan block-plan-gate`
+      * Returns: { thoughts, has_user_required_changes, user_required_plan_changes, prompt_changes }
+  5. If has_user_required_changes: apply changes and loop back to step 4
+  6. Return `{ success: true }` to main agent
+
+**WORKFLOW STEPS (mode = "create" | "refine"):**
+  1. Retrieve context via `envoy plan get-findings --full` (all approaches, notes, variants)
+  2. If mode = "refine": retrieve current prompts via `envoy plan get-full-plan`
+  3. Group approaches into prompts:
+      * Number each prompt sequentially
+      * Ensure approaches that are variants are written to separate prompt files with variant letters
+      * Ensure each prompt is 2-3 tasks maximum for minimal implementing agent context
+      * Any approach pseudocode must include relevant file references
+      * Mark debugging prompts with --debug flag
+      * Track dependencies between prompts
+      * Infer success criteria from approach context
+      * Flag prompts requiring manual testing
+  4. If workflow_type = "debug":
+      * **CRITICAL**: Include in each debug prompt: recommended logging statements, fix hypothesis, instructions to remove debug logs after fix
+      * Mark ALL debug prompts with --debug flag and --requires-testing
+      * Create final observability prompt (NOT --debug) that depends on all debug fix prompts
+  5. Write prompts via `envoy plan write-prompt <number> [<variant>] --files "..." --depends-on "..." [--debug] --criteria "..." --context "..." [--requires-testing]`
+      * If mode = "refine": use `envoy plan clear-prompt` first for prompts being replaced
+  6. Write plan via `envoy plan write-plan --title "..." --objective "..." --context "..."`
+      * If mode = "refine": edit must account for original context
+  7. Call `envoy plan validate-dependencies`
+      * If stale_prompt_ids found:
+          * Review each stale prompt's dependencies to determine if prompt needs adjustment based on recent changes
+          * If only dependency list needs updating: use `envoy plan update-prompt-dependencies` (preserves planned_at)
+          * If prompt content/approach needs updating: use `envoy plan write-prompt` (updates planned_at)
+          * Loop back to step 7 until all dependencies are valid
+  8. Call `envoy gemini audit`
+      * If suggested_edits: implement via write-prompt, loop back to step 8
+      * If verdict = failed: loop back to step 3 to refine prompts
+  9. Call `envoy plan block-plan-gate`
+      * Returns: { thoughts, has_user_required_changes, user_required_plan_changes, prompt_changes }
+  10. If has_user_required_changes:
+      * Apply user_required_plan_changes via `envoy plan write-plan ...`
+      * Apply prompt_changes via `envoy plan write-prompt ...`
+      * Loop back to step 7 (re-validate dependencies and re-audit after changes)
+  11. Return `{ success: true }` to main agent
+
+---
+
+### **curator agent:**
+Agent for AI orchestration curation - agents, skills, commands, hooks.
+
+#### **Workflow: curation-workflow**
+**INPUTS** (from main agent delegation):
+  * `mode`: "create" | "audit"
+  * `artifact_type`: "specialist" | "skill"
+  * `initial_context`: user requirements summary
+
+**OUTPUTS** (to main agent):
+  * `{ success: true, clarifying_questions?: [string] }` - artifact created, optional questions for user
+  * `{ success: false, reason: string }` - unrecoverable failure
+
+**WORKFLOW STEPS:**
+  1. Use repomix to discover relevant code for the artifact
+  2. Use research tools for best practices not in current codebase
+  3. If clarifying questions arise: return them immediately for user input, then resume
+  4. Implement the artifact (agent file, skill directory, etc.)
+  5. Return `{ success: true }` with any clarifying questions
+
+#### **Workflow: curation-audit-workflow**
+**INPUTS** (from main agent delegation):
+  * `mode`: "audit"
+  * `branch_name`: branch with changes to audit
+
+**OUTPUTS** (to main agent):
+  * `{ success: true, amendments_made: boolean }` - audit complete
+
+**WORKFLOW STEPS:**
+  1. Read git diff for the branch
+  2. Review changes against AI orchestration best practices
+  3. Amend any anti-patterns introduced
+  4. Return `{ success: true, amendments_made: boolean }`
+
+---
+
+### **researcher agent:**
+Agent with research tools skill for external knowledge gathering. Use when external research is needed (web search, documentation lookup, best practices from outside codebase). Can only handle discovery protocols - not implementation.
+
+---
+
+### **surveyor:**
+Generic specialist for discovery when no domain-specific specialist exists. Use as fallback when main agent cannot confidently assign a segment to a specialist. Has repomix extraction skill for codebase analysis.
+
+---
+
+### **worker:**
+Generic specialist for implementation when no domain-specific specialist exists. Use as fallback when main agent cannot confidently assign a prompt to a specialist.
+
+---
+
+### **documentor:**
+Agent for extracting documentation from implementation walkthroughs.
+
+#### **Workflow: extract-workflow** (per-prompt documentation)
+**INPUTS** (from main agent delegation):
+  * `mode`: "extract"
+  * `prompt_num`: integer prompt number
+  * `variant`: optional variant letter
+  * `feature_branch`: branch name
+
+**OUTPUTS** (to main agent):
+  * `{ success: true }` - documentation extracted and committed
+
+**WORKFLOW STEPS:**
+  1. Retrieve prompt walkthrough via `envoy plan get-prompt-walkthrough <prompt_num> [<variant>]`
+      * Returns: description, success_criteria, full walkthrough history, git diff summary
+  2. Search existing docs: `envoy knowledge search docs "<prompt topic as descriptive request>"` (semantic search - full phrases, not keywords)
+  3. Determine: update existing doc vs create new vs no doc needed
+  4. If documentation needed:
+      * Write document with inline file path references
+      * Include `resource_description` in front-matter
+      * Do NOT write `relevant_files` (auto-populated by commit hook)
+  5. Commit changes to feature branch
+      * Commit hook validates file references and auto-populates `relevant_files`
+      * If validation fails (missing file references): investigate and retry
+      * If commit conflicts: pull, resolve, retry
+  6. Call `envoy plan mark-prompt-extracted <prompt_num> [<variant>]`
+  7. Return `{ success: true }`
+
+#### **Workflow: audit-workflow** (end-of-plan documentation consolidation)
+**INPUTS** (from main agent delegation):
+  * `mode`: "audit"
+  * `feature_branch`: branch name
+  * `scope_paths`: optional paths to scope audit (for /audit-docs)
+  * `concerns`: optional user concerns to address
+  * `user_decisions`: optional decisions from previous findings review
+
+**OUTPUTS** (to main agent):
+  * `{ success: true }` - audit complete, changes committed
+  * `{ success: true, findings: [...] }` - when findings need user review (for /audit-docs)
+
+**WORKFLOW STEPS:**
+  1. Retrieve docs changes via `envoy git diff-base --path docs/` (or scoped paths)
+  2. Review all documentation changes for:
+      * Redundancies across documents (consolidate where needed)
+      * Structural reorganization opportunities
+      * Consistency in style and practices
+      * Cross-prompt patterns that individual documentors may have missed
+      * Human readability and clarity
+  3. If findings need user review: return `{ success: true, findings: [...] }`
+  4. Make consolidation/reorganization edits as needed (including user_decisions if provided)
+  5. Commit changes (commit hook handles validation and reindexing)
+      * If validation fails: investigate missing file references and retry
+  6. Return `{ success: true }`
+
+#### **Workflow: coordination-workflow** (for /create-docs planning)
+**INPUTS** (from main agent delegation):
+  * `mode`: "coordinate"
+  * `scope_paths`: paths to document (or empty for whole codebase)
+
+**OUTPUTS** (to main agent):
+  * `{ success: true, chunks: [{ paths: [...], scope_description: string }] }`
+
+**WORKFLOW STEPS:**
+  1. Analyze codebase structure for documentation needs
+  2. Divide into non-overlapping chunks that can be documented in parallel
+  3. Ensure no directory writing conflicts between chunks
+  4. Return chunk definitions for parallel agent delegation
+
+**SHARED PRACTICES:**
+  * **Search-existing-first**: ALWAYS query existing docs before writing
+  * **Documentation file structure**:
+      * Front-matter: `resource_description` (required - summarizes key decisions, patterns, focus areas)
+      * Front-matter: `relevant_files` (auto-populated by commit hook, NOT written by documentor)
+      * Body: Full document content with inline file path references to codebase
+  * Uses repomix extraction skill to read relevant codebase files
+  * Infers documentation structure based on codebase organization (no prescribed layout)
+
+---
+
+### **[…custom specialists]**
+Domain-specific specialists created via `/create-specialist` command. Each specialist has a defined area of expertise (codebase files/areas), specific skills, and domain knowledge. Main agent selects specialist based on task relevance to domain and narrowness of scope coverage.
+
+## **Claude Envoy:**
+
+### **Voy Requirements:**
+* Uses two indexes to be added to cli calls for search: all .claude/ files for use by the curator agent, and all project root docs/ files for use by all other agents for project search + context
+* In envoy initialization, run setup command to ensure up to date indexes are created and maintained and block return of sh file that orchestrates it until all indexing is complete
+* Stores indexes and other dependencies utilized by a single instance machine given all setup is done where needed on claude initialization in `.claude/envoy/.search/` directory that is git ignored
+* **Embedding**: Generated via `@visheratin/web-ai-node` using `gtr-t5-quant` model (768-dim vectors). Voy only stores/searches vectors, does NOT generate embeddings.
+* **Similarity Scores**: Voy discards distance scores internally. Use sidecar embeddings file to compute cosine similarity after search.
+* **RAG Approach**: Document-level embeddings (1 vector per doc) - documents are small (500-800 tokens), preserves semantic context
+* **File Watching**: All blocking gates use chokidar for file watching
+
+### **Key Helper Functions:**
+* **getBaseBranch**
+    * Returns BASE_BRANCH environment variable if exists
+    * Else finds the base branch by sequentially checking all known protected branch names
+* **getPlanDir**
+    * Gets the plan directory for the current branch
+
+### **Protocol:**
+* **protocol**
+    * Syntax: `envoy protocol <protocol_name>`
+    * Params:
+        * `<protocol_name>`: Name of protocol (implementation, debugging, discovery, bug-discovery)
+    * Reads the protocol YAML file from `.claude/protocols/<protocol_name>.yaml`
+    * If protocol has `extends` field, reads and merges with base protocol:
+        * Steps with same number **replace** base steps
+        * Steps with `+` suffix (e.g., `6+`) **append** to base step
+        * Steps with dot notation (e.g., `6.1`, `6.2`) **insert** between base steps
+    * Outputs sequentially numbered steps to stdout in format:
+        ```
+        1: <step context>
+        2: <step context>
+        ...
+        ```
+    * Also outputs inputs/outputs schema for agent reference
+    * Returns: plain text workflow steps for agent to follow
+
+### **Observability (dual system):**
+
+Envoy uses two complementary observability systems. Both files are gitignored.
+
+#### **Metrics File** (`.claude/metrics.jsonl`)
+High-level data points for analytics. Each line is a JSON object with a consistent schema. Used for aggregation and dashboarding.
+
+**Schema**: `{ type: string, timestamp: ISO8601, plan_name?: string, branch?: string, ...data }`
+
+**Events tracked:**
+* `plan_created`: { mode, prompt_count, has_variants }
+* `plan_completed`: { duration_ms, prompt_count, total_iterations, gemini_calls }
+* `prompt_started`: { prompt_num, variant, specialist, is_debug }
+* `prompt_completed`: { prompt_num, variant, duration_ms, iterations, review_passes }
+* `gate_completed`: { gate_type, duration_ms, user_refinements_count }
+* `gemini_call`: { endpoint (audit|review|ask), duration_ms, success, retries, verdict? }
+* `discovery_completed`: { specialist, approach_count, variant_count, question_count }
+* `documentation_extracted`: { prompt_num, variant, files_affected }
+
+#### **Logs File** (`.claude/envoy.log`)
+Detailed trail of every envoy operation. Use TypeScript logging library (e.g., pino, winston) with structured JSON output. Every command writes a log entry.
+
+**Log entry schema:**
+```json
+{
+  "timestamp": "ISO8601",
+  "level": "info|warn|error",
+  "command": "plan.start-prompt",
+  "plan_name": "feature-auth",
+  "branch": "feat/auth-flow",
+  "caller": "frontend",
+  "args": { "prompt_num": 1, "variant": null },
+  "result": "success|error",
+  "duration_ms": 150,
+  "context": { /* command-specific details */ }
+}
+```
+
+**Context examples by command type:**
+* `plan.start-prompt`: { specialist, worktree_branch, is_resuming }
+* `plan.record-implementation`: { iteration, walkthrough_length, has_refinement_reason }
+* `plan.block-*-gate`: { questions_asked, refinements_received, user_wait_ms }
+* `gemini.audit`: { verdict, suggested_edit_count, clarifying_questions_asked }
+* `gemini.review`: { verdict, is_full, suggested_changes_length }
+* `knowledge.search`: { query, result_count, tokens_returned }
+
+**Log levels:**
+* `info`: Normal operations (command start/complete)
+* `warn`: Retries, fallbacks, near-limit conditions
+* `error`: Failures, timeouts, validation errors
+
+### **Plan:**
+* **check**
+    * Syntax: `envoy plan check`
+    * **Reads:** `plan.md` (YAML front matter + freetext), `user_input.md` (freetext), `summary.md` (freetext), `prompts/*.md` (YAML front matter + freetext)
+    * Get the current status of the plan and any required context for the main agent to continue workflows that depend on it
+    * Returns
+        * status 
+        * If status = draft and user_input.md is populated
+            * Return user_input.md contents
+        * If status = in_progress
+            * Return user_input.md, plan top-level context, and all prompt descriptions
+        * If status = completed
+            * Return summary.md
+* **write-finding**
+    * Syntax: `envoy plan write-finding <specialist_name> --notes "<notes_context>" --approaches '<JSON_ARRAY>'`
+    * **Writes:** `findings/{specialist_name}.yaml` (fully YAML)
+    * Params:
+        * `<specialist_name>`: Name of specialist, optionally with suffix (e.g., `frontend`, `backend_1`)
+        * `--notes "<notes_context>"`: Key practices, stack, technologies, APIs, dependencies to be aware of
+        * `--approaches '<JSON_ARRAY>'`: JSON array format: `[{"number": 1, "variant": "A", "description": "...", "context": "...", "relevant_files": ["file1.ts"], "questions": ["q1?"]}]`
+        * NOTE: `variant` is optional - null/omit for standalone, "A"/"B"/etc for variants
+    * Alternative: use `write-approach` separately for each approach if JSON array is unwieldy
+* **write-approach**
+    * Syntax: `envoy plan write-approach <specialist_name> <approach_num> --description "<desc>" [--variant <letter>] --context "<full_context>" --files "<file1>,<file2>" [--questions "<q1>|<q2>"]`
+    * **Updates:** `findings/{specialist_name}.yaml` (fully YAML)
+    * Params:
+        * `<specialist_name>`: Name of specialist (e.g., `frontend`, `backend_1`)
+        * `<approach_num>`: Integer approach number
+        * `--description "<desc>"`: 3 sentence description of what approach solves
+        * `--variant <letter>`: Variant letter (A, B, C, etc.) - use for alternative approaches
+        * NOTE: An approach is EITHER standalone (no --variant) OR has variants (all use --variant)
+        * `--context "<full_context>"`: Full approach context with pseudocode and findings
+        * `--files "<file1>,<file2>"`: Comma-separated list of relevant file paths (project relative)
+        * `--questions "<q1>|<q2>"`: Pipe-separated clarifying questions (optional)
+    * Overwrites the approach in the findings file
+    * Clears any `user_requested_changes` on that approach (specialist has addressed feedback)
+    * Returns: { specialist, approach_id, approach_number, variant, updated, created }
+* **get-finding-approach**
+    * Syntax: `envoy plan get-finding-approach <specialist_name> <approach_num> [variant]`
+    * **Reads:** `findings/{specialist_name}.yaml` (fully YAML)
+    * Params:
+        * `<specialist_name>`: Name of specialist
+        * `<approach_num>`: Integer approach number
+        * `[variant]`: Optional variant letter (A, B, etc.)
+    * Returns: finding approach in full context
+    * Returns `user_requested_changes` if set by `envoy plan block-findings-gate` (specialist should address this)
+    * Returns `user_addressed_questions` only when populated (questions user has answered)
+* **get-findings**
+    * Syntax: `envoy plan get-findings [--full]`
+    * **Reads:** `findings/*.yaml` (fully YAML)
+    * Params:
+        * `--full`: Include full context and notes per specialist (optional)
+    * Returns all approaches with: { specialist, approach_id, number, variant, description, relevant_files, full context if --full }
+    * Returns notes for each specialist if --full
+* **append-user-input**
+    * Syntax: `envoy plan append-user-input "<content>"`
+    * **Appends to:** `user_input.md` (freetext only)
+    * Params:
+        * `"<content>"`: User input content to append (quoted string)
+* **read-design-manifest**
+    * Syntax: `envoy plan read-design-manifest`
+    * **Reads:** `design/manifest.yaml` (fully YAML)
+    * Returns the design paths w/ descriptions so that the main agent can pass it to specific delegated discovery agents
+* **block-findings-gate**
+    * Syntax: `envoy plan block-findings-gate`
+    * **Creates:** `user_feedback/findings_gate.yaml` (fully YAML)
+    * **Updates:** `findings/*.yaml` (fully YAML), `user_input.md` (freetext only)
+    * Creates feedback file with:
+        * Keys: `{specialist}_{number}` (standalone) or `{specialist}_{number}_{variant}` (variants)
+        * NOTE: An approach is EITHER standalone OR has variants - never both
+        * Empty `user_required_changes` field for each approach
+        * `rejected: false` field only for variant approaches (variant !== null)
+        * `question_answers` only when approach has questions
+    * Blocks via file watching until `done: true` (default timeout: 12 hours, configurable via BLOCKING_GATE_TIMEOUT_MS)
+    * **Validation:** At least one variant per approach number must NOT be rejected
+    * On completion:
+        * Append `thoughts` to user_input.md (if non-empty)
+        * For each approach feedback:
+            * If `rejected: true`, delete the approach from findings
+            * Write `user_required_changes` to approach's `user_requested_changes` field
+            * Write answered questions to approach's `user_addressed_questions` field
+            * Append changes and answered questions to user_input.md for audit trail
+        * Delete the feedback file
+    * Returns: {
+        thoughts: string (user's additional context/guidance),
+        affected_approaches: [{ specialist_name, approach_id }] (approaches with updates),
+        rejected_approaches: [{ specialist_name, approach_id }] (approaches that were rejected)
+      }
+    * Note: Re-delegated specialists read their approach via `envoy plan get-finding-approach <specialist_name> <approach_num> [variant]` which returns `user_requested_changes` and `user_addressed_questions` (only populated ones)
+    * Note: Pass `thoughts` to re-delegated specialists as additional context for their rework
+* **get-full-plan**
+    * Syntax: `envoy plan get-full-plan`
+    * **Reads:** `plan.md` (YAML front matter + freetext), `prompts/*.md` (YAML front matter + freetext), `summary.md` (freetext), `user_input.md` (freetext)
+    * Get plan full context 
+    * Get all prompts full context (including walkthrough history)
+    * Get plan summary if exists
+    * Get user_input.md context (with label: for reference in what the user has requested over time)
+* **block-plan-gate**
+    * Syntax: `envoy plan block-plan-gate`
+    * **Creates:** `user_feedback/plan_gate.yaml` (fully YAML)
+    * **Updates:** `user_input.md` (freetext only)
+    * **Moves (conditional):** `findings/*.yaml` → `findings/_archive/` (only when NO changes requested)
+    * Creates feedback file with:
+        * `user_required_plan_changes` field for top-level plan feedback
+        * `prompt_feedback` section with `user_required_changes` field for each prompt
+    * Blocks via file watching until `done: true`
+    * On completion:
+        * Append `thoughts` to user_input.md (if non-empty)
+        * Append `user_required_plan_changes` to user_input.md (if non-empty)
+        * For each prompt change (if non-empty):
+            * Append to user_input.md for audit trail
+        * **Only if no changes requested:** Move all findings files to findings/_archive/
+        * Delete the feedback file
+    * Returns: {
+        thoughts: string,
+        has_user_required_changes: boolean,
+        user_required_plan_changes: string,
+        prompt_changes: [{ prompt_id, user_required_changes }],
+        archived_findings: string[] (empty if changes requested)
+      }
+    * Note: Called BY planner agent (not main agent) so planner can directly use returned content
+    * Note: Planner should consider `thoughts` when implementing all changes
+    * Note: If `has_user_required_changes: true`, agent should refine and re-run gate
+* **write-prompt**
+    * Syntax: `envoy plan write-prompt <number> [<variant>] --files "<file1>,<file2>" --depends-on "<1>,<2>" [--debug] --criteria "<success_criteria>" --context "<full_prompt_context>" [--requires-testing]`
+    * **Writes:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<number>`: Integer prompt number
+        * `<variant>`: Optional single letter (A, B, etc.) - omit for non-variant prompts
+        * `--files "<file1>,<file2>"`: Comma-separated relevant file paths (project relative)
+        * `--depends-on "<1>,<2>"`: Comma-separated prompt numbers this depends on
+        * `--debug`: Flag to mark as debugging task (optional)
+        * `--criteria "<success_criteria>"`: Success criteria for the prompt
+        * `--context "<full_prompt_context>"`: Full approach, implementation notes, etc.
+        * `--requires-testing`: Flag if manual user testing required (optional)
+    * **Automatically sets:**
+        * `planned_at`: Current ISO 8601 timestamp
+* **validate-dependencies**
+    * Syntax: `envoy plan validate-dependencies`
+    * **Reads:** `prompts/*.md` (YAML front matter + freetext)
+    * Validates ALL prompts in the plan to check if any dependencies have changed since planning
+    * For each prompt with dependencies:
+        * Compares the prompt's `planned_at` timestamp with each dependency prompt's `planned_at` timestamp
+        * If any dependency prompt has a `planned_at` timestamp newer than the current prompt's `planned_at`, the dependency may be stale
+    * Returns: {
+        valid: boolean (true if all dependencies are still valid),
+        stale_prompt_ids: ["1", "2A", "3"]  # Array of prompt identifiers (number + variant if applicable) that have dependencies that were modified after this prompt was planned
+      }
+* **update-prompt-dependencies**
+    * Syntax: `envoy plan update-prompt-dependencies <number> [<variant>] --depends-on "<1>,<2>"`
+    * **Updates:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<number>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+        * `--depends-on "<1>,<2>"`: Comma-separated prompt numbers this depends on
+    * Updates only the `depends_on` field in the prompt file
+    * Does NOT update `planned_at` (preserves original planning timestamp)
+    * Note: Use this when adjusting dependency lists after validate-dependencies identifies stale prompts, to avoid cascading planned_at updates
+* **clear-prompt**
+    * Syntax: `envoy plan clear-prompt <number> [<variant>]`
+    * **Deletes:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<number>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+* **write-plan**
+    * Syntax: `envoy plan write-plan --title "<title>" --objective "<objective>" --context "<design_doc_context>"`
+    * **Writes:** `plan.md` (YAML front matter + freetext)
+    * Params:
+        * `--title "<title>"`: Plan title
+        * `--objective "<objective>"`: High-level objective
+        * `--context "<design_doc_context>"`: Design doc style context
+* **next**
+    * Syntax: `envoy plan next [-n <count>]`
+    * **Reads:** `prompts/*.md` (YAML front matter + freetext)
+    * Params:
+        * `-n <count>`: Number of independent prompts to return (defaults to N_PARALLEL_WORKERS env var or 1)
+    * Finds the next N prompts that have no dependencies on non-merged previous prompts (ordered by number and variant letter), prioritizes debugging prompts if not depending on incomplete tasks (should be very unlikely as debug prompt that depend on prompts will likely have been sourced from completed prompts
+    * Pulls variants of the same prompt number to implement in parallel (regardless of N) if one variant pulled within N
+    * Returns:
+        * Description, prompt num, variant letter, relevant file list, and whether the prompt is a debugging prompt or an implementation prompt
+* **read-prompt**
+    * Syntax: `envoy plan read-prompt <prompt_num> [<variant>]`
+    * **Reads:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+    * Returns the full context of a prompt file
+* **start-prompt**
+    * Syntax: `envoy plan start-prompt <prompt_num> [<variant>] --specialist "<name>" --worktree "<branch_name>"`
+    * **Updates:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+        * `--specialist "<name>"`: Name of the specialist/agent working on this prompt
+        * `--worktree "<branch_name>"`: Worktree branch name for tracking
+    * Sets status to in_progress
+    * Records specialist name and worktree branch for tracking
+    * Initializes current_iteration to 1
+* **record-implementation**
+    * Syntax: `envoy plan record-implementation <prompt_num> [<variant>] --walkthrough "<structured_walkthrough>" --iteration <N> [--refinement-reason "<context>"]`
+    * **Updates:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+        * `--walkthrough "<structured_walkthrough>"`: Formatted markdown walkthrough section for this iteration (see Walkthrough Format below)
+        * `--iteration <N>`: Integer iteration number (1 for initial, 2+ for refinements)
+        * `--refinement-reason "<context>"`: Context explaining why this iteration was needed (required for iteration > 1)
+    * Sets status to implemented
+    * Appends to existing walkthrough array in prompt file, preserving previous iterations
+    * Updates current_iteration to match the provided iteration number
+    * **Walkthrough Format** (structured markdown for --walkthrough):
+        ```markdown
+        ### Iteration {N}
+        **Type**: initial | review-refinement | testing-refinement
+        **Refinement Context**: {reason for this iteration, if not initial}
+
+        #### Approach
+        {Brief description of the approach taken}
+
+        #### Changes Made
+        - `path/to/file.ts`: {description of changes}
+        - `path/to/other.ts`: {description of changes}
+
+        #### Key Decisions
+        - {Decision 1}: {rationale}
+        - {Decision 2}: {rationale}
+        ```
+* **complete-prompt**
+    * Syntax: `envoy plan complete-prompt <prompt_num> [<variant>]`
+    * **Updates:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+    * Sets status to merged
+    * Closes out prompt (walkthrough already contains all implementation decisions and refinement history for documentation extraction)
+* **block-prompt-variants-gate**
+    * Syntax: `envoy plan block-prompt-variants-gate <prompt_num> <variant>`
+    * **Creates:** `user_feedback/{N}_variants.yaml` (fully YAML)
+    * **Updates:** `prompts/{N}{V}.md` (YAML front matter + freetext), `user_input.md` (freetext only)
+    * **May archive branch:** For discarded variants (`git branch -m <b> archive/<b>`)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Variant letter (A, B, etc.)
+    * Return immediately if not a variant prompt
+    * Creates feedback file (only once when first variant calls this, includes all variants for that prompt num) with:
+        * All variant letters for this prompt number
+        * decision field (main | accepted | rejected) for each - exactly ONE must be 'main'
+        * reason field for each
+    * **Multi-variant acceptance model:**
+        * `main`: Merged to feature branch (exactly ONE per prompt number)
+        * `accepted` (alternative): NOT merged, worktree preserved for manual feature-flagging
+        * `rejected` (discard): Archive branch, remove worktree
+        * For debug prompts: `accepted` (non-main) treated as `rejected`
+    * Blocks via file watching (using chokidar or similar) until `done: true` in the feedback file
+    * Each variant agent blocks waiting for the same file
+    * On completion (all variants unblock together):
+        * Append `thoughts` to user_input.md (if non-empty)
+        * Set variant_solution in each prompt file: 'main' | 'alternative' | 'discard'
+        * For 'discard': archive branch (`git branch -m <b> archive/<b>`), remove worktree
+        * For 'alternative': preserve worktree, do NOT merge
+        * Delete the feedback file
+    * Returns: { thoughts: string, variant_solution: main|alternative|discard, reason: string, unmerged_alternatives?: [branch_names] }
+    * Note: Agent should consider `thoughts` and `reason` when handling the variant decision
+    * Note: `unmerged_alternatives` returned for 'main' variant so complete-prompt can report them
+* **block-prompt-testing-gate**
+    * Syntax: `envoy plan block-prompt-testing-gate <prompt_num> [<variant>]`
+    * **Creates:** `user_feedback/{N}{V}_testing.yaml` (fully YAML)
+    * **Updates:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext), `user_input.md` (freetext only)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+    * Creates feedback file with:
+        * `test_passed` field (true | false)
+        * `user_required_changes` field
+        * `logs` field for optional output capture
+    * Blocks via file watching until `done: true`
+    * On completion:
+        * Append `thoughts` to user_input.md (if non-empty)
+        * If test_passed = false:
+            * Append `user_required_changes` to user_input.md
+            * Delete the feedback file
+            * Return { thoughts, passed: false, user_required_changes, logs }
+        * If test_passed = true:
+            * Set prompt status to tested
+            * Delete the feedback file
+            * Return { thoughts, passed: true }
+* **release-all-prompts**
+    * Syntax: `envoy plan release-all-prompts`
+    * **Updates:** `prompts/*.md` (YAML front matter + freetext)
+    * Sets all prompts in_progress status to false
+* **block-debugging-logging-gate**
+    * Syntax: `envoy plan block-debugging-logging-gate <prompt_num> [<variant>]`
+    * **Creates:** `user_feedback/{N}{V}_logging.yaml` (fully YAML)
+    * **Updates:** `user_input.md` (freetext only)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+    * Creates feedback file with:
+        * logs field for user to paste captured debug output
+    * Blocks via file watching (using chokidar or similar) until `done: true` in the feedback file
+    * On completion:
+        * Append `thoughts` to user_input.md (if non-empty)
+        * Delete the feedback file
+    * Returns: { thoughts: string, logs: string }
+    * Note: Agent should consider `thoughts` (user's observations/hints) alongside logs when analyzing the bug
+* **cleanup-debug-logs**
+    * Syntax: `envoy plan cleanup-debug-logs`
+    * **Modifies:** Files in current worktree containing `[DEBUG-TEMP]` markers
+    * Scans worktree for `[DEBUG-TEMP]` markers and removes them deterministically
+    * **Algorithm:**
+        1. Find marker line: `// [DEBUG-TEMP]` (JS/TS) or `# [DEBUG-TEMP]` (Python/Shell)
+        2. Delete marker line
+        3. Delete ALL consecutive non-whitespace lines below
+        4. Stop at first blank/whitespace-only line
+        5. Repeat for all markers in file
+    * Returns: { success: boolean, files_modified: [paths], markers_removed: number }
+    * Note: Called in debugging protocol step 13.1 before merge
+    * Note: Deterministic removal - no AI judgment, just regex + line iteration
+* **get-prompt-walkthrough**
+    * Syntax: `envoy plan get-prompt-walkthrough <prompt_num> [<variant>]`
+    * **Reads:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+    * Returns full context for documentation extraction of a specific prompt:
+        * Prompt description and success_criteria
+        * Full walkthrough history
+        * Git diff summary for the prompt's relevant_files changes
+    * Returns: { prompt_num, variant, description, success_criteria, walkthrough: [...], git_diff_summary: string }
+* **mark-prompt-extracted**
+    * Syntax: `envoy plan mark-prompt-extracted <prompt_num> [<variant>]`
+    * **Updates:** `prompts/{N}.md` or `prompts/{N}{V}.md` (YAML front matter + freetext)
+    * Params:
+        * `<prompt_num>`: Integer prompt number
+        * `<variant>`: Optional variant letter
+    * Sets documentation_extracted = true on the specific prompt
+    * Called by documentor after processing that individual prompt
+* **complete**
+    * Syntax: `envoy plan complete`
+    * **Reads:** `plan.md` (YAML front matter + freetext), `prompts/*.md` (YAML front matter + freetext), `user_input.md` (freetext only)
+    * **Writes:** `summary.md` (freetext only)
+    * Generates summary with gemini based on git diff, plan context, prompt files full context (including walkthroughs), user_input.md
+    * Pushes code changes to remote feature branch
+    * Creates a PR using gh cli
+
+### **Knowledge:**
+
+**Storage Structure:**
+```
+.claude/envoy/.knowledge/           # Gitignored
+├── docs.usearch                 # Binary USearch index for docs/ (HNSW)
+├── docs.meta.json               # Metadata: id mappings + document metadata
+├── curator.usearch              # Binary USearch index for .claude/
+├── curator.meta.json            # Metadata for .claude/ files
+```
+
+**Search Flow:**
+1. Load USearch index + metadata from disk (sessionless - each CLI call loads fresh)
+2. Generate query embedding via web-ai TextModel (`gtr-t5-quant`, 768-dim)
+3. Search USearch for top-k candidates - returns `{keys, distances}` with similarity scores built-in
+4. Convert cosine distances to similarities, filter by thresholds, aggregate by token limits
+
+* **search**
+    * Syntax: `envoy knowledge search <index_name> <query>`
+    * index_name: the name of the index to search (docs, curator)
+    * query: the query to search the index for
+    * Will fetch results that exceed a threshold of similarity of SEARCH_SIMILARITY_THRESHOLD. (can be any number of results)
+    * Will get the token count of each resource from stored metadata.
+    * Will return full context of files such that total tokens does not exceed SEARCH_CONTEXT_TOKEN_LIMIT where only pulling full_context for files that exceed the similarity threshold SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD
+    * Each of those ENV variables are defined in claude's settings.json file as env variables (but have envoy encoded defaults)
+    * Returns: { success: true, message: "Search completed", results: [{ resource_path: string, similarity: number, token_count: number, resource_description: string, relevant_files: [paths], full_resource_context?: string }] }
+    * Note: `relevant_files` always included (lightweight) so consuming agent can decide which codebase files to read
+* **reindex-all**
+    * Syntax: `envoy knowledge reindex-all [--index_name <optional_index_name>]`
+    * Clears the existing index + metadata files if index_name is provided or all managed indexes if not provided
+    * Reads all files involved in the <index_name> or all indexes, generates embeddings via web-ai, stores in USearch index + metadata
+    * Returns: { success: true, message: "Index reindexed | Index failed to create - please warn user" }
+* **reindex-from-changes**
+    * Syntax: `envoy knowledge reindex-from-changes <index_name> --files <files>`
+    * files: list of files changed (with added/deleted/modified flags) [{ path: string, added: boolean, deleted: boolean, modified: boolean }]
+    * For docs/ files (added or modified):
+        * Scans document body for file path references
+        * Validates each referenced file exists in codebase
+        * If any missing: **fails with list of missing files** (commit should abort)
+        * If all exist: auto-populates `relevant_files` front-matter
+    * Generates embeddings via web-ai for the changed files and updates USearch index + metadata
+    * Returns: { success: boolean, message: string, missing_references?: [{ doc_path, missing_files: [paths] }], files: [{ path, added, deleted, modified }] }
+
+### **Gemini (prev Vertex):**
+
+**Model**: Gemini 3 Pro
+**API Key**: `process.env.VERTEX_API_KEY`
+
+**Retry behavior (all Gemini commands):**
+* Automatically retry on transient failures (network errors, 5xx, rate limits)
+* Max retries: 3
+* Backoff: exponential (1s, 2s, 4s)
+* Each retry is logged with `level: warn`
+* If all retries fail, returns: `{ success: false, error: "gemini_unavailable", retries: 3, fallback_suggestion: "..." }`
+* Fallback suggestions by endpoint:
+    * `audit`: "Skip audit and proceed with user review only via block-plan-gate"
+    * `review`: "Mark prompt as needs_manual_review for user verification"
+    * `ask`: "Proceed without Gemini response, use agent judgment"
+
+* **ask**
+    * Syntax: `envoy gemini ask <query>`
+    * Returns: { content: string }
+* **plan audit**
+    * Syntax: `envoy gemini audit`
+    * **Reads:** `user_input.md` (freetext only), `design/manifest.yaml` (fully YAML), `design/*.png`, `plan.md` (YAML front matter + freetext), `prompts/*.md` (YAML front matter + freetext)
+    * **May create:** `user_feedback/audit_questions.yaml` (fully YAML)
+    * **Updates:** `plan.md` (YAML front matter + freetext), `user_input.md` (freetext only)
+    * Retrieves from plan resources:
+        * user_input.md (labeled with original user intent and direction), 
+        * design/manifest.yaml and all screenshots, 
+        * plan.md, 
+        * all prompt files and full context, 
+    * If clarifying questions needed:
+        * Creates feedback file with questions
+        * Blocks thread polling until `done: true`
+        * Appends `thoughts` and Q&A pairs to user_input.md
+        * Deletes feedback file
+    * Write outcome to plan.md file appending to array as a new audit entry
+    * Returns: { verdict: passed|failed, thoughts?: string, answered_questions?: [{question, answer}], suggested_edits?: [{prompt_id, edit}] }
+    * Note: Agent should consider `thoughts` (user's additional guidance) when implementing suggested_edits
+* **plan review**
+    * **Reads:** `prompts/*.md` (YAML front matter + freetext), `curator.md` (freetext only), `user_input.md` (freetext only)
+    * **May create:** `user_feedback/{N}{V}_review_questions.yaml` or `user_feedback/full_review_questions.yaml` (fully YAML)
+    * **Updates:** `plan.md` or `prompts/{N}.md` (YAML front matter + freetext), `user_input.md` (freetext only)
+    * Full plan review syntax: `envoy gemini review --full`
+        * Takes all prompt file full context, curator.md, user_input.md
+        * git diff + commit summaries against entire feature branch
+        * Write outcome to plan.md file appending to array as a new review entry
+    * Prompt-level review syntax: `envoy gemini review <prompt_num> [<variant>]`
+        * Params:
+            * `<prompt_num>`: Integer prompt number
+            * `<variant>`: Optional variant letter
+        * Takes current prompt file full context
+        * git diff + commit summaries against worktree branch
+        * Write outcome to prompt file appending to array as a new review entry
+    * If clarifying questions needed:
+        * Creates feedback file
+        * Blocks thread polling until `done: true`
+        * Appends `thoughts` and Q&A pairs to user_input.md
+        * Deletes feedback file
+    * If not --full, sets prompt status = reviewed
+    * Returns: { verdict: passed|failed, thoughts?: string, answered_questions?: [{question, answer}], suggested_changes?: string }
+    * Note: Agent should consider `thoughts` (user's additional guidance) when implementing adjustments
+
+### **Git:**
+* **get-base-branch**
+    * Syntax: `envoy git get-base-branch`
+    * Returns the base branch name for this repository (e.g., main, master, develop)
+    * Uses `getBaseBranch` helper which checks for known protected branch names
+    * Returns: { branch: string }
+* **is-base-branch**
+    * Syntax: `envoy git is-base-branch`
+    * Returns true if currently on the base branch
+    * Returns: { is_base: boolean, current_branch: string, base_branch: string }
+* **checkout-base**
+    * Syntax: `envoy git checkout-base`
+    * Checks out the base branch
+    * Returns: { success: boolean, branch: string }
+* **diff-base**
+    * Syntax: `envoy git diff-base [--path <path>] [--summary]`
+    * Params:
+        * `--path <path>`: Optional path to scope the diff (e.g., `docs/`)
+        * `--summary`: Return summary instead of full diff
+    * Returns git diff of current branch vs base branch
+    * Returns: { diff: string, changed_files: [{ path, added, modified, deleted }] }
+* **create-pr**
+    * Syntax: `envoy git create-pr --title "<title>" --body "<body>"`
+    * Params:
+        * `--title "<title>"`: PR title
+        * `--body "<body>"`: PR body/description
+    * Creates a PR from current branch to base branch using gh cli
+    * Returns: { success: boolean, pr_url: string }
+* **cleanup-worktrees**
+    * Syntax: `envoy git cleanup-worktrees`
+    * Lists all worktrees matching `*--implementation-*` pattern
+    * For each: checks if corresponding prompt is merged
+    * If merged: delete worktree
+    * If orphaned (no matching prompt in plan directory):
+        * Display worktree info (branch name, last commit, age)
+        * Prompt user: "(D)elete, (K)eep, (S)kip all orphans"
+        * Delete removes both worktree and branch
+        * Keep leaves worktree intact for manual investigation
+    * Returns: { cleaned: [branches], orphaned: [branches], kept: [branches] }
+
+## **claude-hooks:**
+* startup:
+    * scan_agents (validate each agent file for correct front matter and references to existing skills)
+    * scan_skills (validate skills have required files etc for each directory)
+    * scan_commands (validate front matter)
+    * Release all prompt files in_progress status in current directory by using `envoy plan release-all-prompts`
+    * Run `envoy git cleanup-worktrees` to remove stale worktrees
+    * run envoy to setup venv
+    * log active plan status + directory and remind main agent that it is the main agent
+
+## **git-hooks:**
+* On checkout
+    * run `envoy documentation reindex-all` to reindex all indexes
+    * Delete plan file matter for any now deleted branches
+    * For a newly checked out branch, skip plan matter creation if branch matches any of:
+        * Protected branches: main, master, develop, dev, development, stage, staging, prod, production
+        * Prefix patterns: quick/, docs/, curator/
+        * **Worktree implementation branches**: *--implementation-* (e.g., `feat/auth--implementation-1-A`)
+            * Uses `--` separator because git can't create `branch/subbranch` if `branch` already exists
+            * These are temporary worktrees that derive their workflow from the parent feature branch's plan directory
+            * Any accidentally created plan matter is harmless (deleted with worktree) but skipping avoids unnecessary I/O
+    * Otherwise, creates the directories and certain files required for the plan matter in the branch if not exists
+    * Note: "direct mode" replaced with "on protected branch mode" for clarity
+* On commit
+    * Call `envoy documentation reindex-from-changes --files <files>` using all changed files from the commit and the envoy command will intelligently allocate file changes to specific index changes based on declaration of files / directories per managed index

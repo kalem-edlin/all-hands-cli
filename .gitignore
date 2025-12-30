@@ -1,11 +1,15 @@
 .env
-.claude/envoy/.venv/
 .claude/plans/**/*
 .trees/
 node_modules/
 .DS_Store
 .trees/**
 
+# Envoy observability files
+.claude/envoy.log
+.claude/metrics.jsonl
+
 # Repomix output (safety net - should not be created with --stdout)
 *-output.xml
 repomix-output.*
+.claude-trace
