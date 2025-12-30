@@ -2,7 +2,13 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "PARALLEL_MAX_WORKERS": "3",
-    "PROJECT_NAME": "test-target"
+    "PROJECT_NAME": "test-target",
+    "SEARCH_SIMILARITY_THRESHOLD": "0.64",
+    "SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD": "0.72",
+    "SEARCH_CONTEXT_TOKEN_LIMIT": "5000",
+    "MAX_LOGS_TOKENS": "10000",
+    "BASH_MAX_TIMEOUT_MS": "3600000",
+    "BASE_BRANCH": "main"
   },
   "hooks": {
     "SessionStart": [
@@ -12,33 +18,6 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/startup.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "scan-skills",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scripts/scan_skills.py"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/capture-queries.sh"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scripts/enforce_planning.py"
           }
         ]
       }
@@ -70,70 +49,22 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scripts/enforce_research_search.py"
           }
         ]
-      },
-      {
-        "matcher": "Bash(*grep*)|Bash(*find*)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scripts/enforce_rg.py"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scripts/validate_skill.py"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scripts/validate_skill.py"
-          }
-        ]
       }
     ]
   },
-  "companyAnnouncements": [
-    "Kalem's AI Agent Framework Rules!"
-  ],
   "enableAllProjectMcpServers": false,
   "permissions": {
     "allow": [
-      "Write",
-      "Edit",
+      "Grep",
       "Bash(git:*)",
       "Bash(gh:*)",
       "Bash(cat:*)",
       "Bash(ls:*)",
+      "Bash(rg:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx repomix@latest:*)",
       "Read(~/.claude-code-docs/docs/*)",
-      "Bash(.claude/envoy/envoy tavily search:*)",
-      "Bash(.claude/envoy/envoy tavily extract:*)",
-      "Bash(.claude/envoy/envoy vertex ask:*)",
-      "Bash(.claude/envoy/envoy vertex validate:*)",
-      "Bash(.claude/envoy/envoy vertex review:*)",
-      "Bash(.claude/envoy/envoy vertex architect:*)",
-      "Bash(.claude/envoy/envoy plans status:*)",
-      "Bash(.claude/envoy/envoy plans capture:*)",
-      "Bash(.claude/envoy/envoy plans cleanup:*)",
-      "Bash(.claude/envoy/envoy plans create:*)",
-      "Bash(.claude/envoy/envoy plans set-status:*)",
-      "Bash(.claude/envoy/envoy plans frontmatter:*)",
-      "Bash(.claude/envoy/envoy plans clear-queries:*)",
-      "Bash(.claude/envoy/envoy xai search:*)",
-      "Bash(.claude/envoy/envoy perplexity research:*)",
-      "Bash(.claude/envoy/envoy parallel spawn:*)",
-      "Bash(.claude/envoy/envoy parallel status:*)",
-      "Bash(.claude/envoy/envoy parallel results:*)",
-      "Bash(.claude/envoy/envoy parallel cleanup:*)",
+      "Bash(.claude/envoy/envoy:*)",
       "SlashCommand(/parallel-discovery:*)",
       "SlashCommand(/plan:*)",
       "SlashCommand(/plan-checkpoint:*)",
@@ -141,5 +72,10 @@
     ],
     "deny": [],
     "ask": []
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/statusline.sh",
+    "padding": 0
   }
 }

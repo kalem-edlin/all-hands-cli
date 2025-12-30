@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Validate skill directories on startup."""
+"""Validate agent files on startup."""
 import json
 import re
 import sys
 from pathlib import Path
 from typing import Optional
 
+AGENTS_DIR = Path(".claude/agents")
 SKILLS_DIR = Path(".claude/skills")
 
 
@@ -27,34 +28,30 @@ def parse_frontmatter(content: str) -> Optional[dict]:
 def main():
     errors = []
 
-    if not SKILLS_DIR.exists():
+    if not AGENTS_DIR.exists():
         sys.exit(0)
 
-    for skill_dir in SKILLS_DIR.iterdir():
-        if not skill_dir.is_dir():
-            continue
-
-        skill_file = skill_dir / "SKILL.md"
-        name = skill_dir.name
-
-        if not skill_file.exists():
-            errors.append(f"⚠️ skill/{name}/: missing SKILL.md")
-            continue
-
-        content = skill_file.read_text()
+    for f in AGENTS_DIR.glob("*.md"):
+        content = f.read_text()
         fm = parse_frontmatter(content)
+        name = f.stem
 
         if not fm:
-            errors.append(f"⚠️ skill/{name}/SKILL.md: missing frontmatter")
+            errors.append(f"⚠️ agent/{f.name}: missing frontmatter")
             continue
 
-        if "name" not in fm:
-            errors.append(f"⚠️ skill/{name}/SKILL.md: missing name")
-        elif fm["name"] != name:
-            errors.append(f"⚠️ skill/{name}/SKILL.md: name '{fm['name']}' doesn't match directory")
-
         if "description" not in fm:
-            errors.append(f"⚠️ skill/{name}/SKILL.md: missing description")
+            errors.append(f"⚠️ agent/{f.name}: missing description")
+
+        if fm.get("name") and fm["name"] != name:
+            errors.append(f"⚠️ agent/{f.name}: name '{fm['name']}' doesn't match filename")
+
+        # Check skills references
+        if "skills" in fm:
+            for skill in fm["skills"].split(","):
+                skill = skill.strip()
+                if skill and not (SKILLS_DIR / skill).exists():
+                    errors.append(f"⚠️ agent/{f.name}: skill '{skill}' not found")
 
     if errors:
         print(json.dumps({"systemMessage": "\n".join(errors)}))

@@ -1,147 +1,119 @@
 ---
-description: Generate XML handoff document for session continuity
-argument-hint: [--save]
+description: Suggest next steps after plan completion based on implemented work
 ---
 
 <objective>
-Generate structured XML handoff document capturing session state for seamless context transfer to next session. Prevents knowledge loss and repeated work.
+Analyze completed plan and generate contextual next-step suggestions. Uses plan context (user_input.md, summary.md, plan.md) to suggest relevant follow-up work.
 </objective>
 
-<quick_start>
-1. Gather git status, branch, recent commits
-2. Extract completed/remaining work from plan
-3. Document failed approaches and critical context
-4. Output XML to chat (or save to file with --save)
-</quick_start>
-
-<success_criteria>
-- XML document captures all session work and state
-- Failed approaches documented with WHY they failed
-- Critical non-obvious context preserved
-- Next session can resume without rediscovery
-</success_criteria>
+<context>
+Plan status: !`.claude/envoy/envoy plan check`
+</context>
 
 <process>
+<step name="check_status">
+Parse plan check result:
 
-## Output Format
+| Status | Action |
+|--------|--------|
+| in_progress | Tell user: "Plan has incomplete prompts. Run /continue or /plan --refine" and exit |
+| completed | Continue to get_context step |
+| no_plan | Generate generic suggestions (skip get_context) |
+</step>
 
-```xml
-<handoff>
-  <work_completed>
-    <!-- Bullet list of completed tasks/changes this session -->
-  </work_completed>
+<step name="get_context">
+Call `.claude/envoy/envoy plan get-full-plan`
 
-  <work_remaining>
-    <!-- Bullet list of outstanding tasks from plan -->
-  </work_remaining>
+Parse returned context:
+- user_input.md: original requirements, anticipated follow-ups, out-of-scope items
+- summary.md: what was implemented, key decisions
+- plan.md: prompts that were executed
+</step>
 
-  <attempted_approaches>
-    <!-- Any approaches tried that failed or were abandoned -->
-    <!-- Include WHY they failed to prevent repetition -->
-  </attempted_approaches>
+<step name="generate_suggestions">
+Using the Suggestion Domains below and parsed context, generate **3-5 concrete suggestions**.
 
-  <critical_context>
-    <!-- Non-obvious discoveries, constraints, or decisions -->
-    <!-- Things that would be lost without explicit capture -->
-  </critical_context>
+**Priority order:**
+1. Explicitly mentioned follow-ups from user_input.md
+2. Natural extensions of what was built
+3. Quality/hardening improvements
+4. New capabilities enabled by implementation
 
-  <current_state>
-    <!-- Git status, branch, uncommitted changes -->
-    <!-- Any blockers or pending decisions -->
-  </current_state>
-</handoff>
-```
+**Format each suggestion as actionable:**
+- Good: "Add unit tests for the auth service refresh token logic"
+- Bad: "Maybe add some tests"
+</step>
 
-## Execution
+<step name="present_suggestions">
+Output suggestions with routing guidance:
 
-### Step 1: Gather Session Context
+"Based on the completed work, here are suggested next steps:
 
-Analyze:
-1. Current git branch and status
-2. Recent commits (if on feature branch)
-3. Plan file contents (if exists at `.claude/plans/<branch>/plan.md`)
-4. Any uncommitted changes
+1. [Suggestion 1]
+2. [Suggestion 2]
+3. [Suggestion 3]
+...
 
-### Step 2: Extract Work Status
-
-From plan file (if exists):
-- `[x]` items → work_completed
-- `[ ]` items → work_remaining
-
-From session memory:
-- What was attempted this session
-- What succeeded vs failed
-- Why failures occurred
-
-### Step 3: Identify Critical Context
-
-Capture:
-- Design decisions made and rationale
-- Discovered constraints or gotchas
-- Dependencies or blockers identified
-- Any deviations from plan and why
-
-### Step 4: Document Current State
-
-```bash
-git status
-git branch --show-current
-git log --oneline -5  # if on feature branch
-```
-
-### Step 5: Generate Output
-
-If `--save` argument provided:
-- Save to `.claude/plans/<branch>/handoff.md`
-- Confirm: "Handoff saved to .claude/plans/<branch>/handoff.md"
-
-Otherwise:
-- Output XML directly to chat for copy/paste
-
+**Ready to continue?**
+- `/plan [suggestion]` - Start planning one of these
+- `/plan [your own idea]` - Plan something else
+- `/plan --refine` - Add to current plan instead of starting fresh
+- `/debug [issue]` - If you found a bug to fix first"
+</step>
 </process>
 
+<knowledge_bank name="suggestion_domains">
+**Directly Mentioned:**
+- Anything in "Anticipated follow-ups" from user_input.md
+- Items explicitly marked "out of scope for this iteration"
+- Technical debt the user said was acceptable for now
+
+**Natural Extensions:**
+- Additional user flows that build on implemented features
+- Edge cases that weren't covered but now matter
+- Performance optimizations for implemented features
+- Mobile/responsive versions if only desktop was built
+- API extensions if backend was built
+- Admin/management UI if user-facing was built
+
+**Quality and Hardening:**
+- Test coverage for implemented features
+- Error handling improvements
+- Accessibility enhancements
+- Documentation (README, API docs, inline comments)
+- Logging/monitoring for new features
+- Security hardening (input validation, auth edge cases)
+
+**Developer Experience:**
+- Local development improvements
+- CI/CD enhancements
+- Developer documentation
+- Code cleanup/refactoring opportunities identified during implementation
+
+**New Capabilities:**
+- Features that are now possible because of what was built
+- Integrations with other systems
+- Analytics/reporting on new functionality
+- User feedback mechanisms
+
+**Observability and Operations:**
+- Dashboards for new features
+- Alerting for failure modes
+- Performance baselines
+- Usage tracking
+</knowledge_bank>
+
+<success_criteria>
+- Plan status correctly determined
+- Context parsed from plan files
+- 3-5 contextual suggestions generated
+- Suggestions prioritized by relevance
+- Clear routing guidance provided
+</success_criteria>
+
 <constraints>
-- ALWAYS include WHY for failed approaches - prevents repetition
-- NEVER omit critical_context section - even if "none" is the value
-- Be specific in work_completed: include file paths, commit hashes
+- MUST check plan status first
+- MUST read plan context before generating suggestions
+- Suggestions MUST be specific to implemented work (not generic)
+- MUST provide routing guidance for each action type
 </constraints>
-
-## Usage Examples
-
-**End of session:**
-```
-/whats-next
-```
-Outputs XML to chat for next session.
-
-**Save for later:**
-```
-/whats-next --save
-```
-Persists to plan directory.
-
-## Section Guidelines
-
-### work_completed
-- Be specific: "Added intake gate to /plan command" not "made changes"
-- Include file paths modified
-- Note commits made
-
-### work_remaining
-- Pull directly from plan's unchecked items
-- Add any discovered tasks not in original plan
-
-### attempted_approaches
-- ONLY include if something failed or was abandoned
-- Always include WHY: "X failed because Y"
-- This prevents next session from repeating mistakes
-
-### critical_context
-- Non-obvious information that isn't in code comments
-- Verbal agreements or decisions
-- External constraints discovered
-- "If I forget this, I'll waste time rediscovering it"
-
-### current_state
-- Factual: branch, status, blockers
-- Any pending questions awaiting user input

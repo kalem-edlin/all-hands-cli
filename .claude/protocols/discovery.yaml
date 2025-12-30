@@ -1,0 +1,53 @@
+name: discovery
+description: Discovery workflow for feature requirements
+extends: null
+inputs:
+  - name: agent_name
+    type: string
+    optional: false
+    description: assigned specialist name (e.g., "frontend", "backend_1")
+  - name: segment_context
+    type: string
+    optional: false
+    description: segmented requirements from main agent
+  - name: approach_references
+    type: array
+    optional: true
+    description: "[{ specialist_name, approach_num }] for re-delegation"
+outputs:
+  - value: "{ success: true }"
+    description: findings written to file via envoy commands
+steps:
+  1: |
+    **Query documentation first**: Call `envoy knowledge search docs "<focused requirement area as descriptive request>"` (semantic search - full phrases, not keywords)
+    * May run multiple searches if requirements span distinct focus areas
+    * Use returned docs as context for approach building - reference existing patterns rather than reinventing
+    * Note any constraints or anti-patterns documented for this area
+  2: |
+    Read the design manifest for a specific screenshot if needed
+  3: |
+    If re-delegated with approach references:
+    * Call `envoy plan get-finding-approach <specialist_name> <approach_num>` for each
+    * Returns approach with `pending_refinement` if user requested changes
+    * Address the pending_refinement in updated approach
+  4: |
+    If available (not research agent) use repomix extraction skill to gather context relevant codebase files over areas of focus to generate approaches
+  5: |
+    Report key notes for all approaches to be aware of (relevant key technologies, stack, patterns, dependencies, known constraints / caveats, existing APIs etc) in notes
+    * Include references to relevant documentation found in step 1
+  6: |
+    Call `envoy plan write-approach <AGENT_NAME> <approach_num> --description "<desc>" [--variant <LETTER>] --context "<full_context>" --files "<file1>,<file2>" [--questions "<q1>|<q2>"]` for each approach
+
+    **CRITICAL - Approach Variant Rules:**
+    * An approach number is EITHER standalone (no variant) OR has variants (A, B, etc) - NEVER both
+    * If proposing alternatives for the same approach number, ALL must have variant letters (e.g., 1_A, 1_B)
+    * If only one approach for a number, do NOT use --variant flag
+    * INVALID: approach 1 + approach 1_A + approach 1_B (mixing standalone with variants)
+    * VALID: approach 1 (standalone) or approach 1_A + 1_B (variants only)
+
+    Additional guidelines:
+    1. Allowed to propose multiple variants of an approach where necessary / beneficial to user discretion and coverage
+    2. When using variants, start with A and increment (A, B, C...)
+    3. Include relevant file directories for given approaches (project relative for worktree compatibility)
+    4. Include comments highlighting best practices in pseudocode (reference docs if applicable)
+    5. Include any clarifying questions per approach

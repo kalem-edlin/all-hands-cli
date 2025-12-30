@@ -1,0 +1,55 @@
+name: bug-discovery
+description: Discovery workflow for bug investigation
+extends: discovery
+inputs:
+  - name: agent_name
+    type: string
+    optional: false
+    description: assigned specialist name (e.g., "frontend", "backend_1")
+  - name: segment_context
+    type: string
+    optional: false
+    description: bug context from main agent (symptoms, reproduction steps, suspected areas)
+  - name: approach_references
+    type: array
+    optional: true
+    description: "[{ specialist_name, approach_num }] for re-delegation"
+outputs:
+  - value: "{ success: true }"
+    description: bug hypotheses written to file via envoy commands
+steps:
+  1: |
+    **Query documentation first**: Call `envoy knowledge search docs "<suspected area + symptoms as descriptive phrase>"` (semantic search - full phrases, not keywords)
+    * Check for documented anti-patterns that might explain the bug
+    * Note any constraints that must be preserved in the fix
+  2: |
+    Run compiler/linter commands in domain area to identify compilation errors
+    * Capture any error output as additional context for approach building
+  4+: |
+    over suspected bug areas in codebase relevant files
+  5: |
+    Report key notes for all approaches to be aware of:
+    * Best practices to follow for the bug fix (reference docs if applicable)
+    * Found constraints and limitations
+    * Relevant error messages, stack traces, or symptoms discovered
+    * Related dependencies and APIs
+  6: |
+    Call `envoy plan write-approach <AGENT_NAME> <approach_num> --description "<hypothesis>" [--variant <LETTER>] --context "<full_context>" --files "<file1>,<file2>" [--questions "<q1>|<q2>"]` for each approach
+
+    **CRITICAL - Approach Variant Rules:**
+    * An approach number is EITHER standalone (no variant) OR has variants (A, B, etc) - NEVER both
+    * If proposing alternative hypotheses for the same approach number, ALL must have variant letters (e.g., 1_A, 1_B)
+    * If only one hypothesis for a number, do NOT use --variant flag
+    * INVALID: approach 1 + approach 1_A + approach 1_B (mixing standalone with variants)
+    * VALID: approach 1 (standalone) or approach 1_A + 1_B (variants only)
+
+    Additional guidelines:
+    1. Approach description is a **hypothesis** for a specific fix (can have variants for different fix strategies)
+    2. When using variants, start with A and increment (A, B, C...)
+    3. Include relevant file directories for given approaches (project relative for worktree compatibility)
+    4. FREE TEXT context must include:
+        * Problem area analysis
+        * Recommended logging statements to add (to capture debug output)
+        * Potential fixes to investigate based on hypothesis
+    5. Include comments highlighting best practices that should be retained in any fix
+    6. Include any clarifying questions after diving into code

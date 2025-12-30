@@ -1,0 +1,51 @@
+name: debugging
+description: Debugging workflow for debug prompts
+extends: implementation
+inputs: null
+outputs:
+  - value: "{ success: true, merged: true }"
+    description: fix merged to feature branch
+  - value: "{ success: true, merged: false, reason: \"rejected\" }"
+    description: variant was rejected by user
+steps:
+  6+: |
+    * Prioritize logging tasks first
+  6.1: |
+    Implement logging tasks from todo list using **[DEBUG-TEMP] markers**:
+    ```
+    // [DEBUG-TEMP]
+    console.log("debug output");
+    console.log("more debug");
+
+    // real code here (blank line above preserves this)
+    ```
+    * Marker format: `// [DEBUG-TEMP]` (JS/TS) or `# [DEBUG-TEMP]` (Python)
+    * All log statements MUST be consecutive lines below marker
+    * MUST have blank line before resuming real code
+  6.2: |
+    Call `envoy plan block-debugging-logging-gate <PROMPT_NUM> [<VARIANT>]`
+    * Returns: { thoughts, logs }
+  7: |
+    Implement fix based on prompt hypothesis, user `thoughts`, and returned logs
+  8: |
+    **Call `envoy plan record-implementation <PROMPT_NUM> [<VARIANT>] --walkthrough "<STRUCTURED_WALKTHROUGH>" --iteration <ITERATION> [--refinement-reason "<REFINEMENT_REASON>"]`**
+    * Generate walkthrough with type = "initial" for ITERATION 1, "testing-refinement" for ITERATION > 1
+  12: |
+    Call `envoy plan block-prompt-testing-gate <PROMPT_NUM> [<VARIANT>]`
+    * Returns: { thoughts, passed, user_required_changes?, logs? }
+    * If passed = false:
+      * **Increment ITERATION, set REFINEMENT_REASON = "Testing feedback: {summary of user_required_changes}"**
+      * **Go to step 10** (re-implement fix with refinement context, generate walkthrough with type = "testing-refinement")
+  13: |
+    Call `envoy plan block-prompt-variants-gate <PROMPT_NUM> <VARIANT>`
+    * Returns immediately if not a variant prompt
+    * Returns: { thoughts, variant_solution, reason }
+    * **For debug prompts:** `alternative` (non-main) treated as `discard` - only one fix can be main
+    * If discard: archive branch, remove worktree
+    * If main: continue
+  13.1: |
+    Call `envoy plan cleanup-debug-logs` to remove all [DEBUG-TEMP] markers
+    * Algorithm: find marker -> delete marker line -> delete all consecutive non-blank lines below -> stop at first blank line
+    * Deterministic removal, no AI judgment required
+  14: |
+    Commit remaining changes, merge worktree to feature branch
