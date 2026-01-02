@@ -4856,9 +4856,79 @@ var Yargs = YargsFactory(esm_default);
 var yargs_default = Yargs;
 
 // src/commands/init.ts
-import { existsSync as existsSync3, readFileSync as readFileSync5, writeFileSync, mkdirSync, copyFileSync, renameSync } from "fs";
-import { join as join2, dirname as dirname4, resolve as resolve6 } from "path";
 import { spawnSync as spawnSync2 } from "child_process";
+import { copyFileSync, existsSync as existsSync3, mkdirSync, readFileSync as readFileSync5, renameSync, writeFileSync } from "fs";
+import { dirname as dirname4, join as join2, resolve as resolve6 } from "path";
+import * as readline from "readline";
+
+// src/lib/git.ts
+import { execSync, spawnSync } from "child_process";
+function git(args, cwd) {
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf-8",
+    maxBuffer: 10 * 1024 * 1024
+  });
+  return {
+    success: result.status === 0,
+    stdout: result.stdout?.trim() || "",
+    stderr: result.stderr?.trim() || ""
+  };
+}
+function getCurrentBranch(repoPath) {
+  const result = git(["rev-parse", "--abbrev-ref", "HEAD"], repoPath);
+  return result.success ? result.stdout : "";
+}
+function getRepoName(repoPath) {
+  const result = git(["remote", "get-url", "origin"], repoPath);
+  if (result.success) {
+    let name = result.stdout.split("/").pop() || "";
+    if (name.endsWith(".git")) {
+      name = name.slice(0, -4);
+    }
+    return name;
+  }
+  return repoPath.split("/").pop() || "unknown";
+}
+function getStagedFiles(repoPath) {
+  const result = git(["diff", "--cached", "--name-only"], repoPath);
+  if (!result.success || !result.stdout) {
+    return /* @__PURE__ */ new Set();
+  }
+  return new Set(result.stdout.split("\n").filter(Boolean));
+}
+function isGitRepo(path2) {
+  const result = git(["rev-parse", "--git-dir"], path2);
+  return result.success;
+}
+function ghCli(args, cwd) {
+  const result = spawnSync("gh", args, {
+    cwd,
+    encoding: "utf-8",
+    maxBuffer: 10 * 1024 * 1024
+  });
+  return {
+    success: result.status === 0,
+    stdout: result.stdout?.trim() || "",
+    stderr: result.stderr?.trim() || ""
+  };
+}
+function checkGitInstalled() {
+  try {
+    execSync("git --version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+function checkGhInstalled() {
+  try {
+    execSync("gh --version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // src/lib/manifest.ts
 import { readFileSync as readFileSync4, existsSync, readdirSync as readdirSync2 } from "fs";
@@ -6501,75 +6571,6 @@ function isIgnored(path2, patterns) {
   return patterns.some((pattern) => minimatch(path2, pattern, { dot: true }));
 }
 
-// src/lib/git.ts
-import { execSync, spawnSync } from "child_process";
-function git(args, cwd) {
-  const result = spawnSync("git", args, {
-    cwd,
-    encoding: "utf-8",
-    maxBuffer: 10 * 1024 * 1024
-  });
-  return {
-    success: result.status === 0,
-    stdout: result.stdout?.trim() || "",
-    stderr: result.stderr?.trim() || ""
-  };
-}
-function getCurrentBranch(repoPath) {
-  const result = git(["rev-parse", "--abbrev-ref", "HEAD"], repoPath);
-  return result.success ? result.stdout : "";
-}
-function getRepoName(repoPath) {
-  const result = git(["remote", "get-url", "origin"], repoPath);
-  if (result.success) {
-    let name = result.stdout.split("/").pop() || "";
-    if (name.endsWith(".git")) {
-      name = name.slice(0, -4);
-    }
-    return name;
-  }
-  return repoPath.split("/").pop() || "unknown";
-}
-function getStagedFiles(repoPath) {
-  const result = git(["diff", "--cached", "--name-only"], repoPath);
-  if (!result.success || !result.stdout) {
-    return /* @__PURE__ */ new Set();
-  }
-  return new Set(result.stdout.split("\n").filter(Boolean));
-}
-function isGitRepo(path2) {
-  const result = git(["rev-parse", "--git-dir"], path2);
-  return result.success;
-}
-function ghCli(args, cwd) {
-  const result = spawnSync("gh", args, {
-    cwd,
-    encoding: "utf-8",
-    maxBuffer: 10 * 1024 * 1024
-  });
-  return {
-    success: result.status === 0,
-    stdout: result.stdout?.trim() || "",
-    stderr: result.stderr?.trim() || ""
-  };
-}
-function checkGitInstalled() {
-  try {
-    execSync("git --version", { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-function checkGhInstalled() {
-  try {
-    execSync("gh --version", { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // src/lib/paths.ts
 import { existsSync as existsSync2 } from "fs";
 import { dirname as dirname3, resolve as resolve5 } from "path";
@@ -6599,7 +6600,6 @@ function getAllhandsRoot() {
 }
 
 // src/commands/init.ts
-import * as readline from "readline";
 var MIGRATION_MAP = {
   "CLAUDE.md": "CLAUDE.project.md",
   ".claude/settings.json": ".claude/settings.local.json"
@@ -6613,6 +6613,34 @@ var HUSKY_HOOKS = [
   "post-checkout",
   "post-rewrite"
 ];
+function syncGitignore(allhandsRoot, target) {
+  const sourceGitignore = join2(allhandsRoot, ".gitignore");
+  const targetGitignore = join2(target, ".gitignore");
+  if (!existsSync3(sourceGitignore)) {
+    return { added: [], unchanged: true };
+  }
+  const sourceContent = readFileSync5(sourceGitignore, "utf-8");
+  const sourceLines = sourceContent.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+  let targetLines = [];
+  let targetContent = "";
+  if (existsSync3(targetGitignore)) {
+    targetContent = readFileSync5(targetGitignore, "utf-8");
+    targetLines = targetContent.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+  }
+  const targetSet = new Set(targetLines);
+  const linesToAdd = sourceLines.filter((line) => !targetSet.has(line));
+  if (linesToAdd.length === 0) {
+    return { added: [], unchanged: true };
+  }
+  const additions = [
+    "",
+    "# AllHands framework ignores",
+    ...linesToAdd
+  ].join("\n");
+  const newContent = targetContent.trimEnd() + additions + "\n";
+  writeFileSync(targetGitignore, newContent);
+  return { added: linesToAdd, unchanged: false };
+}
 async function confirm(message) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -6736,6 +6764,16 @@ ${"!".repeat(60)}`);
     }
     copyFileSync(sourceFile, targetFile);
     copied++;
+  }
+  console.log("\nSyncing .gitignore entries...");
+  const gitignoreResult = syncGitignore(allhandsRoot, resolvedTarget);
+  if (gitignoreResult.unchanged) {
+    console.log("  .gitignore already contains all required entries");
+  } else {
+    console.log(`  Added ${gitignoreResult.added.length} entries to .gitignore:`);
+    for (const entry of gitignoreResult.added) {
+      console.log(`    + ${entry}`);
+    }
   }
   const ignoreFile = join2(resolvedTarget, ".allhandsignore");
   if (!existsSync3(ignoreFile)) {
