@@ -9,12 +9,12 @@ Create comprehensive documentation for the codebase from scratch. Uses taxonomy-
 
 <context>
 Current branch: !`git branch --show-current`
-Base branch: !`.claude/envoy/envoy git get-base-branch`
+Base branch: !`envoy git get-base-branch`
 </context>
 
 <process>
 <step name="setup_branch">
-1. Checkout base branch: `.claude/envoy/envoy git checkout-base`
+1. Checkout base branch: `envoy git checkout-base`
 2. Create docs branch: `docs/init-<timestamp>` or inferred from context
 </step>
 

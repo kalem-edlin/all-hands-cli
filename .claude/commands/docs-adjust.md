@@ -9,7 +9,7 @@ Update documentation incrementally based on recent code changes or user-specifie
 
 <context>
 Current branch: !`git branch --show-current`
-Base branch: !`.claude/envoy/envoy git get-base-branch`
+Base branch: !`envoy git get-base-branch`
 </context>
 
 <process>
@@ -28,8 +28,9 @@ Determine mode:
 <step name="get_changed_files">
 If `--diff` mode:
 ```bash
-git diff --name-only $(git merge-base HEAD <base_branch>)
+envoy git diff-base --summary
 ```
+Extract file paths from `changed_files[].path` in the response.
 
 Filter to source files only (exclude tests, configs, etc. unless explicitly requested).
 </step>

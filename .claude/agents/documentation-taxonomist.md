@@ -81,7 +81,17 @@ segments:
    - Only segment what needs documentation work
    - Smaller segments for incremental changes
 
-5. Return segments (same format as init_workflow)
+5. Return segments with action field:
+```yaml
+segments:
+  - domain: "<domain-name>"
+    files: ["<glob-patterns>"]
+    output_path: "docs/<domain>/"
+    worktree_branch: "<feature_branch>/docs-<domain>"
+    depth: "overview" | "detailed" | "comprehensive"
+    notes: "<guidance for writer>"
+    action: "create" | "update"
+```
 </adjust_workflow>
 
 <segmentation_principles>

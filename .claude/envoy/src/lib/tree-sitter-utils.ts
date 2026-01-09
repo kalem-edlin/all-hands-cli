@@ -25,21 +25,54 @@ export interface ParseResult {
   error?: string;
 }
 
-// Lazy-loaded parsers cache
-const parserCache = new Map<string, unknown>();
+// Tree-sitter Query types
+interface QueryCapture {
+  name: string;
+  node: {
+    text: string;
+    startPosition: { row: number; column: number };
+    endPosition: { row: number; column: number };
+  };
+}
+
+interface QueryMatch {
+  pattern: number;
+  captures: QueryCapture[];
+}
+
+interface Query {
+  matches(node: unknown): QueryMatch[];
+}
+
+interface QueryConstructor {
+  new (grammar: unknown, queryString: string): Query;
+}
+
+// Parser data type including Query constructor
+interface ParserData {
+  parser: unknown;
+  grammar: unknown;
+  QueryClass: QueryConstructor;
+}
+
+// Lazy-loaded parsers cache - stores parser, grammar, and Query class
+const parserCache = new Map<string, ParserData>();
 
 /**
  * Get or create a tree-sitter parser for a language.
  * Lazily loads grammars to avoid startup cost.
+ * Returns parser, grammar, and Query class (needed for Query API).
  */
-async function getParser(language: string): Promise<unknown | null> {
+async function getParser(language: string): Promise<ParserData | null> {
   if (parserCache.has(language)) {
     return parserCache.get(language)!;
   }
 
   try {
     // Dynamic import tree-sitter
-    const Parser = (await import("tree-sitter")).default;
+    const TreeSitter = await import("tree-sitter");
+    const Parser = TreeSitter.default;
+    const QueryClass = (TreeSitter as unknown as { Query: QueryConstructor }).Query;
 
     // Load language grammar
     let grammar: unknown;
@@ -74,8 +107,9 @@ async function getParser(language: string): Promise<unknown | null> {
 
     const parser = new Parser();
     parser.setLanguage(grammar as Parameters<typeof parser.setLanguage>[0]);
-    parserCache.set(language, parser);
-    return parser;
+    const cached: ParserData = { parser, grammar, QueryClass };
+    parserCache.set(language, cached);
+    return cached;
   } catch (e) {
     console.error(`Failed to load parser for ${language}:`, e);
     return null;
@@ -103,8 +137,8 @@ export async function parseFile(filePath: string): Promise<ParseResult> {
     };
   }
 
-  const parser = await getParser(language);
-  if (!parser) {
+  const parserData = await getParser(language);
+  if (!parserData) {
     return {
       success: false,
       error: `No parser available for ${language}`,
@@ -113,7 +147,7 @@ export async function parseFile(filePath: string): Promise<ParseResult> {
 
   try {
     const sourceCode = readFileSync(filePath, "utf-8");
-    const tree = (parser as { parse(source: string): unknown }).parse(sourceCode);
+    const tree = (parserData.parser as { parse(source: string): unknown }).parse(sourceCode);
     const queries = getQueriesForLanguage(language);
 
     if (!queries) {
@@ -123,7 +157,7 @@ export async function parseFile(filePath: string): Promise<ParseResult> {
       };
     }
 
-    const symbols = extractSymbols(tree, queries, language);
+    const symbols = extractSymbols(tree, queries, parserData.grammar, parserData.QueryClass);
 
     return {
       success: true,
@@ -165,274 +199,58 @@ export async function symbolExists(
   return symbol !== null;
 }
 
+// Cache compiled queries to avoid recompilation
+const queryCache = new Map<string, Query>();
+
 /**
- * Extract symbols from a parsed tree using queries.
+ * Extract symbols from a parsed tree using tree-sitter's Query API.
+ * This uses the declarative query patterns from ast-queries.ts.
  */
 function extractSymbols(
   tree: unknown,
   queries: LanguageQueries,
-  language: string
+  grammar: unknown,
+  QueryClass: QueryConstructor
 ): SymbolLocation[] {
   const symbols: SymbolLocation[] = [];
   const root = (tree as { rootNode: unknown }).rootNode;
 
-  // Walk the tree and match nodes against our query patterns
-  // This is a simplified approach - for full query support we'd use tree-sitter's Query class
-  walkTree(root, (node: TreeNode) => {
-    for (const [symbolType, queryDef] of Object.entries(queries)) {
-      const match = matchNode(node, queryDef.query, symbolType, language);
-      if (match) {
-        symbols.push(match);
+  for (const [symbolType, queryDef] of Object.entries(queries)) {
+    const cacheKey = `${symbolType}:${queryDef.query}`;
+
+    let query = queryCache.get(cacheKey);
+    if (!query) {
+      try {
+        query = new QueryClass(grammar, queryDef.query);
+        queryCache.set(cacheKey, query);
+      } catch (e) {
+        // Query compilation failed - skip this symbol type
+        console.error(`Failed to compile query for ${symbolType}:`, e);
+        continue;
       }
     }
-  });
+
+    try {
+      const matches = query.matches(root);
+      for (const match of matches) {
+        const nameCapture = match.captures.find(c => c.name === queryDef.nameCapture);
+        if (nameCapture) {
+          symbols.push({
+            name: nameCapture.node.text,
+            startLine: nameCapture.node.startPosition.row + 1,
+            endLine: nameCapture.node.endPosition.row + 1,
+            type: symbolType,
+          });
+        }
+      }
+    } catch (e) {
+      // Query execution failed - skip this symbol type
+      console.error(`Failed to execute query for ${symbolType}:`, e);
+      continue;
+    }
+  }
 
   return symbols;
-}
-
-interface TreeNode {
-  type: string;
-  text: string;
-  startPosition: { row: number; column: number };
-  endPosition: { row: number; column: number };
-  children: TreeNode[];
-  childForFieldName?: (name: string) => TreeNode | null;
-  namedChildren?: TreeNode[];
-}
-
-/**
- * Walk tree recursively, calling callback for each node.
- */
-function walkTree(node: TreeNode, callback: (node: TreeNode) => void): void {
-  callback(node);
-  const children = node.namedChildren || node.children || [];
-  for (const child of children) {
-    walkTree(child, callback);
-  }
-}
-
-/**
- * Simple pattern matching for tree-sitter nodes.
- * Matches common declaration patterns without full query syntax.
- */
-function matchNode(
-  node: TreeNode,
-  _queryPattern: string,
-  symbolType: string,
-  language: string
-): SymbolLocation | null {
-  // Match based on node type patterns for each language
-  const nodeType = node.type;
-
-  // TypeScript/JavaScript patterns
-  if (language === "typescript" || language === "javascript") {
-    if (symbolType === "function" && nodeType === "function_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "class" && (nodeType === "class_declaration" || nodeType === "abstract_class_declaration")) {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "variable" && nodeType === "variable_declarator") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "type" && nodeType === "type_alias_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "interface" && nodeType === "interface_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "method" && nodeType === "method_definition") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "arrowFunction" && nodeType === "lexical_declaration") {
-      // Find variable_declarator with arrow_function value
-      const children = node.namedChildren || node.children || [];
-      for (const child of children) {
-        if (child.type === "variable_declarator") {
-          const nameNode = child.childForFieldName?.("name");
-          const valueNode = child.childForFieldName?.("value");
-          if (nameNode && valueNode?.type === "arrow_function") {
-            return makeLocation(nameNode.text, node, "function");
-          }
-        }
-      }
-    }
-  }
-
-  // Python patterns
-  if (language === "python") {
-    if (symbolType === "function" && nodeType === "function_definition") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "class" && nodeType === "class_definition") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-  }
-
-  // Go patterns
-  if (language === "go") {
-    if (symbolType === "function" && nodeType === "function_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "type" && nodeType === "type_declaration") {
-      // Look for type_spec child
-      const children = node.namedChildren || node.children || [];
-      for (const child of children) {
-        if (child.type === "type_spec") {
-          const nameNode = child.childForFieldName?.("name");
-          if (nameNode) {
-            return makeLocation(nameNode.text, node, symbolType);
-          }
-        }
-      }
-    }
-    if (symbolType === "method" && nodeType === "method_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-  }
-
-  // Rust patterns
-  if (language === "rust") {
-    if (symbolType === "function" && nodeType === "function_item") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "struct" && nodeType === "struct_item") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "enum" && nodeType === "enum_item") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "trait" && nodeType === "trait_item") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-  }
-
-  // Java patterns
-  if (language === "java") {
-    if (symbolType === "class" && nodeType === "class_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "interface" && nodeType === "interface_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "method" && nodeType === "method_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-  }
-
-  // Ruby patterns
-  if (language === "ruby") {
-    if (symbolType === "function" && nodeType === "method") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "class" && nodeType === "class") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "module" && nodeType === "module") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-  }
-
-  // Swift patterns
-  if (language === "swift") {
-    if (symbolType === "function" && nodeType === "function_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "class" && nodeType === "class_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-    if (symbolType === "struct" && nodeType === "struct_declaration") {
-      const nameNode = node.childForFieldName?.("name");
-      if (nameNode) {
-        return makeLocation(nameNode.text, node, symbolType);
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
- * Create a SymbolLocation from node data.
- */
-function makeLocation(
-  name: string,
-  node: TreeNode,
-  type: string
-): SymbolLocation {
-  return {
-    name,
-    // Tree-sitter uses 0-indexed rows, but git blame uses 1-indexed lines
-    startLine: node.startPosition.row + 1,
-    endLine: node.endPosition.row + 1,
-    type,
-  };
 }
 
 /**

@@ -29,6 +29,46 @@ const getProjectRoot = (): string => {
 };
 
 /**
+ * Get most recent commit hash for a line range using git blame.
+ * Uses -t flag to get timestamps directly from blame output (single subprocess).
+ */
+const getMostRecentHashForRange = (
+  filePath: string,
+  startLine: number,
+  endLine: number,
+  cwd: string
+): { hash: string; success: boolean } => {
+  const blameResult = spawnSync(
+    "git",
+    ["blame", "-L", `${startLine},${endLine}`, "--porcelain", "-t", filePath],
+    { encoding: "utf-8", cwd }
+  );
+
+  if (blameResult.status !== 0) {
+    return { hash: "0000000", success: false };
+  }
+
+  const lines = blameResult.stdout.split("\n");
+  let mostRecentHash = "0000000";
+  let mostRecentTime = 0;
+  let currentHash = "";
+
+  for (const line of lines) {
+    if (/^[a-f0-9]{40}/.test(line)) {
+      currentHash = line.substring(0, 7);
+    } else if (line.startsWith("committer-time ") && currentHash) {
+      const timestamp = parseInt(line.substring(15), 10);
+      if (timestamp > mostRecentTime) {
+        mostRecentTime = timestamp;
+        mostRecentHash = currentHash;
+      }
+    }
+  }
+
+  return { hash: mostRecentHash, success: true };
+};
+
+/**
  * Format a symbol reference with git blame hash.
  * Output: [ref:file:symbol:hash]
  */
@@ -70,72 +110,31 @@ class FormatReferenceCommand extends BaseCommand {
     }
 
     // Get git blame hash for symbol's line range
-    try {
-      const blameResult = spawnSync(
-        "git",
-        ["blame", "-L", `${symbol.startLine},${symbol.endLine}`, "--porcelain", absolutePath],
-        { encoding: "utf-8", cwd: projectRoot }
-      );
+    const { hash: mostRecentHash, success } = getMostRecentHashForRange(
+      absolutePath,
+      symbol.startLine,
+      symbol.endLine,
+      projectRoot
+    );
 
-      if (blameResult.status !== 0) {
-        return this.error(
-          "git_error",
-          "Failed to get git blame for symbol",
-          "Ensure file is tracked by git"
-        );
-      }
-
-      // Extract most recent commit hash from blame output
-      const hashes = new Set<string>();
-      const lines = blameResult.stdout.split("\n");
-      for (const line of lines) {
-        // Porcelain format starts each block with full commit hash
-        if (/^[a-f0-9]{40}/.test(line)) {
-          hashes.add(line.substring(0, 7)); // Short hash
-        }
-      }
-
-      // Get most recent hash (we need to check commit timestamps)
-      const hashArray = Array.from(hashes);
-      let mostRecentHash = hashArray[0] || "0000000";
-
-      if (hashArray.length > 1) {
-        // Find most recent commit
-        let mostRecentTime = 0;
-        for (const hash of hashArray) {
-          try {
-            const timeResult = spawnSync(
-              "git",
-              ["show", "-s", "--format=%ct", hash],
-              { encoding: "utf-8", cwd: projectRoot }
-            );
-            const timestamp = parseInt(timeResult.stdout.trim(), 10);
-            if (timestamp > mostRecentTime) {
-              mostRecentTime = timestamp;
-              mostRecentHash = hash;
-            }
-          } catch {
-            continue;
-          }
-        }
-      }
-
-      const reference = `[ref:${relativePath}:${symbolName}:${mostRecentHash}]`;
-
-      return this.success({
-        reference,
-        file: relativePath,
-        symbol: symbolName,
-        hash: mostRecentHash,
-        line_range: { start: symbol.startLine, end: symbol.endLine },
-        symbol_type: symbol.type,
-      });
-    } catch (e) {
+    if (!success) {
       return this.error(
-        "execution_error",
-        e instanceof Error ? e.message : String(e)
+        "git_error",
+        "Failed to get git blame for symbol",
+        "Ensure file is tracked by git"
       );
     }
+
+    const reference = `[ref:${relativePath}:${symbolName}:${mostRecentHash}]`;
+
+    return this.success({
+      reference,
+      file: relativePath,
+      symbol: symbolName,
+      hash: mostRecentHash,
+      line_range: { start: symbol.startLine, end: symbol.endLine },
+      symbol_type: symbol.type,
+    });
   }
 }
 
@@ -245,31 +244,17 @@ class ValidateCommand extends BaseCommand {
         continue;
       }
 
+      // Check if file type is supported for symbol validation
+      const ext = extname(absoluteRefFile);
+      const supported = getSupportedExtensions();
+      if (!supported.includes(ext)) {
+        // Can't validate symbol hash for unsupported files - file exists, skip hash check
+        continue;
+      }
+
       // Check if symbol exists
       const symbolFound = await symbolExists(absoluteRefFile, ref.refSymbol);
       if (!symbolFound) {
-        // Check if it's an unsupported extension (validate file only)
-        const ext = extname(absoluteRefFile);
-        const supported = getSupportedExtensions();
-        if (!supported.includes(ext)) {
-          // For unsupported files, just check file+hash
-          const blameResult = spawnSync(
-            "git",
-            ["log", "-1", "--format=%h", "--", absoluteRefFile],
-            { encoding: "utf-8", cwd: projectRoot }
-          );
-          const currentHash = blameResult.stdout.trim().substring(0, 7);
-          if (currentHash !== ref.refHash) {
-            stale.push({
-              doc_file: ref.file,
-              reference: ref.reference,
-              stored_hash: ref.refHash,
-              current_hash: currentHash,
-            });
-          }
-          continue;
-        }
-
         invalid.push({
           doc_file: ref.file,
           reference: ref.reference,
@@ -284,51 +269,20 @@ class ValidateCommand extends BaseCommand {
         continue; // Already validated above
       }
 
-      const blameResult = spawnSync(
-        "git",
-        ["blame", "-L", `${symbol.startLine},${symbol.endLine}`, "--porcelain", absoluteRefFile],
-        { encoding: "utf-8", cwd: projectRoot }
+      const { hash: mostRecentHash, success } = getMostRecentHashForRange(
+        absoluteRefFile,
+        symbol.startLine,
+        symbol.endLine,
+        projectRoot
       );
 
-      if (blameResult.status !== 0) {
+      if (!success) {
         invalid.push({
           doc_file: ref.file,
           reference: ref.reference,
           reason: "Git blame failed",
         });
         continue;
-      }
-
-      // Extract most recent hash
-      const hashes = new Set<string>();
-      const lines = blameResult.stdout.split("\n");
-      for (const line of lines) {
-        if (/^[a-f0-9]{40}/.test(line)) {
-          hashes.add(line.substring(0, 7));
-        }
-      }
-
-      const hashArray = Array.from(hashes);
-      let mostRecentHash = hashArray[0] || "0000000";
-
-      if (hashArray.length > 1) {
-        let mostRecentTime = 0;
-        for (const hash of hashArray) {
-          try {
-            const timeResult = spawnSync(
-              "git",
-              ["show", "-s", "--format=%ct", hash],
-              { encoding: "utf-8", cwd: projectRoot }
-            );
-            const timestamp = parseInt(timeResult.stdout.trim(), 10);
-            if (timestamp > mostRecentTime) {
-              mostRecentTime = timestamp;
-              mostRecentHash = hash;
-            }
-          } catch {
-            continue;
-          }
-        }
       }
 
       if (mostRecentHash !== ref.refHash) {
