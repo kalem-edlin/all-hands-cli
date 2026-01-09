@@ -7,7 +7,7 @@ Analyze completed plan and generate contextual next-step suggestions. Uses plan 
 </objective>
 
 <context>
-Plan status: !`.claude/envoy/envoy plan check`
+Plan status: !`envoy plan check`
 </context>
 
 <process>
@@ -22,7 +22,7 @@ Parse plan check result:
 </step>
 
 <step name="get_context">
-Call `.claude/envoy/envoy plan get-full-plan`
+Call `envoy plan get-full-plan`
 
 Parse returned context:
 - user_input.md: original requirements, anticipated follow-ups, out-of-scope items

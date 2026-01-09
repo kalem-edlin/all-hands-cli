@@ -10,14 +10,14 @@ Enable agents to perform read-only codebase analysis during planning phase. Agen
 <quick_start>
 ```bash
 # Write approach (required)
-.claude/envoy/envoy plans write-approach \
+envoy plans write-approach \
   --specialist "<your-name>" \
   --summary "2-3 sentence summary" \
   --files '[{"path": "src/auth/service.ts", "purpose": "Core auth logic"}]' \
   --content "Full analysis..."
 
 # Write options (when alternatives exist)
-.claude/envoy/envoy plans write-option \
+envoy plans write-option \
   --specialist "<your-name>" \
   --id "1A" --group "Token storage" --name "httpOnly cookies" \
   --summary "Store tokens in httpOnly cookies..." \
@@ -44,7 +44,7 @@ Use: Glob, Grep, Read
 
 **Approach (required)**:
 ```bash
-.claude/envoy/envoy plans write-approach \
+envoy plans write-approach \
   --specialist "<name>" \
   --summary "Brief summary for main agent" \
   --files '[{"path": "...", "purpose": "..."}]' \
@@ -54,7 +54,7 @@ Use: Glob, Grep, Read
 
 **Options (only if alternatives exist that the approach file mentions)**:
 ```bash
-.claude/envoy/envoy plans write-option \
+envoy plans write-option \
   --specialist "<name>" \
   --id "1A" \
   --group "Token storage" \
@@ -83,13 +83,13 @@ When re-invoked after user feedback (re-discovery loop):
 
 ```bash
 # Check for existing findings
-.claude/envoy/envoy plans has-findings --specialist "<name>"
+envoy plans has-findings --specialist "<name>"
 
 # Read previous approach
-.claude/envoy/envoy plans read-finding --specialist "<name>" --type approach
+envoy plans read-finding --specialist "<name>" --type approach
 
 # Write new approach with --replace (clears existing options)
-.claude/envoy/envoy plans write-approach \
+envoy plans write-approach \
   --specialist "<name>" \
   --replace \
   --summary "..." \

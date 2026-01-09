@@ -23,7 +23,7 @@
       "Bash(mkdir:*)",
       "Bash(npx repomix@latest:*)",
       "Read(~/.claude-code-docs/docs/*)",
-      "Bash(.claude/envoy/envoy:*)",
+      "Bash(envoy:*)",
       "SlashCommand(/plan:*)"
     ],
     "deny": [],

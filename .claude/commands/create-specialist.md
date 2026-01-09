@@ -9,7 +9,7 @@ Create a new specialist agent tailored to a specific domain. Gathers requirement
 
 <context>
 Current branch: !`git branch --show-current`
-Available envoy commands: !`.claude/envoy/envoy --help`
+Available envoy commands: !`envoy --help`
 Existing agents: !`ls -la .claude/agents/`
 </context>
 
@@ -84,8 +84,8 @@ If "Need changes":
 Commit any final changes.
 
 Check branch status:
-- Call `.claude/envoy/envoy git is-base-branch` on parent branch
-- If parent is base branch: Create PR via `.claude/envoy/envoy git create-pr --title "<title>" --body "<body>"`
+- Call `envoy git is-base-branch` on parent branch
+- If parent is base branch: Create PR via `envoy git create-pr --title "<title>" --body "<body>"`
 - If parent has plan matter: Merge back to parent, add updates to curator.md
 
 Report completion with next steps.

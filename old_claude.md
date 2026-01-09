@@ -33,7 +33,7 @@ This file MUST only be edited via curator agent consultation. Changes require cu
 ## Research Policy
 
 - **Web search**: Only curator/researcher agents (others blocked by hook)
-- **URL extraction**: All agents can use `.claude/envoy/envoy tavily extract "<url>"` for known doc URLs
+- **URL extraction**: All agents can use `envoy tavily extract "<url>"` for known doc URLs
 - **GitHub content**: Use `gh` CLI instead of extract (e.g., `gh api repos/owner/repo/contents/path`)
 
 ## Context Budget (50% Rule)

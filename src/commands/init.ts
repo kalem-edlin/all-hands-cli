@@ -1,10 +1,18 @@
 import { spawnSync } from 'child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import * as readline from 'readline';
 import { git, isGitRepo } from '../lib/git.js';
 import { Manifest } from '../lib/manifest.js';
 import { getAllhandsRoot } from '../lib/paths.js';
+
+const ENVOY_SHELL_FUNCTION = `
+# AllHands envoy command - resolves to .claude/envoy/envoy from current directory
+envoy() {
+  "$PWD/.claude/envoy/envoy" "$@"
+}
+`;
 
 const MIGRATION_MAP: Record<string, string> = {
   'CLAUDE.md': 'CLAUDE.project.md',
@@ -78,6 +86,36 @@ async function confirm(message: string): Promise<boolean> {
       resolve(answer.toLowerCase() === 'y');
     });
   });
+}
+
+function setupEnvoyShellFunction(): { added: boolean; shellRc: string | null } {
+  const shell = process.env.SHELL || '';
+  let shellRc: string | null = null;
+
+  if (shell.includes('zsh')) {
+    shellRc = join(homedir(), '.zshrc');
+  } else if (shell.includes('bash')) {
+    // macOS uses .bash_profile, Linux uses .bashrc
+    const bashProfile = join(homedir(), '.bash_profile');
+    const bashRc = join(homedir(), '.bashrc');
+    shellRc = existsSync(bashProfile) ? bashProfile : bashRc;
+  }
+
+  if (!shellRc) {
+    return { added: false, shellRc: null };
+  }
+
+  // Check if already present
+  if (existsSync(shellRc)) {
+    const content = readFileSync(shellRc, 'utf-8');
+    if (content.includes('envoy()') || content.includes('.claude/envoy/envoy')) {
+      return { added: false, shellRc };
+    }
+  }
+
+  // Append the function
+  appendFileSync(shellRc, ENVOY_SHELL_FUNCTION);
+  return { added: true, shellRc };
 }
 
 function migrateExistingFiles(target: string): Record<string, string> {
@@ -291,7 +329,20 @@ CLAUDE.project.md
     }
   }
 
-  // Step 7: Offer auto-sync setup (if GitHub repo)
+  // Step 7: Setup envoy shell function
+  console.log('\nSetting up envoy shell command...');
+  const envoyResult = setupEnvoyShellFunction();
+  if (envoyResult.added && envoyResult.shellRc) {
+    console.log(`  Added envoy function to ${envoyResult.shellRc}`);
+    console.log('  Run `source ' + envoyResult.shellRc + '` or restart terminal to use');
+  } else if (envoyResult.shellRc) {
+    console.log('  envoy function already configured');
+  } else {
+    console.log('  Could not detect shell config (add manually to your shell rc):');
+    console.log('    envoy() { "$PWD/.claude/envoy/envoy" "$@"; }');
+  }
+
+  // Step 8: Offer auto-sync setup (if GitHub repo)
   if (!autoYes) {
     const remoteResult = git(['remote', 'get-url', 'origin'], resolvedTarget);
     const hasGitHubRemote = remoteResult.success && remoteResult.stdout.includes('github.com');

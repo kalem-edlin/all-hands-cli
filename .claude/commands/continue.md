@@ -7,12 +7,12 @@ Loop through plan prompts, delegate to specialists for implementation, extract d
 </objective>
 
 <context>
-Plan status: !`.claude/envoy/envoy plan check`
+Plan status: !`envoy plan check`
 </context>
 
 <process>
 <step name="get_next_prompts">
-Call `.claude/envoy/envoy plan next [-n <count>]`
+Call `envoy plan next [-n <count>]`
 
 Returns next available prompts respecting dependencies:
 - If count > 1: returns independent prompts that can run in parallel
@@ -58,7 +58,7 @@ Repeat steps 1-3 until:
 </step>
 
 <step name="full_review">
-Call `.claude/envoy/envoy gemini review --full`
+Call `envoy gemini review --full`
 
 Returns: `{ verdict, thoughts?, answered_questions?, suggested_fixes? }`
 
@@ -88,7 +88,7 @@ Call `/docs audit` to validate all documentation symbol references.
 </step>
 
 <step name="complete_plan">
-Call `.claude/envoy/envoy plan complete`
+Call `envoy plan complete`
 
 This:
 - Generates summary.md
