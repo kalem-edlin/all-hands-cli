@@ -1,5 +1,11 @@
 ---
-description: Agent-scoped CLI providing external tool access through a unified command interface with auto-discovery, JSON-only output, observability instrumentation, and retry resilience for external API calls.
+description: >-
+  Agent-scoped CLI providing external tool access through a unified command
+  interface with auto-discovery, JSON-only output, observability
+  instrumentation, and retry resilience for external API calls.
+relevant_files:
+  - src/cli.ts
+  - src/lib/git.ts
 ---
 
 # Envoy CLI
@@ -48,7 +54,7 @@ Envoy is built on Commander.js for CLI argument parsing, with TypeScript compile
 
 **Documentation references remain valid**: Writers use envoy docs format-reference to generate versioned references. The validate command checks references against current source, identifying stale or broken links before documentation is committed.
 
-**Semantic knowledge retrieval**: Before implementing a feature, agents call envoy knowledge search docs to find relevant existing patterns. The search returns similarity-ranked documentation with optional full content, providing implementation context without manual file discovery.
+**Semantic knowledge retrieval**: Before implementing a feature, agents call envoy knowledge search to find relevant existing patterns. The search returns similarity-ranked documentation with optional full content, providing implementation context without manual file discovery.
 
 **Plan-aware git operations**: The continue command uses envoy git commands to manage worktrees, detect base branches, and create PRs. These operations are plan-aware, automatically deriving context from the current branch and prompt metadata.
 

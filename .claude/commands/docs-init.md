@@ -122,40 +122,11 @@ notes: "<segment.notes>"
 success: true
 ```
 
-All writers run in parallel using worktree isolation.
-
-**Parallel Worker Monitoring:**
-
-1. Launch all writers as background tasks, track task IDs and output files
-2. Set monitoring interval (every 60 seconds while tasks running)
-3. On each interval:
-   - Check task completion status for all workers
-   - If some workers completed but others still running after 2+ intervals:
-     a. Read output file of lagging worker(s): `tail -100 <output_file>`
-     b. Check for patterns indicating issues:
-        - "permission" / "denied" / "blocked" → permission issue
-        - "AskUserQuestion" / "waiting" → blocked on user input
-        - "error" / "failed" / "timeout" → execution error
-        - No recent output (>2 min) → possible hang
-     c. Report findings to user via AskUserQuestion:
-        - "Writer for <domain> appears stuck. Issue: <detected_issue>"
-        - Options: ["Investigate output", "Kill and retry", "Wait longer", "Cancel all"]
-4. If user selects "Investigate output":
-   - Show last 50 lines of worker output
-   - Ask for next action
-5. If user selects "Kill and retry":
-   - Kill stuck task
-   - Re-launch single writer (not parallel)
-   - Continue monitoring
-
-**Completion handling:**
-- Wait for all workers OR user cancellation
-- Collect success/failure status per worker
-- Report summary before proceeding to merge
+All writers run in parallel using worktree isolation. Merge completed writers incrementally as they finish (don't wait for all).
 </step>
 
 <step name="merge_worktrees">
-After all writers complete:
+As each writer completes:
 
 1. For each worktree branch, merge to main docs branch:
    ```bash
@@ -177,6 +148,51 @@ If stale/invalid refs found:
 - Delegate single writer with fix-workflow if user approves
 </step>
 
+<step name="commit_documentation">
+Commit any uncommitted documentation changes (e.g., validation fixes):
+
+1. Check for uncommitted changes in docs/:
+   ```bash
+   git status --porcelain docs/
+   ```
+
+2. If changes exist:
+   ```bash
+   git add docs/
+   git commit -m "docs: finalize documentation"
+   ```
+
+3. Track documentation files for reindex:
+   - Get list of all doc files created/modified since branch diverged from base:
+   ```bash
+   git diff --name-only $(git merge-base HEAD <base_branch>)..HEAD -- docs/
+   ```
+   - Store this list for the reindex step
+</step>
+
+<step name="reindex_knowledge">
+Update semantic search index with new documentation:
+
+1. Build file changes JSON from tracked doc files:
+   ```json
+   [
+     {"path": "docs/domain/index.md", "added": true},
+     {"path": "docs/domain/subdomain/index.md", "added": true}
+   ]
+   ```
+   - Use `added: true` for new files
+   - Use `modified: true` for updated files
+
+2. Call reindex:
+   ```bash
+   envoy knowledge reindex-from-changes docs --files '<json_array>'
+   ```
+
+3. If reindex reports missing references:
+   - Log warning but continue (docs may reference code not yet indexed)
+   - These will resolve on next full reindex
+</step>
+
 <step name="create_pr">
 Create PR:
 ```bash
@@ -193,6 +209,8 @@ Report completion with PR link.
 - Writers created docs in parallel (worktrees)
 - Worktrees merged to docs branch
 - Validation passed
+- Documentation committed
+- Knowledge index updated
 - PR created
 </success_criteria>
 
@@ -203,11 +221,10 @@ Report completion with PR link.
 - MUST only create docs branch if already on base branch
 - MUST delegate to taxonomist for all segmentation and discovery
 - MUST run writers in parallel with worktrees
-- MUST monitor parallel workers for stuck/blocked state
-- MUST report lagging workers to user after reasonable timeout
-- MUST provide options to investigate, retry, or cancel stuck workers
 - MUST merge all worktrees back
 - MUST validate before PR
 - MUST clean up worktrees after merge
+- MUST commit documentation changes before reindex (reindex reads from disk)
+- MUST reindex knowledge base after documentation committed
 - All delegations MUST follow INPUTS/OUTPUTS format
 </constraints>

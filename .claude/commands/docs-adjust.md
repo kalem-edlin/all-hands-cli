@@ -114,38 +114,11 @@ notes: "<segment.notes>"
 success: true
 ```
 
-**Parallel Worker Monitoring (if multiple segments):**
-
-1. Launch all writers as background tasks, track task IDs and output files
-2. Set monitoring interval (every 60 seconds while tasks running)
-3. On each interval:
-   - Check task completion status for all workers
-   - If some workers completed but others still running after 2+ intervals:
-     a. Read output file of lagging worker(s): `tail -100 <output_file>`
-     b. Check for patterns indicating issues:
-        - "permission" / "denied" / "blocked" → permission issue
-        - "AskUserQuestion" / "waiting" → blocked on user input
-        - "error" / "failed" / "timeout" → execution error
-        - No recent output (>2 min) → possible hang
-     c. Report findings to user via AskUserQuestion:
-        - "Writer for <domain> appears stuck. Issue: <detected_issue>"
-        - Options: ["Investigate output", "Kill and retry", "Wait longer", "Cancel all"]
-4. If user selects "Investigate output":
-   - Show last 50 lines of worker output
-   - Ask for next action
-5. If user selects "Kill and retry":
-   - Kill stuck task
-   - Re-launch single writer (not parallel)
-   - Continue monitoring
-
-**Completion handling:**
-- Wait for all workers OR user cancellation
-- Collect success/failure status per worker
-- Report summary before proceeding to merge
+Merge completed writers incrementally as they finish (don't wait for all).
 </step>
 
 <step name="merge_worktrees">
-For each worktree branch:
+As each writer completes:
 1. Merge to feature branch
 2. Clean up worktree and branch
 </step>
@@ -153,6 +126,57 @@ For each worktree branch:
 <step name="validate_and_report">
 Run validation: `envoy docs validate`
 
+If stale/invalid refs found:
+- Present findings to user
+- Delegate single writer with fix-workflow if user approves
+</step>
+
+<step name="commit_documentation">
+Commit any uncommitted documentation changes (e.g., validation fixes):
+
+1. Check for uncommitted changes in docs/:
+   ```bash
+   git status --porcelain docs/
+   ```
+
+2. If changes exist:
+   ```bash
+   git add docs/
+   git commit -m "docs: update documentation"
+   ```
+
+3. Track documentation files for reindex:
+   - Get list of doc files created/modified since branch diverged from base:
+   ```bash
+   git diff --name-only $(git merge-base HEAD <base_branch>)..HEAD -- docs/
+   ```
+   - Store this list for the reindex step
+</step>
+
+<step name="reindex_knowledge">
+Update semantic search index with changed documentation:
+
+1. Build file changes JSON from tracked doc files:
+   ```json
+   [
+     {"path": "docs/domain/index.md", "added": true},
+     {"path": "docs/domain/subdomain/index.md", "modified": true}
+   ]
+   ```
+   - Use `added: true` for new files
+   - Use `modified: true` for updated files
+   - Use `deleted: true` for removed files
+
+2. Call reindex:
+   ```bash
+   envoy knowledge reindex-from-changes docs --files '<json_array>'
+   ```
+
+3. If reindex reports missing references:
+   - Log warning but continue (docs may reference code not yet indexed)
+</step>
+
+<step name="finalize">
 If in workflow context (called from /continue):
 - Return success without creating PR
 - Let parent workflow handle PR
@@ -180,6 +204,8 @@ When called standalone:
 - Writers updated relevant docs
 - Worktrees merged
 - Validation run
+- Documentation committed
+- Knowledge index updated
 - PR created (if standalone)
 </success_criteria>
 
@@ -190,10 +216,9 @@ When called standalone:
 - MUST delegate to taxonomist for all segmentation and discovery
 - MUST pass --diff flag to taxonomist (not process it directly)
 - MUST work both standalone and in workflow context
-- MUST monitor parallel workers for stuck/blocked state (if multiple segments)
-- MUST report lagging workers to user after reasonable timeout
-- MUST provide options to investigate, retry, or cancel stuck workers
 - MUST validate after documentation
 - MUST clean up worktrees
+- MUST commit documentation changes before reindex (reindex reads from disk)
+- MUST reindex knowledge base after documentation committed
 - All delegations MUST follow INPUTS/OUTPUTS format
 </constraints>

@@ -3,12 +3,12 @@
  * Uses @visheratin/web-ai-node for embeddings and usearch for HNSW indexing.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from "fs";
-import { join, relative, extname, basename } from "path";
 import { createHash } from "crypto";
-import { createRequire } from "module";
-import { Index, MetricKind, ScalarKind } from "usearch";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import matter from "gray-matter";
+import { createRequire } from "module";
+import { basename, extname, join, relative } from "path";
+import { Index, MetricKind, ScalarKind } from "usearch";
 
 // Create require function for ESM compatibility (needed for fetch caching)
 const require = createRequire(import.meta.url);
@@ -58,15 +58,13 @@ interface IndexConfig {
   hasFrontmatter: boolean;
 }
 
-// Configuration
-const INDEX_CONFIGS: Record<string, IndexConfig> = {
-  docs: {
-    name: "docs",
-    paths: ["docs/"],
-    extensions: [".md"],
-    description: "Project documentation",
-    hasFrontmatter: true,
-  },
+// Docs index configuration (only supported index)
+const DOCS_CONFIG: IndexConfig = {
+  name: "docs",
+  paths: ["docs/"],
+  extensions: [".md"],
+  description: "Project documentation",
+  hasFrontmatter: true,
 };
 
 // File reference patterns for auto-populating relevant_files
@@ -78,14 +76,14 @@ const FILE_REF_PATTERNS = [
 
 // Environment config with defaults
 const SEARCH_SIMILARITY_THRESHOLD = parseFloat(
-  process.env.SEARCH_SIMILARITY_THRESHOLD ?? "0.64"
+  process.env.SEARCH_SIMILARITY_THRESHOLD ?? "0.65"
 );
 const SEARCH_CONTEXT_TOKEN_LIMIT = parseInt(
   process.env.SEARCH_CONTEXT_TOKEN_LIMIT ?? "5000",
   10
 );
 const SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD = parseFloat(
-  process.env.SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD ?? "0.72"
+  process.env.SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD ?? "0.82"
 );
 
 export class KnowledgeService {
@@ -228,10 +226,10 @@ export class KnowledgeService {
   /**
    * Get index file paths
    */
-  private getIndexPaths(indexName: string): { index: string; meta: string } {
+  private getIndexPaths(): { index: string; meta: string } {
     return {
-      index: join(this.knowledgeDir, `${indexName}.usearch`),
-      meta: join(this.knowledgeDir, `${indexName}.meta.json`),
+      index: join(this.knowledgeDir, "docs.usearch"),
+      meta: join(this.knowledgeDir, "docs.meta.json"),
     };
   }
 
@@ -263,10 +261,8 @@ export class KnowledgeService {
   /**
    * Load index + metadata from disk
    */
-  async loadIndex(
-    indexName: string
-  ): Promise<{ index: Index; meta: IndexMetadata }> {
-    const paths = this.getIndexPaths(indexName);
+  async loadIndex(): Promise<{ index: Index; meta: IndexMetadata }> {
+    const paths = this.getIndexPaths();
 
     if (!existsSync(paths.index) || !existsSync(paths.meta)) {
       return {
@@ -285,13 +281,9 @@ export class KnowledgeService {
   /**
    * Save index + metadata to disk
    */
-  async saveIndex(
-    indexName: string,
-    index: Index,
-    meta: IndexMetadata
-  ): Promise<void> {
+  async saveIndex(index: Index, meta: IndexMetadata): Promise<void> {
     this.ensureDir();
-    const paths = this.getIndexPaths(indexName);
+    const paths = this.getIndexPaths();
 
     meta.lastUpdated = new Date().toISOString();
     index.save(paths.index);
@@ -431,11 +423,11 @@ export class KnowledgeService {
   }
 
   /**
-   * Search with similarity computation
+   * Search docs index with similarity computation
    * @param metadataOnly - If true, only return file paths and descriptions (no full_resource_context)
    */
-  async search(indexName: string, query: string, k: number = 50, metadataOnly: boolean = false): Promise<SearchResult[]> {
-    const { index, meta } = await this.loadIndex(indexName);
+  async search(query: string, k: number = 50, metadataOnly: boolean = false): Promise<SearchResult[]> {
+    const { index, meta } = await this.loadIndex();
 
     if (Object.keys(meta.documents).length === 0) {
       return [];
@@ -494,98 +486,76 @@ export class KnowledgeService {
   }
 
   /**
-   * Full reindex for an index
+   * Full reindex of docs
    */
-  async reindexAll(indexName?: string): Promise<Record<string, ReindexResult>> {
+  async reindexAll(): Promise<ReindexResult> {
     this.ensureDir();
-    const results: Record<string, ReindexResult> = {};
+    const startTime = Date.now();
+    console.error("[knowledge] Reindexing docs...");
 
-    const indexes = indexName ? [indexName] : Object.keys(INDEX_CONFIGS);
-    console.error(`[knowledge] Reindexing ${indexes.length} index(es): ${indexes.join(", ")}`);
+    // Create fresh index
+    const index = this.createIndex();
+    const meta = this.createEmptyMetadata();
 
-    for (const name of indexes) {
-      const config = INDEX_CONFIGS[name];
-      if (!config) {
-        throw new Error(`Unknown index: ${name}`);
-      }
+    // Discover and index files
+    const files = this.discoverFiles(DOCS_CONFIG);
+    console.error(`[knowledge] Found ${files.length} files`);
+    let totalTokens = 0;
 
-      const indexStartTime = Date.now();
-      console.error(`[knowledge] Starting index '${name}'...`);
+    for (let i = 0; i < files.length; i++) {
+      const filePath = files[i];
+      const fullPath = join(this.projectRoot, filePath);
+      const content = readFileSync(fullPath, "utf-8");
 
-      // Create fresh index
-      const index = this.createIndex();
-      const meta = this.createEmptyMetadata();
-
-      // Discover and index files
-      const files = this.discoverFiles(config);
-      console.error(`[knowledge] Found ${files.length} files for '${name}'`);
-      let totalTokens = 0;
-
-      for (let i = 0; i < files.length; i++) {
-        const filePath = files[i];
-        const fullPath = join(this.projectRoot, filePath);
-        const content = readFileSync(fullPath, "utf-8");
-
-        // Parse front-matter only for indexes that support it
-        let frontMatter: Record<string, unknown> = {};
-        if (config.hasFrontmatter && filePath.endsWith(".md")) {
-          try {
-            const parsed = matter(content);
-            frontMatter = parsed.data;
-          } catch {
-            // Skip files with invalid front-matter
-          }
+      // Parse front-matter
+      let frontMatter: Record<string, unknown> = {};
+      if (filePath.endsWith(".md")) {
+        try {
+          const parsed = matter(content);
+          frontMatter = parsed.data;
+        } catch {
+          // Skip files with invalid front-matter
         }
-
-        console.error(`[knowledge] [${name}] Embedding ${i + 1}/${files.length}: ${filePath}`);
-        await this.indexDocument(index, meta, filePath, content, frontMatter);
-        totalTokens += meta.documents[filePath].token_count;
       }
 
-      // Save
-      await this.saveIndex(name, index, meta);
-      const indexDuration = ((Date.now() - indexStartTime) / 1000).toFixed(1);
-      console.error(`[knowledge] Index '${name}' complete: ${files.length} files, ${totalTokens} tokens in ${indexDuration}s`);
-
-      results[name] = {
-        files_indexed: files.length,
-        total_tokens: totalTokens,
-      };
+      console.error(`[knowledge] Embedding ${i + 1}/${files.length}: ${filePath}`);
+      await this.indexDocument(index, meta, filePath, content, frontMatter);
+      totalTokens += meta.documents[filePath].token_count;
     }
 
-    return results;
+    // Save
+    await this.saveIndex(index, meta);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`[knowledge] Reindex complete: ${files.length} files, ${totalTokens} tokens in ${duration}s`);
+
+    return {
+      files_indexed: files.length,
+      total_tokens: totalTokens,
+    };
   }
 
   /**
    * Incremental reindex from changed files
    */
-  async reindexFromChanges(
-    indexName: string,
-    changes: FileChange[]
-  ): Promise<{
+  async reindexFromChanges(changes: FileChange[]): Promise<{
     success: boolean;
     message: string;
     missing_references?: { doc_path: string; missing_files: string[] }[];
     files: { path: string; action: string }[];
   }> {
-    const config = INDEX_CONFIGS[indexName];
-    if (!config) {
-      throw new Error(`Unknown index: ${indexName}`);
-    }
-
-    console.error(`[knowledge] Incremental reindex '${indexName}': ${changes.length} change(s)`);
+    console.error(`[knowledge] Incremental reindex: ${changes.length} change(s)`);
     const startTime = Date.now();
 
-    const { index, meta } = await this.loadIndex(indexName);
+    const { index, meta } = await this.loadIndex();
     const processedFiles: { path: string; action: string }[] = [];
     const missingReferences: { doc_path: string; missing_files: string[] }[] = [];
 
     for (const change of changes) {
       const { path, added, deleted, modified } = change;
 
-      // Check if file matches index config
-      const matchesConfig = config.paths.some((p) => path.startsWith(p)) &&
-        config.extensions.includes(extname(path));
+      // Check if file matches docs config
+      const matchesConfig = DOCS_CONFIG.paths.some((p: string) => path.startsWith(p)) &&
+        DOCS_CONFIG.extensions.includes(extname(path));
 
       if (!matchesConfig) continue;
 
@@ -599,7 +569,7 @@ export class KnowledgeService {
           delete meta.path_to_id[path];
           delete meta.documents[path];
           processedFiles.push({ path, action: "deleted" });
-          console.error(`[knowledge] [${indexName}] Deleted: ${path}`);
+          console.error(`[knowledge] Deleted: ${path}`);
         }
       } else if (added || modified) {
         const fullPath = join(this.projectRoot, path);
@@ -608,8 +578,8 @@ export class KnowledgeService {
         const content = readFileSync(fullPath, "utf-8");
         let frontMatter: Record<string, unknown> = {};
 
-        // Only process front-matter and file references for indexes that support it
-        if (config.hasFrontmatter && path.endsWith(".md")) {
+        // Process front-matter and file references
+        if (path.endsWith(".md")) {
           try {
             const parsed = matter(content);
             frontMatter = parsed.data;
@@ -636,16 +606,16 @@ export class KnowledgeService {
 
         // Index document
         const action = added ? "added" : "modified";
-        console.error(`[knowledge] [${indexName}] Embedding (${action}): ${path}`);
+        console.error(`[knowledge] Embedding (${action}): ${path}`);
         await this.indexDocument(index, meta, path, content, frontMatter);
         processedFiles.push({ path, action });
       }
     }
 
     // Save updated index
-    await this.saveIndex(indexName, index, meta);
+    await this.saveIndex(index, meta);
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.error(`[knowledge] Incremental reindex '${indexName}' complete: ${processedFiles.length} file(s) in ${duration}s`);
+    console.error(`[knowledge] Incremental reindex complete: ${processedFiles.length} file(s) in ${duration}s`);
 
     if (missingReferences.length > 0) {
       return {
@@ -664,24 +634,13 @@ export class KnowledgeService {
   }
 
   /**
-   * Check if indexes exist and are valid
+   * Check if docs index exists
    */
-  async checkIndexes(): Promise<{ valid: string[]; missing: string[] }> {
-    const valid: string[] = [];
-    const missing: string[] = [];
-
-    for (const name of Object.keys(INDEX_CONFIGS)) {
-      const paths = this.getIndexPaths(name);
-      if (existsSync(paths.index) && existsSync(paths.meta)) {
-        valid.push(name);
-      } else {
-        missing.push(name);
-      }
-    }
-
-    return { valid, missing };
+  async checkIndex(): Promise<{ exists: boolean }> {
+    const paths = this.getIndexPaths();
+    return { exists: existsSync(paths.index) && existsSync(paths.meta) };
   }
 }
 
-export { INDEX_CONFIGS };
-export type { SearchResult, ReindexResult, FileChange, IndexMetadata, DocumentMeta };
+export type { DocumentMeta, FileChange, IndexMetadata, ReindexResult, SearchResult };
+

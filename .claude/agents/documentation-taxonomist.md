@@ -52,8 +52,8 @@ Your assignments should guide writers toward capturing KNOWLEDGE that isn't obvi
    envoy docs tree docs/ --depth 4
    
    # Check if concepts are already documented
-   envoy knowledge search docs "<product-name>" --metadata-only
-   envoy knowledge search docs "<feature-name>" --metadata-only
+   envoy knowledge search "<product-name>" --metadata-only
+   envoy knowledge search "<feature-name>" --metadata-only
    ```
    
    **Critical:** Before creating new documentation domains, check existing docs/ hierarchy to:
@@ -152,8 +152,8 @@ Your assignments should guide writers toward capturing KNOWLEDGE that isn't obvi
    envoy docs tree docs/ --depth 4
 
    # Check if changed concepts are already documented
-   envoy knowledge search docs "<changed-feature>" --metadata-only
-   envoy knowledge search docs "<affected-product>" --metadata-only
+   envoy knowledge search "<changed-feature>" --metadata-only
+   envoy knowledge search "<affected-product>" --metadata-only
    ```
 
 2. Identify affected products/features from the changes
@@ -218,7 +218,7 @@ assignments:
 | `envoy docs tree <path> --depth <n>` | Get structure with doc coverage |
 | `envoy docs tree docs/ --depth <n>` | **See existing doc hierarchy/taxonomy** |
 | `envoy docs complexity <path>` | Get complexity metrics |
-| `envoy knowledge search docs "<query>" --metadata-only` | Find if concept is already documented |
+| `envoy knowledge search "<query>" --metadata-only` | Find if concept is already documented |
 | `envoy git diff-base --name-only` | Get list of changed files |
 
 **Always run docs tree on BOTH:**
@@ -228,7 +228,7 @@ assignments:
 
 <constraints>
 - MUST run `envoy docs tree docs/` to see existing documentation hierarchies before planning
-- MUST use `envoy knowledge search docs` to check if concepts are already documented
+- MUST use `envoy knowledge search` to check if concepts are already documented
 - MUST use product/feature names, not directory names
 - MUST create and commit directory structure BEFORE returning assignments
 - MUST assign writers to existing directories with clear responsibilities

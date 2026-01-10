@@ -34,10 +34,6 @@ Skills solve the expertise distribution problem. Different tasks require differe
 
 **Agent loads domain expertise**: The curator [ref:.claude/agents/curator.md::cf5a964] has skills configured for orchestration patterns, envoy patterns, and development patterns for skills, subagents, hooks, and commands. When invoked, these skills load automatically, giving the curator access to best practices without requiring the main agent to include that context in its delegation.
 
-**Discovery mode skill**: When a specialist follows the discovery protocol [ref:.claude/protocols/discovery.yaml::1297377], it may load the discovery-mode skill [ref:.claude/skills/discovery-mode/SKILL.md::dbb53d3] for guidance on read-only analysis and envoy-mediated writes. The skill provides command syntax and workflow patterns without the agent needing to figure them out fresh.
-
-**Implementation mode skill**: Similarly, the implementation-mode skill [ref:.claude/skills/implementation-mode/SKILL.md::dbb53d3] provides prompt execution lifecycle guidance. It covers reading prompts, tracking history, getting reviews, and iterating until approval. Agents following the implementation protocol [ref:.claude/protocols/implementation.yaml::c15ff37] can reference this skill for detailed procedures.
-
 **Creating new skills**: The skills-development skill [ref:.claude/skills/skills-development/SKILL.md::4dcde68] is meta - it teaches how to create other skills. It routes between creating new skills, auditing existing ones, adding components, and getting guidance. The curator loads this skill when asked to create a new skill.
 
 **Claude Code patterns**: The claude-code-patterns skill [ref:.claude/skills/claude-code-patterns/SKILL.md::d937ec7] maps task types to official documentation. When building skills, agents, hooks, or tools, this skill points to the right reference docs. It aggregates Claude Code knowledge that would otherwise require external lookups.

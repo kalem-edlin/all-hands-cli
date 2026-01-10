@@ -151,10 +151,6 @@ Use .allhandsignore when curating project-specific config (unless intentional fr
 - ALWAYS check .allhandsignore for project-specific vs framework changes
 </constraints>
 
-<discovery_mode>
-When in discovery mode: follow discovery-mode skill. Focus on .claude/ orchestration patterns.
-</discovery_mode>
-
 <success_criteria>
 Task complete when:
 - Orchestration component follows domain-specific rules (check relevant skill)

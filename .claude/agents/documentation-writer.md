@@ -129,7 +129,7 @@ Authentication uses JWT for stateless sessions. The signing implementation [ref:
 
 2. Change to worktree directory for all subsequent operations
 
-3. Search existing knowledge: `envoy knowledge search docs "<domain> decisions patterns"`
+3. Search existing knowledge: `envoy knowledge search "<domain> decisions patterns"`
    - Understand existing knowledge
    - Identify gaps
 
@@ -219,6 +219,91 @@ Authentication uses JWT for stateless sessions. The signing implementation [ref:
 5. Return fix summary
 </fix_workflow>
 
+<audit_fix_workflow>
+**INPUTS** (from main agent):
+- `mode`: "audit-fix"
+- `doc_file`: path to doc file with issues
+- `stale_refs`: list of stale refs in this doc:
+  ```yaml
+  - reference: "[ref:file:symbol:hash]"
+    ref_type: "symbol" | "file-only"
+    file_path: "path/to/file.ts"
+    symbol_name: "symbolName" | null
+    stored_hash: "abc1234"
+    current_hash: "def5678"
+  ```
+- `invalid_refs`: list of invalid refs in this doc:
+  ```yaml
+  - reference: "[ref:file:symbol:hash]"
+    reason: "Symbol not found" | "File not found"
+  ```
+- `worktree_branch`: branch for fixes
+
+**OUTPUTS** (to main agent):
+```yaml
+success: true
+doc_file: "<path>"
+changes:
+  - ref: "<reference>"
+    action: "hash_update" | "prose_rewrite" | "ref_removed" | "ref_updated"
+    reason: "<why this action>"
+```
+
+**STEPS:**
+
+1. Create or reuse worktree: `git worktree add .trees/docs-audit -b <worktree_branch>`
+
+2. Read the doc file to understand context
+
+3. **For each stale reference:**
+
+   a. Get diff between stored_hash and current_hash:
+      ```bash
+      git diff <stored_hash>..<current_hash> -- <file_path>
+      ```
+
+   b. For symbol refs: use LSP or read file to get current symbol definition
+
+   c. Read surrounding context in doc file where the ref is used
+
+   d. **Analyze if prose is still accurate:**
+      - If code change is cosmetic (formatting, comments, minor refactor): prose likely still accurate
+      - If code change affects behavior, API, or semantics: prose may need updating
+      - If code change adds/removes functionality doc describes: prose needs updating
+
+   e. **Take action:**
+      - If prose still accurate: update hash only via `envoy docs format-reference`
+      - If prose needs updating: rewrite the relevant section, then update hash
+      - Record action and reason
+
+4. **For each invalid reference:**
+
+   a. Parse reference to extract file_path and symbol_name
+
+   b. **Determine what happened:**
+      - Search for similar symbol names: `grep -r "<symbol_name>" <directory>`
+      - Search for similar file names: `find . -name "*<partial_name>*"`
+      - Check git log for renames: `git log --diff-filter=R --summary -- <file_path>`
+
+   c. **Take action based on finding:**
+      - If symbol/file was RENAMED:
+        - Update reference to new location
+        - action: "ref_updated"
+      - If symbol/file was DELETED and section still relevant:
+        - Remove reference, rewrite section to be self-contained
+        - action: "prose_rewrite"
+      - If symbol/file was DELETED and section no longer relevant:
+        - Remove entire section
+        - action: "ref_removed"
+      - Record action and reason
+
+5. Validate changes: `envoy docs validate --path <doc_file>`
+
+6. Commit: `git commit -m "docs: fix stale/invalid refs in <doc_file>"`
+
+7. Return changes summary
+</audit_fix_workflow>
+
 <documentation_format>
 **Front-matter (REQUIRED):**
 ```yaml
@@ -263,7 +348,7 @@ Adjust structure based on domain. The structure serves knowledge transfer, not c
 |---------|---------|
 | `envoy docs format-reference <file> <symbol>` | Get symbol ref: `[ref:file:symbol:hash]` |
 | `envoy docs format-reference <file>` | Get file-only ref: `[ref:file::hash]` |
-| `envoy knowledge search docs "<query>"` | Find existing knowledge |
+| `envoy knowledge search "<query>"` | Find existing knowledge |
 </envoy_commands>
 
 <constraints>
