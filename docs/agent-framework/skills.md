@@ -32,7 +32,7 @@ Skills solve the expertise distribution problem. Different tasks require differe
 
 ## Use Cases
 
-**Agent loads domain expertise**: The curator [ref:.claude/agents/curator.md::cf5a964] has skills configured for orchestration patterns, envoy patterns, and development patterns for skills, subagents, hooks, and commands. When invoked, these skills load automatically, giving the curator access to best practices without requiring the main agent to include that context in its delegation.
+**Agent loads domain expertise**: The curator [ref:.claude/agents/curator.md::6607b05] has skills configured for orchestration patterns, envoy patterns, and development patterns for skills, subagents, hooks, and commands. When invoked, these skills load automatically, giving the curator access to best practices without requiring the main agent to include that context in its delegation.
 
 **Creating new skills**: The skills-development skill [ref:.claude/skills/skills-development/SKILL.md::4dcde68] is meta - it teaches how to create other skills. It routes between creating new skills, auditing existing ones, adding components, and getting guidance. The curator loads this skill when asked to create a new skill.
 
