@@ -129,10 +129,17 @@ export async function withRetry<T>(
 }
 
 /**
- * Pre-defined fallback suggestions for Gemini endpoints.
+ * Pre-defined fallback suggestions for oracle endpoints (provider-agnostic).
  */
-export const GEMINI_FALLBACKS: Record<string, string> = {
-  audit: "Skip audit and proceed with user review only via block-plan-gate",
+export const ORACLE_FALLBACKS: Record<string, string> = {
+  audit: "Skip audit and proceed with user review only",
   review: "Mark prompt as needs_manual_review for user verification",
-  ask: "Proceed without Gemini response, use agent judgment",
+  ask: "Proceed without LLM response, use agent judgment",
+  validate: "Skip validation and proceed with user review only",
+  architect: "Proceed without architect analysis",
 };
+
+/**
+ * @deprecated Use ORACLE_FALLBACKS instead
+ */
+export const GEMINI_FALLBACKS = ORACLE_FALLBACKS;

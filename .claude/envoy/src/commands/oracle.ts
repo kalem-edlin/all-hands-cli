@@ -1,11 +1,10 @@
 /**
- * Gemini API commands.
- * Phase 8: Consolidated Gemini integration with audit, review, and retry behavior.
+ * Oracle: Multi-provider LLM commands.
+ * Supports Gemini and OpenAI with unified interface.
  */
 
-import { GoogleGenAI } from "@google/genai";
 import { Command } from "commander";
-import { readFileSync, existsSync, readdirSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { join, extname } from "path";
 import { spawnSync } from "child_process";
 import { getBaseBranch, getBranch, getDiff, getPlanDir, isDirectModeBranch } from "../lib/git.js";
@@ -28,19 +27,19 @@ import {
   planExists,
   getPlanPaths,
   getPromptId,
-  parsePromptId,
 } from "../lib/index.js";
 import { watchForDone } from "../lib/watcher.js";
-import { withRetry, GEMINI_FALLBACKS } from "../lib/retry.js";
-import { recordGeminiCall } from "../lib/observability.js";
+import { withRetry, ORACLE_FALLBACKS } from "../lib/retry.js";
+import { recordOracleCall } from "../lib/observability.js";
+import {
+  createProvider,
+  getDefaultProvider,
+  type LLMProvider,
+  type ProviderName,
+  type ContentPart,
+} from "../lib/providers.js";
 import { BaseCommand, type CommandResult } from "./base.js";
 
-// Default model for most operations
-const DEFAULT_MODEL = "gemini-2.0-flash";
-// Pro model for complex audit/review operations
-const PRO_MODEL = "gemini-3-pro-preview";
-
-// Blocking gate timeout (12 hours default)
 const DEFAULT_BLOCKING_GATE_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 
 function getBlockingGateTimeout(): number {
@@ -54,9 +53,6 @@ function getBlockingGateTimeout(): number {
   return DEFAULT_BLOCKING_GATE_TIMEOUT_MS;
 }
 
-/**
- * Parse JSON from a response that may contain markdown code blocks.
- */
 function parseJsonResponse(response: string): Record<string, unknown> {
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
@@ -69,9 +65,6 @@ function parseJsonResponse(response: string): Record<string, unknown> {
   return { raw_response: response };
 }
 
-/**
- * Read an image file and return base64 data with mime type.
- */
 function readImageAsBase64(filePath: string): { data: string; mimeType: string } | null {
   if (!existsSync(filePath)) return null;
 
@@ -95,19 +88,81 @@ function readImageAsBase64(filePath: string): { data: string; mimeType: string }
   }
 }
 
-/**
- * Get commit summaries for a branch since divergence from base.
- */
 function getCommitSummaries(baseRef: string): string {
   try {
-    const result = spawnSync(
-      "git",
-      ["log", "--oneline", `${baseRef}..HEAD`],
-      { encoding: "utf-8" }
-    );
+    const result = spawnSync("git", ["log", "--oneline", `${baseRef}..HEAD`], {
+      encoding: "utf-8",
+    });
     return result.status === 0 ? result.stdout.trim() : "(No commits)";
   } catch {
     return "(Unable to get commits)";
+  }
+}
+
+function addProviderOption(cmd: Command): Command {
+  return cmd.option(
+    "--provider <provider>",
+    "LLM provider (gemini | openai)",
+    getDefaultProvider()
+  );
+}
+
+// ============================================================================
+// Base Oracle Command
+// ============================================================================
+
+abstract class OracleCommand extends BaseCommand {
+  protected provider!: LLMProvider;
+
+  protected async initProvider(args: Record<string, unknown>): Promise<CommandResult | null> {
+    const providerName = (args.provider as ProviderName) ?? getDefaultProvider();
+    this.provider = await createProvider(providerName);
+
+    const apiKey = this.provider.getApiKey();
+    if (!apiKey) {
+      return this.error("auth_error", `${this.provider.config.apiKeyEnvVar} not set`);
+    }
+    return null;
+  }
+
+  protected async callProvider(
+    contents: string | ContentPart[],
+    endpoint: string,
+    usePro: boolean = false
+  ): Promise<{ result: Awaited<ReturnType<typeof withRetry<{ text: string; model: string }>>>; durationMs: number }> {
+    const start = performance.now();
+    const result = await withRetry(
+      () => this.provider.generate(contents, { usePro }),
+      `oracle.${this.provider.config.name}.${endpoint}`,
+      {},
+      ORACLE_FALLBACKS[endpoint]
+    );
+    const durationMs = Math.round(performance.now() - start);
+
+    recordOracleCall({
+      provider: this.provider.config.name,
+      endpoint,
+      duration_ms: durationMs,
+      success: result.success,
+      retries: result.retries,
+    });
+
+    return { result, durationMs };
+  }
+
+  protected handleError(
+    result: { success: false; error: string; retries: number; fallback_suggestion?: string },
+    durationMs: number
+  ): CommandResult {
+    return {
+      status: "error",
+      error: {
+        type: result.error,
+        message: "LLM API unavailable after retries",
+        suggestion: result.fallback_suggestion,
+      },
+      metadata: { retries: result.retries, duration_ms: durationMs },
+    };
   }
 }
 
@@ -115,26 +170,22 @@ function getCommitSummaries(baseRef: string): string {
 // Ask Command
 // ============================================================================
 
-class GeminiAskCommand extends BaseCommand {
+class OracleAskCommand extends OracleCommand {
   readonly name = "ask";
-  readonly description = "Raw Gemini inference with retry";
+  readonly description = "Raw LLM inference with retry";
 
   defineArguments(cmd: Command): void {
-    cmd
-      .argument("<query>", "Query for Gemini")
+    addProviderOption(cmd)
+      .argument("<query>", "Query for LLM")
       .option("--files <files...>", "Files to include as context")
-      .option("--context <context>", "Additional context")
-      .option("--model <model>", "Model to use", DEFAULT_MODEL);
+      .option("--context <context>", "Additional context");
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const apiKey = process.env.VERTEX_API_KEY;
-    if (!apiKey) {
-      return this.error("auth_error", "VERTEX_API_KEY not set");
-    }
+    const authError = await this.initProvider(args);
+    if (authError) return authError;
 
     const query = args.query as string;
-    const model = (args.model as string) ?? DEFAULT_MODEL;
     const files = args.files as string[] | undefined;
     const context = args.context as string | undefined;
 
@@ -154,39 +205,21 @@ class GeminiAskCommand extends BaseCommand {
     parts.push(query);
     const prompt = parts.join("\n\n");
 
-    const start = performance.now();
-    const result = await withRetry(
-      async () => {
-        const client = new GoogleGenAI({ vertexai: true, apiKey });
-        const genResult = await client.models.generateContent({
-          model,
-          contents: prompt,
-        });
-        return genResult.text ?? "";
-      },
-      "gemini.ask",
-      {},
-      GEMINI_FALLBACKS.ask
-    );
-
-    const durationMs = Math.round(performance.now() - start);
-    recordGeminiCall({ endpoint: "ask", duration_ms: durationMs, success: result.success, retries: result.retries });
+    const { result, durationMs } = await this.callProvider(prompt, "ask");
 
     if (!result.success) {
-      return {
-        status: "error",
-        error: {
-          type: result.error,
-          message: "Gemini API unavailable after retries",
-          suggestion: result.fallback_suggestion,
-        },
-        metadata: { retries: result.retries, duration_ms: durationMs },
-      };
+      return this.handleError(result, durationMs);
     }
 
     return this.success(
-      { content: result.data },
-      { model, command: "gemini ask", duration_ms: durationMs, retries: result.retries }
+      { content: result.data.text },
+      {
+        model: result.data.model,
+        provider: this.provider.config.name,
+        command: "oracle ask",
+        duration_ms: durationMs,
+        retries: result.retries,
+      }
     );
   }
 }
@@ -195,7 +228,7 @@ class GeminiAskCommand extends BaseCommand {
 // Validate Command
 // ============================================================================
 
-class GeminiValidateCommand extends BaseCommand {
+class OracleValidateCommand extends OracleCommand {
   readonly name = "validate";
   readonly description = "Validate plan against requirements (anti-overengineering)";
 
@@ -228,16 +261,14 @@ Output JSON:
 }`;
 
   defineArguments(cmd: Command): void {
-    cmd
+    addProviderOption(cmd)
       .option("--queries <path>", "Queries file path (optional)")
       .option("--context <context>", "Additional context");
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const apiKey = process.env.VERTEX_API_KEY;
-    if (!apiKey) {
-      return this.error("auth_error", "VERTEX_API_KEY not set");
-    }
+    const authError = await this.initProvider(args);
+    if (authError) return authError;
 
     if (isDirectModeBranch(getBranch())) {
       return this.error("direct_mode", "No plan in direct mode");
@@ -282,38 +313,16 @@ ${additional}
 
 Respond with JSON only.`;
 
-    const start = performance.now();
-    const result = await withRetry(
-      async () => {
-        const client = new GoogleGenAI({ vertexai: true, apiKey });
-        const genResult = await client.models.generateContent({
-          model: DEFAULT_MODEL,
-          contents: fullPrompt,
-        });
-        return genResult.text ?? "";
-      },
-      "gemini.validate",
-      {},
-      "Skip validation and proceed with user review only"
-    );
-
-    const durationMs = Math.round(performance.now() - start);
+    const { result, durationMs } = await this.callProvider(fullPrompt, "validate");
 
     if (!result.success) {
-      return {
-        status: "error",
-        error: {
-          type: result.error,
-          message: "Gemini API unavailable after retries",
-          suggestion: result.fallback_suggestion,
-        },
-        metadata: { retries: result.retries, duration_ms: durationMs },
-      };
+      return this.handleError(result, durationMs);
     }
 
-    const parsed = parseJsonResponse(result.data);
+    const parsed = parseJsonResponse(result.data.text);
     return this.success(parsed, {
-      command: "gemini validate",
+      provider: this.provider.config.name,
+      command: "oracle validate",
       duration_ms: durationMs,
       retries: result.retries,
     });
@@ -324,7 +333,7 @@ Respond with JSON only.`;
 // Architect Command
 // ============================================================================
 
-class GeminiArchitectCommand extends BaseCommand {
+class OracleArchitectCommand extends OracleCommand {
   readonly name = "architect";
   readonly description = "Solutions architecture for complex features";
 
@@ -355,17 +364,15 @@ Output JSON:
 }`;
 
   defineArguments(cmd: Command): void {
-    cmd
+    addProviderOption(cmd)
       .argument("<query>", "Feature/system description")
       .option("--files <files...>", "Relevant code files")
       .option("--context <context>", "Additional context or constraints");
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const apiKey = process.env.VERTEX_API_KEY;
-    if (!apiKey) {
-      return this.error("auth_error", "VERTEX_API_KEY not set");
-    }
+    const authError = await this.initProvider(args);
+    if (authError) return authError;
 
     const query = args.query as string;
     const files = args.files as string[] | undefined;
@@ -394,38 +401,16 @@ ${additional}
 
 Respond with JSON only.`;
 
-    const start = performance.now();
-    const result = await withRetry(
-      async () => {
-        const client = new GoogleGenAI({ vertexai: true, apiKey });
-        const genResult = await client.models.generateContent({
-          model: DEFAULT_MODEL,
-          contents: fullPrompt,
-        });
-        return genResult.text ?? "";
-      },
-      "gemini.architect",
-      {},
-      "Proceed without architect analysis"
-    );
-
-    const durationMs = Math.round(performance.now() - start);
+    const { result, durationMs } = await this.callProvider(fullPrompt, "architect");
 
     if (!result.success) {
-      return {
-        status: "error",
-        error: {
-          type: result.error,
-          message: "Gemini API unavailable after retries",
-          suggestion: result.fallback_suggestion,
-        },
-        metadata: { retries: result.retries, duration_ms: durationMs },
-      };
+      return this.handleError(result, durationMs);
     }
 
-    const parsed = parseJsonResponse(result.data);
+    const parsed = parseJsonResponse(result.data.text);
     return this.success(parsed, {
-      command: "gemini architect",
+      provider: this.provider.config.name,
+      command: "oracle architect",
       duration_ms: durationMs,
       retries: result.retries,
     });
@@ -433,10 +418,10 @@ Respond with JSON only.`;
 }
 
 // ============================================================================
-// Audit Command (Phase 8)
+// Audit Command
 // ============================================================================
 
-class GeminiAuditCommand extends BaseCommand {
+class OracleAuditCommand extends OracleCommand {
   readonly name = "audit";
   readonly description = "Audit plan for completeness and coherence";
 
@@ -461,14 +446,12 @@ Output JSON:
 }`;
 
   defineArguments(cmd: Command): void {
-    // No arguments - reads from plan directory
+    addProviderOption(cmd);
   }
 
-  async execute(_args: Record<string, unknown>): Promise<CommandResult> {
-    const apiKey = process.env.VERTEX_API_KEY;
-    if (!apiKey) {
-      return this.error("auth_error", "VERTEX_API_KEY not set");
-    }
+  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+    const authError = await this.initProvider(args);
+    if (authError) return authError;
 
     if (isDirectModeBranch(getBranch())) {
       return this.error("direct_mode", "No plan in direct mode");
@@ -478,7 +461,6 @@ Output JSON:
       return this.error("no_plan", "No plan directory exists for this branch");
     }
 
-    // Gather all plan context
     const plan = readPlan();
     if (!plan) {
       return this.error("file_not_found", "Plan file not found");
@@ -489,9 +471,8 @@ Output JSON:
     const designManifest = readDesignManifest();
     const paths = getPlanPaths();
 
-    // Build prompts section
     const promptsSection = allPrompts
-      .map((p, i) => {
+      .map((p) => {
         const id = getPromptId(p.number, p.variant);
         return `### Prompt ${id}
 **Description:** ${p.frontMatter.description}
@@ -503,15 +484,13 @@ ${p.content}`;
       })
       .join("\n\n");
 
-    // Build design assets section with images
     let designSection = "";
-    const contentParts: Array<string | { inlineData: { mimeType: string; data: string } }> = [];
+    const contentParts: ContentPart[] = [];
 
     if (designManifest && designManifest.designs.length > 0) {
       designSection = "## Design Assets\n\n";
       for (const design of designManifest.designs) {
         designSection += `- **${design.screenshot_file_name}**: ${design.description}\n`;
-        // Try to read the image
         const imagePath = join(paths.design, design.screenshot_file_name);
         const imageData = readImageAsBase64(imagePath);
         if (imageData) {
@@ -535,47 +514,19 @@ ${designSection}
 
 Review the plan and respond with JSON only.`;
 
-    // Add text prompt to content parts
     contentParts.unshift(fullPrompt);
 
-    const start = performance.now();
-    const result = await withRetry(
-      async () => {
-        const client = new GoogleGenAI({ vertexai: true, apiKey });
-        const genResult = await client.models.generateContent({
-          model: PRO_MODEL,
-          contents: contentParts,
-        });
-        return genResult.text ?? "";
-      },
-      "gemini.audit",
-      {},
-      GEMINI_FALLBACKS.audit
-    );
-
-    const durationMs = Math.round(performance.now() - start);
-    recordGeminiCall({ endpoint: "audit", duration_ms: durationMs, success: result.success, retries: result.retries });
+    const { result, durationMs } = await this.callProvider(contentParts, "audit", true);
 
     if (!result.success) {
-      return {
-        status: "error",
-        error: {
-          type: result.error,
-          message: "Gemini API unavailable after retries",
-          suggestion: result.fallback_suggestion,
-        },
-        metadata: { retries: result.retries, duration_ms: durationMs },
-      };
+      return this.handleError(result, durationMs);
     }
 
-    const parsed = parseJsonResponse(result.data);
+    const parsed = parseJsonResponse(result.data.text);
     const questions = (parsed.clarifying_questions as string[]) ?? [];
 
-    // If there are clarifying questions, block for user answers
     if (questions.length > 0) {
       const feedbackPath = writeAuditQuestionsFeedback(questions);
-
-      // Block until done: true
       await watchForDone(feedbackPath, getBlockingGateTimeout());
       const feedback = readAuditQuestionsFeedback();
 
@@ -583,62 +534,67 @@ Review the plan and respond with JSON only.`;
         return this.error("invalid_feedback", feedback.error);
       }
 
-      // Append thoughts and Q&A to user_input.md
       const qaContent = feedback.data.questions
         .map((q) => `**Q:** ${q.question}\n**A:** ${q.answer}`)
         .join("\n\n");
-      const userThoughts = feedback.data.thoughts ? `**User Thoughts:** ${feedback.data.thoughts}\n\n` : "";
+      const userThoughts = feedback.data.thoughts
+        ? `**User Thoughts:** ${feedback.data.thoughts}\n\n`
+        : "";
       appendUserInput(`## Audit Clarifications\n\n${userThoughts}${qaContent}`);
-
-      // Delete feedback file
       deleteFeedbackFile("audit_questions");
 
-      // Record audit entry
       appendPlanAudit({
-        review_context: parsed.thoughts as string ?? "",
+        review_context: (parsed.thoughts as string) ?? "",
         decision: "needs_clarification",
         total_questions: questions.length,
         were_changes_suggested: ((parsed.suggested_edits as unknown[]) ?? []).length > 0,
       });
 
-      return this.success({
-        verdict: "needs_clarification",
-        thoughts: parsed.thoughts,
-        answered_questions: feedback.data.questions,
-        suggested_edits: parsed.suggested_edits,
-      }, {
-        command: "gemini audit",
-        duration_ms: durationMs,
-        retries: result.retries,
-      });
+      return this.success(
+        {
+          verdict: "needs_clarification",
+          thoughts: parsed.thoughts,
+          answered_questions: feedback.data.questions,
+          suggested_edits: parsed.suggested_edits,
+        },
+        {
+          provider: this.provider.config.name,
+          command: "oracle audit",
+          duration_ms: durationMs,
+          retries: result.retries,
+        }
+      );
     }
 
-    // No questions - record audit and return
-    const verdict = parsed.verdict as string ?? "passed";
+    const verdict = (parsed.verdict as string) ?? "passed";
     appendPlanAudit({
-      review_context: parsed.thoughts as string ?? "",
+      review_context: (parsed.thoughts as string) ?? "",
       decision: verdict === "passed" ? "approved" : "rejected",
       total_questions: 0,
       were_changes_suggested: ((parsed.suggested_edits as unknown[]) ?? []).length > 0,
     });
 
-    return this.success({
-      verdict,
-      thoughts: parsed.thoughts,
-      suggested_edits: parsed.suggested_edits,
-    }, {
-      command: "gemini audit",
-      duration_ms: durationMs,
-      retries: result.retries,
-    });
+    return this.success(
+      {
+        verdict,
+        thoughts: parsed.thoughts,
+        suggested_edits: parsed.suggested_edits,
+      },
+      {
+        provider: this.provider.config.name,
+        command: "oracle audit",
+        duration_ms: durationMs,
+        retries: result.retries,
+      }
+    );
   }
 }
 
 // ============================================================================
-// Review Command (Phase 8)
+// Review Command
 // ============================================================================
 
-class GeminiReviewCommand extends BaseCommand {
+class OracleReviewCommand extends OracleCommand {
   readonly name = "review";
   readonly description = "Review implementation against requirements";
 
@@ -673,17 +629,15 @@ Output JSON:
 }`;
 
   defineArguments(cmd: Command): void {
-    cmd
+    addProviderOption(cmd)
       .argument("[prompt_num]", "Prompt number to review")
       .argument("[variant]", "Optional variant letter (A, B, etc.)")
       .option("--full", "Review entire plan implementation");
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const apiKey = process.env.VERTEX_API_KEY;
-    if (!apiKey) {
-      return this.error("auth_error", "VERTEX_API_KEY not set");
-    }
+    const authError = await this.initProvider(args);
+    if (authError) return authError;
 
     if (isDirectModeBranch(getBranch())) {
       return this.error("direct_mode", "No plan in direct mode");
@@ -698,18 +652,17 @@ Output JSON:
     const variant = args.variant as string | undefined;
 
     if (isFull) {
-      return this.executeFullReview(apiKey);
+      return this.executeFullReview();
     }
 
     if (!promptNum) {
       return this.error("missing_argument", "Either --full or prompt_num is required");
     }
 
-    return this.executePromptReview(apiKey, parseInt(promptNum, 10), variant ?? null);
+    return this.executePromptReview(parseInt(promptNum, 10), variant ?? null);
   }
 
   private async executePromptReview(
-    apiKey: string,
     promptNum: number,
     variant: string | null
   ): Promise<CommandResult> {
@@ -721,8 +674,6 @@ Output JSON:
 
     const userInput = readUserInput() ?? "";
     const promptId = getPromptId(promptNum, variant);
-
-    // Get diff for worktree branch if available, otherwise current branch
     const baseBranch = getBaseBranch();
     const diffContent = getDiff(baseBranch);
     const commits = getCommitSummaries(baseBranch);
@@ -746,43 +697,17 @@ ${commits}
 
 Review and respond with JSON only.`;
 
-    const start = performance.now();
-    const result = await withRetry(
-      async () => {
-        const client = new GoogleGenAI({ vertexai: true, apiKey });
-        const genResult = await client.models.generateContent({
-          model: PRO_MODEL,
-          contents: fullPrompt,
-        });
-        return genResult.text ?? "";
-      },
-      "gemini.review",
-      {},
-      GEMINI_FALLBACKS.review
-    );
-
-    const durationMs = Math.round(performance.now() - start);
-    recordGeminiCall({ endpoint: "review", duration_ms: durationMs, success: result.success, retries: result.retries });
+    const { result, durationMs } = await this.callProvider(fullPrompt, "review", true);
 
     if (!result.success) {
-      return {
-        status: "error",
-        error: {
-          type: result.error,
-          message: "Gemini API unavailable after retries",
-          suggestion: result.fallback_suggestion,
-        },
-        metadata: { retries: result.retries, duration_ms: durationMs },
-      };
+      return this.handleError(result, durationMs);
     }
 
-    const parsed = parseJsonResponse(result.data);
+    const parsed = parseJsonResponse(result.data.text);
     const questions = (parsed.clarifying_questions as string[]) ?? [];
 
-    // If there are clarifying questions, block for user answers
     if (questions.length > 0) {
       const feedbackPath = writeReviewQuestionsFeedback(promptId, questions);
-
       await watchForDone(feedbackPath, getBlockingGateTimeout());
       const feedback = readReviewQuestionsFeedback(promptId);
 
@@ -790,61 +715,70 @@ Review and respond with JSON only.`;
         return this.error("invalid_feedback", feedback.error);
       }
 
-      // Append to user_input.md
       const qaContent = feedback.data.questions
         .map((q) => `**Q:** ${q.question}\n**A:** ${q.answer}`)
         .join("\n\n");
-      const userThoughts = feedback.data.thoughts ? `**User Thoughts:** ${feedback.data.thoughts}\n\n` : "";
-      appendUserInput(`## Review Clarifications (Prompt ${promptId})\n\n${userThoughts}${qaContent}`);
-
+      const userThoughts = feedback.data.thoughts
+        ? `**User Thoughts:** ${feedback.data.thoughts}\n\n`
+        : "";
+      appendUserInput(
+        `## Review Clarifications (Prompt ${promptId})\n\n${userThoughts}${qaContent}`
+      );
       deleteFeedbackFile(`${promptId}_review_questions`);
 
       appendPromptReview(promptNum, variant, {
-        review_context: parsed.thoughts as string ?? "",
+        review_context: (parsed.thoughts as string) ?? "",
         decision: "needs_changes",
         total_questions: questions.length,
         were_changes_suggested: !!(parsed.suggested_changes as string),
       });
 
-      return this.success({
-        verdict: "needs_clarification",
-        thoughts: parsed.thoughts,
-        answered_questions: feedback.data.questions,
-        suggested_changes: parsed.suggested_changes,
-      }, {
-        command: "gemini review",
-        duration_ms: durationMs,
-        retries: result.retries,
-        prompt_id: promptId,
-      });
+      return this.success(
+        {
+          verdict: "needs_clarification",
+          thoughts: parsed.thoughts,
+          answered_questions: feedback.data.questions,
+          suggested_changes: parsed.suggested_changes,
+        },
+        {
+          provider: this.provider.config.name,
+          command: "oracle review",
+          duration_ms: durationMs,
+          retries: result.retries,
+          prompt_id: promptId,
+        }
+      );
     }
 
-    // No questions - update status and return
-    const verdict = parsed.verdict as string ?? "passed";
+    const verdict = (parsed.verdict as string) ?? "passed";
     if (verdict === "passed") {
       updatePromptStatus(promptNum, variant, "reviewed");
     }
 
     appendPromptReview(promptNum, variant, {
-      review_context: parsed.thoughts as string ?? "",
+      review_context: (parsed.thoughts as string) ?? "",
       decision: verdict === "passed" ? "approved" : "needs_changes",
       total_questions: 0,
       were_changes_suggested: !!(parsed.suggested_changes as string),
     });
 
-    return this.success({
-      verdict,
-      thoughts: parsed.thoughts,
-      suggested_changes: parsed.suggested_changes,
-    }, {
-      command: "gemini review",
-      duration_ms: durationMs,
-      retries: result.retries,
-      prompt_id: promptId,
-    });
+    return this.success(
+      {
+        verdict,
+        thoughts: parsed.thoughts,
+        suggested_changes: parsed.suggested_changes,
+      },
+      {
+        provider: this.provider.config.name,
+        command: "oracle review",
+        duration_ms: durationMs,
+        retries: result.retries,
+        prompt_id: promptId,
+      }
+    );
   }
 
-  private async executeFullReview(apiKey: string): Promise<CommandResult> {
+  private async executeFullReview(): Promise<CommandResult> {
     const plan = readPlan();
     if (!plan) {
       return this.error("file_not_found", "Plan file not found");
@@ -854,7 +788,6 @@ Review and respond with JSON only.`;
     const allPrompts = readAllPrompts();
     const paths = getPlanPaths();
 
-    // Read curator.md if exists
     const curatorPath = paths.curator;
     const curatorContent = existsSync(curatorPath)
       ? readFileSync(curatorPath, "utf-8")
@@ -899,42 +832,17 @@ ${commits}
 
 Review and respond with JSON only.`;
 
-    const start = performance.now();
-    const result = await withRetry(
-      async () => {
-        const client = new GoogleGenAI({ vertexai: true, apiKey });
-        const genResult = await client.models.generateContent({
-          model: PRO_MODEL,
-          contents: fullPrompt,
-        });
-        return genResult.text ?? "";
-      },
-      "gemini.review",
-      {},
-      GEMINI_FALLBACKS.review
-    );
-
-    const durationMs = Math.round(performance.now() - start);
-    recordGeminiCall({ endpoint: "review", duration_ms: durationMs, success: result.success, retries: result.retries });
+    const { result, durationMs } = await this.callProvider(fullPrompt, "review", true);
 
     if (!result.success) {
-      return {
-        status: "error",
-        error: {
-          type: result.error,
-          message: "Gemini API unavailable after retries",
-          suggestion: result.fallback_suggestion,
-        },
-        metadata: { retries: result.retries, duration_ms: durationMs },
-      };
+      return this.handleError(result, durationMs);
     }
 
-    const parsed = parseJsonResponse(result.data);
+    const parsed = parseJsonResponse(result.data.text);
     const questions = (parsed.clarifying_questions as string[]) ?? [];
 
     if (questions.length > 0) {
       const feedbackPath = writeReviewQuestionsFeedback("full", questions);
-
       await watchForDone(feedbackPath, getBlockingGateTimeout());
       const feedback = readReviewQuestionsFeedback("full");
 
@@ -945,55 +853,63 @@ Review and respond with JSON only.`;
       const qaContent = feedback.data.questions
         .map((q) => `**Q:** ${q.question}\n**A:** ${q.answer}`)
         .join("\n\n");
-      const userThoughts = feedback.data.thoughts ? `**User Thoughts:** ${feedback.data.thoughts}\n\n` : "";
+      const userThoughts = feedback.data.thoughts
+        ? `**User Thoughts:** ${feedback.data.thoughts}\n\n`
+        : "";
       appendUserInput(`## Full Review Clarifications\n\n${userThoughts}${qaContent}`);
-
       deleteFeedbackFile("full_review_questions");
 
       appendPlanReview({
-        review_context: parsed.thoughts as string ?? "",
+        review_context: (parsed.thoughts as string) ?? "",
         decision: "needs_changes",
         total_questions: questions.length,
         were_changes_suggested: !!(parsed.suggested_changes as string),
       });
 
-      return this.success({
-        verdict: "needs_clarification",
-        thoughts: parsed.thoughts,
-        answered_questions: feedback.data.questions,
-        suggested_changes: parsed.suggested_changes,
-      }, {
-        command: "gemini review --full",
-        duration_ms: durationMs,
-        retries: result.retries,
-      });
+      return this.success(
+        {
+          verdict: "needs_clarification",
+          thoughts: parsed.thoughts,
+          answered_questions: feedback.data.questions,
+          suggested_changes: parsed.suggested_changes,
+        },
+        {
+          provider: this.provider.config.name,
+          command: "oracle review --full",
+          duration_ms: durationMs,
+          retries: result.retries,
+        }
+      );
     }
 
-    const verdict = parsed.verdict as string ?? "passed";
+    const verdict = (parsed.verdict as string) ?? "passed";
     appendPlanReview({
-      review_context: parsed.thoughts as string ?? "",
+      review_context: (parsed.thoughts as string) ?? "",
       decision: verdict === "passed" ? "approved" : "needs_changes",
       total_questions: 0,
       were_changes_suggested: !!(parsed.suggested_changes as string),
     });
 
-    return this.success({
-      verdict,
-      thoughts: parsed.thoughts,
-      suggested_changes: parsed.suggested_changes,
-    }, {
-      command: "gemini review --full",
-      duration_ms: durationMs,
-      retries: result.retries,
-    });
+    return this.success(
+      {
+        verdict,
+        thoughts: parsed.thoughts,
+        suggested_changes: parsed.suggested_changes,
+      },
+      {
+        provider: this.provider.config.name,
+        command: "oracle review --full",
+        duration_ms: durationMs,
+        retries: result.retries,
+      }
+    );
   }
 }
 
-// Auto-discovered by cli.ts
 export const COMMANDS = {
-  ask: GeminiAskCommand,
-  validate: GeminiValidateCommand,
-  architect: GeminiArchitectCommand,
-  audit: GeminiAuditCommand,
-  review: GeminiReviewCommand,
+  ask: OracleAskCommand,
+  validate: OracleValidateCommand,
+  architect: OracleArchitectCommand,
+  audit: OracleAuditCommand,
+  review: OracleReviewCommand,
 };

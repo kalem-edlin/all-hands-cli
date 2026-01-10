@@ -29,6 +29,7 @@ export {
   recordPromptCompleted,
   recordGateCompleted,
   recordGeminiCall,
+  recordOracleCall,
   recordDiscoveryCompleted,
   recordDocumentationExtracted,
 } from "./observability.js";
@@ -167,8 +168,23 @@ export {
 export type { TreeEntry, RepomixResult } from "./repomix.js";
 
 // Retry utilities
-export { withRetry, GEMINI_FALLBACKS } from "./retry.js";
+export { withRetry, ORACLE_FALLBACKS, GEMINI_FALLBACKS } from "./retry.js";
 export type { RetryOptions, RetryResult } from "./retry.js";
+
+// Provider utilities
+export {
+  createProvider,
+  getDefaultProvider,
+  PROVIDER_CONFIGS,
+} from "./providers.js";
+export type {
+  ProviderName,
+  ProviderConfig,
+  GenerateOptions,
+  GenerateResult,
+  ContentPart,
+  LLMProvider,
+} from "./providers.js";
 
 // Protocol utilities (Phase 9)
 export {

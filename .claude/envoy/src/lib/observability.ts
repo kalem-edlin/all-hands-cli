@@ -242,6 +242,18 @@ export function recordGeminiCall(data: {
   recordMetric({ type: "gemini_call", ...data });
 }
 
+export function recordOracleCall(data: {
+  provider: string;
+  endpoint: string;
+  duration_ms: number;
+  success: boolean;
+  retries: number;
+  verdict?: string;
+  plan_name?: string;
+}): void {
+  recordMetric({ type: "oracle_call", ...data });
+}
+
 export function recordDiscoveryCompleted(data: {
   specialist: string;
   approach_count: number;
