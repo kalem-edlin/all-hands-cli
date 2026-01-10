@@ -30,6 +30,7 @@ async function getInfo(
         TAVILY_API_KEY: process.env.TAVILY_API_KEY ? "set" : "missing",
         VERTEX_API_KEY: process.env.VERTEX_API_KEY ? "set" : "missing",
         X_AI_API_KEY: process.env.X_AI_API_KEY ? "set" : "missing",
+        CONTEXT7_API_KEY: process.env.CONTEXT7_API_KEY ? "set" : "missing",
       },
       timeout_ms: process.env.ENVOY_TIMEOUT_MS ?? "120000",
     },

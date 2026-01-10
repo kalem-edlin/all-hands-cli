@@ -1,7 +1,7 @@
 ## General Rules
 
-- Never leave comments that mark a update in code given a user prompt to change code.
-- When deleting files/functions, use Grep tool to find and update all references.
+- Never leave comments that mark a update in code given a user prompt to change code - if you cant them, dont leave them.
+- When deleting files/functions, be sure to use LSP to understand the implications of the change. If LSP calls lack results, use GREP for further references.
 
 ## Human Checkpoints
 

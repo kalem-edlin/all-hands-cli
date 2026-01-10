@@ -21,6 +21,16 @@ CLI for agent-scoped external tool access. Keeps file contents OUT of Claude's c
 | `tavily extract` | Extract full content from URLs |
 | `xai search` | X/Twitter search for community opinions, alternatives, discussions |
 
+### NIA (External Documentation & Package Search)
+
+| Tool | Use Case |
+|------|----------|
+| `nia search` | Universal search across indexed repos, docs, packages |
+| `nia package` | Search inside package source code (npm, pypi, crates, go) |
+| `nia research` | AI-powered deep research (falls back to perplexity) |
+
+*If NIA doesn't have a repo indexed, fall back to `gh api repos/{owner}/{repo}/contents/{path}`*
+
 ### Vertex (Gemini)
 
 | Tool | Use Case |
@@ -44,6 +54,9 @@ CLI for agent-scoped external tool access. Keeps file contents OUT of Claude's c
 - Pre-synthesized findings → `perplexity research`
 - Raw sources for processing → `tavily search` → `tavily extract`
 - Community opinions/alternatives → `xai search` (can build on previous findings with `--context`)
+- Search inside package source code → `nia package <pkg> <query> --registry npm|pypi|crates|go`
+- Search indexed repos/docs → `nia search` (fallback: `gh api` for unindexed repos)
+- Implementation patterns research → `nia research` (fallback: perplexity)
 
 **Vertex:**
 - Arbitrary Gemini query → `vertex ask`
@@ -63,7 +76,9 @@ These tools read files directly and pass to external LLMs. Claude only receives 
 | `TAVILY_API_KEY` | tavily | Tavily API key |
 | `VERTEX_API_KEY` | vertex | Google AI API key (Vertex Express) |
 | `X_AI_API_KEY` | xai | xAI Grok API key |
+| `NIA_API_KEY` | nia | NIA API key (trynia.ai) |
 | `ENVOY_TIMEOUT_MS` | optional | Global timeout (default: 120000) |
+| `NIA_TIMEOUT_MS` | optional | NIA deep research timeout (default: 300000) |
 
 ## Discovery
 
