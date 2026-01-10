@@ -3,7 +3,7 @@ name: surveyor
 description: |
   Generic codebase discovery specialist. Fallback when no domain-specific specialist matches for DISCOVERY tasks. Uses Glob, Grep, Read for comprehensive codebase analysis. Cannot implement - discovery only.
 tools: Read, Glob, Grep, Bash
-model: opus
+model: haiku
 color: green
 ---
 

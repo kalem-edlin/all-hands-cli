@@ -10,15 +10,15 @@ Execute individual prompts from an active plan. Read prompt → implement → tr
 <quick_start>
 ```bash
 # 1. Get prompt to implement
-.claude/envoy/envoy plans get-prompt <task-number>
+envoy plans get-prompt <task-number>
 
 # 2. Implement using Glob, Grep, Read for context
 
 # 3. Track progress
-.claude/envoy/envoy plans append-history <task> --summary "Added auth middleware" --files '["src/auth.ts"]'
+envoy plans append-history <task> --summary "Added auth middleware" --files '["src/auth.ts"]'
 
 # 4. Get review
-.claude/envoy/envoy plans review-prompt <task>
+envoy plans review-prompt <task>
 
 # 5. Commit when review passes
 git commit -m "task-<N>: <summary>"
@@ -28,7 +28,7 @@ git commit -m "task-<N>: <summary>"
 <workflow>
 ### 1. Get Prompt
 ```bash
-.claude/envoy/envoy plans get-prompt <task-number>
+envoy plans get-prompt <task-number>
 ```
 Returns: prompt content + existing history
 
@@ -46,14 +46,14 @@ git worktree add .worktrees/task-N-V <branch>
 ### 4. Track History
 After each significant change:
 ```bash
-.claude/envoy/envoy plans append-history <task> \
+envoy plans append-history <task> \
   --summary "Brief description of change" \
   --files '["path/to/changed.ts", "path/to/other.ts"]'
 ```
 
 ### 5. Get Review
 ```bash
-.claude/envoy/envoy plans review-prompt <task>
+envoy plans review-prompt <task>
 ```
 If changes needed → fix → append-history → review again
 
@@ -119,7 +119,7 @@ For each issue:
 
 ### 3. Review Changes
 ```bash
-.claude/envoy/envoy vertex review --last-commit
+envoy vertex review --last-commit
 ```
 
 | Response | Action |

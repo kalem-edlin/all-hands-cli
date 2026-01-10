@@ -13,7 +13,7 @@ Modes:
 </objective>
 
 <context>
-Plan status: !`.claude/envoy/envoy plan check`
+Plan status: !`envoy plan check`
 </context>
 
 <process>
@@ -30,7 +30,7 @@ Parse $ARGUMENTS for mode flags and bug description:
 
 1. Call `envoy plan check` to get status
 2. If no plan: Create branch from bug description (infer name)
-3. Append bug description: `.claude/envoy/envoy plan append-user-input "<bug_description>"`
+3. Append bug description: `envoy plan append-user-input "<bug_description>"`
 4. Delegate to **planner agent**:
    * "Run the planning-workflow. INPUTS: `{ mode: 'quick', workflow_type: 'debug', feature_branch: <current_branch>, plan_status: <status> }`"
    * OUTPUTS: `{ success: true }`
@@ -77,7 +77,7 @@ If user chooses "start fresh": create new branch off base, set mode = "create"
 
 <step name="write_user_input">
 Append all gathered context to user_input.md:
-`.claude/envoy/envoy plan append-user-input "<all_gathered_context>"`
+`envoy plan append-user-input "<all_gathered_context>"`
 </step>
 
 <step name="specialist_delegation">
@@ -93,7 +93,7 @@ Append all gathered context to user_input.md:
 </step>
 
 <step name="get_findings">
-Call `.claude/envoy/envoy plan get-findings` to get bug hypotheses/approaches
+Call `envoy plan get-findings` to get bug hypotheses/approaches
 </step>
 
 <step name="research_delegation">
@@ -107,7 +107,7 @@ For each research objective (known library issues, similar errors, anti-patterns
 1. Present all clarifying questions from approach documents (bug hypotheses) to user
 2. AskUserQuestion: "Want to redirect investigation with specific requirements? (clears all findings)"
    - If yes: clear findings, return to specialist_delegation step
-3. Call `.claude/envoy/envoy plan block-findings-gate`
+3. Call `envoy plan block-findings-gate`
    - Returns: `{ thoughts, affected_approaches: [{ specialist_name, approach_number }] }`
 4. If affected_approaches exist:
    - Re-delegate to affected specialists with thoughts context

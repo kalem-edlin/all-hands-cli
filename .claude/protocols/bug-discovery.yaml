@@ -19,7 +19,7 @@ outputs:
     description: bug hypotheses written to file via envoy commands
 steps:
   1: |
-    **Query documentation first**: Call `envoy knowledge search docs "<suspected area + symptoms as descriptive phrase>"` (semantic search - full phrases, not keywords)
+    **Query documentation first**: Call `envoy knowledge search "<suspected area + symptoms as descriptive phrase>"` (semantic search - full phrases, not keywords)
     * Check for documented anti-patterns that might explain the bug
     * Note any constraints that must be preserved in the fix
   2: |

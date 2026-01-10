@@ -19,7 +19,7 @@ outputs:
     description: findings written to file via envoy commands
 steps:
   1: |
-    **Query documentation first**: Call `envoy knowledge search docs "<focused requirement area as descriptive request>"` (semantic search - full phrases, not keywords)
+    **Query documentation first**: Call `envoy knowledge search "<focused requirement area as descriptive request>"` (semantic search - full phrases, not keywords)
     * May run multiple searches if requirements span distinct focus areas
     * Use returned docs as context for approach building - reference existing patterns rather than reinventing
     * Note any constraints or anti-patterns documented for this area

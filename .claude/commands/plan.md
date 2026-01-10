@@ -13,7 +13,7 @@ Modes:
 </objective>
 
 <context>
-Plan status: !`.claude/envoy/envoy plan check`
+Plan status: !`envoy plan check`
 </context>
 
 <process>
@@ -30,14 +30,14 @@ Parse $ARGUMENTS for mode flags and user prompt:
 
 1. Call `envoy plan check` to get status
 2. **If plan exists (in_progress or completed)**:
-   - Append user prompt: `.claude/envoy/envoy plan append-user-input "<user_prompt>"`
+   - Append user prompt: `envoy plan append-user-input "<user_prompt>"`
    - Delegate to **planner agent**:
      * "Run `envoy plan protocol implementation` and follow the steps. INPUTS: `{ mode: 'quick', workflow_type: 'feature', feature_branch: <current_branch>, plan_status: <status> }`"
    - AskUserQuestion: "Quick plan created. Ready to implement?"
    - If yes: call /continue command
 3. **If no plan exists**:
    - Create branch from user prompt context (infer name)
-   - Append user prompt: `.claude/envoy/envoy plan append-user-input "<user_prompt>"`
+   - Append user prompt: `envoy plan append-user-input "<user_prompt>"`
    - Delegate to **planner agent**:
      * "Run `envoy plan protocol implementation` and follow the steps. INPUTS: `{ mode: 'quick', workflow_type: 'feature', feature_branch: <current_branch> }`"
    - AskUserQuestion: "Quick plan created. Ready to implement?"
@@ -77,7 +77,7 @@ If user chooses "start fresh": create new branch off base, set mode = "create"
 
 <step name="write_user_input">
 Append all gathered context to user_input.md:
-`.claude/envoy/envoy plan append-user-input "<all_gathered_context>"`
+`envoy plan append-user-input "<all_gathered_context>"`
 </step>
 
 <step name="specialist_delegation">
@@ -93,7 +93,7 @@ Append all gathered context to user_input.md:
 </step>
 
 <step name="get_findings">
-Call `.claude/envoy/envoy plan get-findings` to get list of approaches
+Call `envoy plan get-findings` to get list of approaches
 </step>
 
 <step name="research_delegation">
@@ -107,7 +107,7 @@ For each distinct research objective identified from approaches:
 1. Present all clarifying questions from approach documents to user
 2. AskUserQuestion: "Want to redirect specialists with specific requirements? (clears all findings)"
    - If yes: clear findings, return to specialist_delegation step
-3. Call `.claude/envoy/envoy plan block-findings-gate`
+3. Call `envoy plan block-findings-gate`
    - Returns: `{ thoughts, affected_approaches: [{ specialist_name, approach_number }] }`
 4. If affected_approaches exist:
    - Re-delegate to affected specialists with thoughts context

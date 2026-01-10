@@ -12,6 +12,6 @@ if not url:
 # JSON output with additionalContext for Claude self-correction
 print(json.dumps({
     "continue": False,
-    "additionalContext": "WebFetch blocked.\n\nMain agent: delegate to researcher agent.\nSubagent: use `.claude/envoy/envoy tavily extract \"<url>\"` instead."
+    "additionalContext": "WebFetch blocked.\n\nMain agent: delegate to researcher agent.\nSubagent: use `envoy tavily extract \"<url>\"` instead."
 }))
 sys.exit(0)

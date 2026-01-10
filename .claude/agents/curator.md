@@ -95,7 +95,7 @@ When creating/modifying agents:
 **Tool selection:** Least privilege - grant only what's needed.
 
 **Workflow architecture:**
-- Non-protocol agents (planner, documentor): workflows ARE primary
+- Non-protocol agents (planner, documentation-taxonomist, documentation-writer): workflows ARE primary
 - Protocol-compatible: prefix internal workflows with:
   > Fallback workflow. Use only when no protocol explicitly requested.
 - Core capabilities: OUTSIDE workflows
@@ -150,10 +150,6 @@ Use .allhandsignore when curating project-specific config (unless intentional fr
 **Sync:**
 - ALWAYS check .allhandsignore for project-specific vs framework changes
 </constraints>
-
-<discovery_mode>
-When in discovery mode: follow discovery-mode skill. Focus on .claude/ orchestration patterns.
-</discovery_mode>
 
 <success_criteria>
 Task complete when:

@@ -3,8 +3,8 @@
   "env": {
     "PARALLEL_MAX_WORKERS": "3",
     "PROJECT_NAME": "test-target",
-    "SEARCH_SIMILARITY_THRESHOLD": "0.64",
-    "SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD": "0.72",
+    "SEARCH_SIMILARITY_THRESHOLD": "0.65",
+    "SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD": "0.82",
     "SEARCH_CONTEXT_TOKEN_LIMIT": "5000",
     "MAX_LOGS_TOKENS": "10000",
     "BASH_MAX_TIMEOUT_MS": "3600000",
@@ -21,9 +21,10 @@
       "Bash(ls:*)",
       "Bash(rg:*)",
       "Bash(mkdir:*)",
+      "Bash(mkdir -p:*)",
       "Bash(npx repomix@latest:*)",
       "Read(~/.claude-code-docs/docs/*)",
-      "Bash(.claude/envoy/envoy:*)",
+      "Bash(envoy:*)",
       "SlashCommand(/plan:*)"
     ],
     "deny": [],
