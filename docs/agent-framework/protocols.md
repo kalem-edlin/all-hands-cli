@@ -22,7 +22,7 @@ Protocols standardize how agents execute workflows. Rather than embedding workfl
 
 ## Patterns
 
-**Discovery protocol pair**: The discovery protocol [ref:.claude/protocols/discovery.yaml::1297377] handles feature requirement analysis. Specialists query documentation first, gather codebase context, then write approaches via envoy commands. The bug-discovery protocol [ref:.claude/protocols/bug-discovery.yaml::c15ff37] extends this for bug investigation, adding compiler/linter checks and hypothesis-based approaches.
+**Discovery protocol pair**: The discovery protocol [ref:.claude/protocols/discovery.yaml::6607b05] handles feature requirement analysis. Specialists query documentation first, gather codebase context, then write approaches via envoy commands. The bug-discovery protocol [ref:.claude/protocols/bug-discovery.yaml::6607b05] extends this for bug investigation, adding compiler/linter checks and hypothesis-based approaches.
 
 **Implementation protocol pair**: The implementation protocol handles prompt execution with worktree setup, iteration tracking, review cycles, and merge. The debugging protocol extends this for bug fixes, adding structured logging with DEBUG-TEMP markers that get cleaned up after fix validation.
 
