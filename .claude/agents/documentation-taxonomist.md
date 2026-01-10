@@ -35,14 +35,14 @@ Your assignments should guide writers toward capturing KNOWLEDGE that isn't obvi
 - `mode`: "init"
 - `scope_paths`: optional paths to scope (default: entire codebase)
 - `user_request`: optional user-specified context
-- `feature_branch`: branch name for worktree naming
+- `feature_branch`: branch name (used for context only)
 
 **OUTPUTS** (to main agent):
-- `{ success: true, structure_committed: true, assignments: [...] }` - ready for writers
+- `{ success: true, structure_created: true, assignments: [...] }` - ready for writers
 
 **STEPS:**
 
-1. **Analyze codebase AND existing docs** - Run envoy commands directly (no chaining):
+1. **Analyze codebase AND existing docs** - Run as parallel tool calls or join with `;` (not `&&`, want all outputs):
    ```bash
    # Understand codebase structure
    envoy docs tree <path> --depth 4
@@ -85,22 +85,20 @@ Your assignments should guide writers toward capturing KNOWLEDGE that isn't obvi
    - Subdomains should represent distinct subsystems, not directories
    - One writer can handle parent + children if simple enough
 
-4. **Create and commit directory structure:**
+4. **Create directory structure:**
    ```bash
    mkdir -p docs/<product>/<subdomain>
-   git add docs/
-   git commit -m "docs: create documentation structure for <products>"
    ```
 
    This happens BEFORE delegation - writers receive existing directories.
+   Note: Do NOT create .gitkeep files. Writers will add content shortly - empty directories are fine temporarily.
 
 5. **Assign writers to directories:**
    ```yaml
-   structure_committed: true
+   structure_created: true
    assignments:
      - directory: "docs/<product>/"
        files: ["<source-glob-patterns>"]
-       worktree_branch: "<feature_branch>/docs-<product>"
        responsibilities:
          - "Key design decisions and rationale"
          - "Patterns observers should know"
@@ -110,7 +108,6 @@ Your assignments should guide writers toward capturing KNOWLEDGE that isn't obvi
 
      - directory: "docs/<product>/<subdomain>/"
        files: ["<source-glob-patterns>"]
-       worktree_branch: "<feature_branch>/docs-<product>-<subdomain>"
        responsibilities:
          - "Implementation rationale for subsystem"
          - "Key patterns with reference examples"
@@ -133,13 +130,23 @@ Your assignments should guide writers toward capturing KNOWLEDGE that isn't obvi
 - `use_diff`: boolean - if true, get changed files from git
 - `scope_paths`: optional list of paths to scope
 - `user_request`: optional user-specified context
-- `feature_branch`: branch name for worktree naming
+- `feature_branch`: branch name (used for context only)
+- `walkthroughs`: optional array from `envoy plan get-all-walkthroughs` containing:
+  - `prompt_num`, `variant`, `id`: prompt identifiers
+  - `description`: what the prompt implemented
+  - `walkthrough`: array of implementation iterations with decisions/rationale
+  - `relevant_files`: files affected by this prompt
 
 **OUTPUTS** (to main agent):
-- `{ success: true, structure_committed: true, assignments: [...] }` - targeted updates
+- `{ success: true, structure_created: true, assignments: [...] }` - targeted updates
 
 **STEPS:**
-1. **Discover what needs documenting:**
+1. **Analyze walkthroughs for rationale** (if provided):
+   - Extract design decisions, patterns chosen, and rationale from walkthrough entries
+   - Map prompts to affected files via `relevant_files`
+   - This context informs what knowledge to capture (WHY decisions were made)
+
+2. **Discover what needs documenting:**
    ```bash
    # If use_diff is true, get changed files from git
    envoy git diff-base --name-only
@@ -153,25 +160,24 @@ Your assignments should guide writers toward capturing KNOWLEDGE that isn't obvi
 
    # Check if changed concepts are already documented
    envoy knowledge search "<changed-feature>" --metadata-only
-   envoy knowledge search "<affected-product>" --metadata-only
    ```
 
-2. Identify affected products/features from the changes
-3. Check existing doc structure - which directories need updates vs new sections
-4. Create any new directories needed (and commit)
-5. Assign writers to affected directories with update responsibilities
+3. Identify affected products/features from changes + walkthrough context
+4. Check existing doc structure - which directories need updates vs new sections
+5. Create any new directories needed
+6. Assign writers with walkthrough rationale included in notes:
 
 ```yaml
-structure_committed: true
+structure_created: true
 assignments:
   - directory: "docs/<product>/"
     files: ["<changed-source-patterns>"]
-    worktree_branch: "<feature_branch>/docs-<product>"
     responsibilities:
       - "update README.md for new features"
       - "add documentation for new commands"
     action: "update"
-    notes: "<what changed and needs documenting>"
+    notes: "<what changed, plus rationale from walkthroughs>"
+    walkthrough_context: "<relevant decisions/rationale from prompt walkthroughs>"
 ```
 </adjust_workflow>
 
@@ -230,9 +236,9 @@ assignments:
 - MUST run `envoy docs tree docs/` to see existing documentation hierarchies before planning
 - MUST use `envoy knowledge search` to check if concepts are already documented
 - MUST use product/feature names, not directory names
-- MUST create and commit directory structure BEFORE returning assignments
+- MUST create directory structure BEFORE returning assignments
 - MUST assign writers to existing directories with clear responsibilities
-- MUST run envoy commands directly - no chaining
+- MUST run envoy commands via parallel tool calls or `;` joins (avoid `&&` - want all outputs)
 - MUST use --metadata-only for knowledge searches
 - NEVER mirror source directory structure in domain names
 - NEVER over-distribute - prefer fewer writers handling more
@@ -244,12 +250,12 @@ assignments:
 **Init workflow complete when:**
 - Products/features identified (not directories)
 - Meaningful domain names chosen
-- Directory structure created and committed
+- Directory structure created
 - Writer assignments defined with responsibilities
 - Each assignment has directory, files, responsibilities, depth
 
 **Adjust workflow complete when:**
 - Affected products identified
-- New directories created if needed (and committed)
+- New directories created if needed
 - Writer assignments target specific update responsibilities
 </success_criteria>

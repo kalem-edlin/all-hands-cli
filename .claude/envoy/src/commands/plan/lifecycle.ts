@@ -453,6 +453,91 @@ export class MarkPromptExtractedCommand extends BaseCommand {
 }
 
 /**
+ * Get all walkthroughs from prompts not yet documented.
+ * Returns walkthroughs for all prompts where documentation_extracted is false.
+ */
+export class GetAllWalkthroughsCommand extends BaseCommand {
+  readonly name = "get-all-walkthroughs";
+  readonly description = "Get walkthroughs from all undocumented prompts";
+
+  defineArguments(_cmd: Command): void {
+    // No arguments
+  }
+
+  async execute(_args: Record<string, unknown>): Promise<CommandResult> {
+    const branch = getBranch();
+    if (!branch) {
+      return this.error("no_branch", "Not in a git repository or no branch checked out");
+    }
+
+    if (!planExists()) {
+      return this.error("no_plan", "No plan directory exists for this branch");
+    }
+
+    const prompts = readAllPrompts();
+    const undocumented = prompts.filter((p) => !p.frontMatter.documentation_extracted);
+
+    const walkthroughs = undocumented.map((p) => ({
+      prompt_num: p.number,
+      variant: p.variant,
+      id: getPromptId(p.number, p.variant),
+      description: p.frontMatter.description,
+      walkthrough: p.frontMatter.walkthrough || [],
+      relevant_files: p.frontMatter.relevant_files || [],
+    }));
+
+    return this.success({
+      count: walkthroughs.length,
+      walkthroughs,
+    });
+  }
+}
+
+/**
+ * Mark all undocumented prompts as documentation_extracted.
+ */
+export class MarkAllDocumentedCommand extends BaseCommand {
+  readonly name = "mark-all-documented";
+  readonly description = "Mark all undocumented prompts as documentation extracted";
+
+  defineArguments(_cmd: Command): void {
+    // No arguments
+  }
+
+  async execute(_args: Record<string, unknown>): Promise<CommandResult> {
+    const branch = getBranch();
+    if (!branch) {
+      return this.error("no_branch", "Not in a git repository or no branch checked out");
+    }
+
+    if (!planExists()) {
+      return this.error("no_plan", "No plan directory exists for this branch");
+    }
+
+    const prompts = readAllPrompts();
+    const undocumented = prompts.filter((p) => !p.frontMatter.documentation_extracted);
+    const marked: string[] = [];
+
+    for (const p of undocumented) {
+      const prompt = readPrompt(p.number, p.variant);
+      if (prompt) {
+        const updatedFrontMatter: PromptFrontMatter = {
+          ...prompt.frontMatter,
+          documentation_extracted: true,
+        };
+        writePrompt(p.number, p.variant, updatedFrontMatter, prompt.content);
+        marked.push(getPromptId(p.number, p.variant));
+      }
+    }
+
+    return this.success({
+      marked_count: marked.length,
+      marked_prompts: marked,
+    });
+  }
+}
+
+/**
  * Release all prompts from in_progress status.
  */
 export class ReleaseAllPromptsCommand extends BaseCommand {

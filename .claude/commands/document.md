@@ -120,7 +120,7 @@ notes: "<segment.notes>"
 success: true
 ```
 
-Writers work directly on the branch. Taxonomist ensures non-overlapping output directories, so no conflicts occur.
+Writers work directly on the branch without committing. Taxonomist ensures non-overlapping output directories, so no conflicts occur. Main agent commits all changes after writers complete.
 </step>
 
 <step name="validate_docs">
@@ -132,7 +132,7 @@ If stale/invalid refs found:
 </step>
 
 <step name="commit_documentation">
-Commit any uncommitted documentation changes (e.g., validation fixes):
+Commit ALL documentation changes from parallel writers:
 
 1. Check for uncommitted changes in docs/:
    ```bash
@@ -168,7 +168,7 @@ Update semantic search index with new documentation:
 
 2. Call reindex:
    ```bash
-   envoy knowledge reindex-from-changes docs --files '<json_array>'
+   envoy knowledge reindex-from-changes --files '<json_array>'
    ```
 
 3. If reindex reports missing references:

@@ -42,17 +42,8 @@ For each prompt from next:
 3. **Parallel execution**: If multiple prompts/variants returned, delegate all in parallel
 </step>
 
-<step name="extract_documentation">
-After each specialist returns (prompt merged):
-
-Call `/docs adjust --diff` to update documentation based on changes.
-* Uses taxonomy-based approach to identify changed areas
-* Writers update relevant documentation with symbol references
-* Returns: `{ success: true }`
-</step>
-
 <step name="loop">
-Repeat steps 1-3 until:
+Repeat steps 1-2 until:
 - No more prompts returned from next
 - No prompts in_progress status
 </step>
@@ -80,8 +71,38 @@ If verdict = "failed" OR suggested_fixes exist:
 4. Rerun full review (repeat until passes)
 </step>
 
+<step name="extract_documentation">
+After full review passes, delegate to **documentation-taxonomist** agent with adjust mode:
+
+1. Get prompt walkthroughs for rationale context:
+   ```bash
+   envoy plan get-all-walkthroughs
+   ```
+
+2. Delegate to taxonomist with inputs:
+   ```yaml
+   mode: "adjust"
+   use_diff: true
+   feature_branch: "<current_branch>"
+   walkthroughs: <output from get-all-walkthroughs>
+   ```
+
+3. Taxonomist identifies affected domains, delegates to writers (writers do NOT commit)
+
+4. After ALL writers complete, commit documentation changes:
+   ```bash
+   git add docs/
+   git commit -m "docs: update documentation for feature"
+   ```
+
+5. Mark prompts documented:
+   ```bash
+   envoy plan mark-all-documented
+   ```
+</step>
+
 <step name="mandatory_doc_audit">
-Call `/docs audit` to validate all documentation symbol references.
+Call `/audit-docs` to validate all documentation symbol references.
 * Checks for stale (hash changed) and invalid (symbol deleted) references
 * If issues found: fix automatically or present to user
 * Returns: `{ success: true }`
@@ -104,7 +125,7 @@ Call /whats-next command
 <success_criteria>
 - All prompts implemented via specialist delegation
 - Variants executed in parallel
-- Documentation extracted for each prompt
+- Documentation updated from all changes (once, after review passes)
 - Full review passes
 - Documentation audit completed
 - Plan marked complete with PR created
@@ -114,7 +135,7 @@ Call /whats-next command
 <constraints>
 - MUST respect prompt dependencies (use envoy next)
 - MUST run all variants in parallel
-- MUST extract documentation after each prompt
+- MUST extract documentation once after full review passes
 - MUST loop until no prompts remain
 - MUST pass full review before completing
 - MUST run doc audit before completion

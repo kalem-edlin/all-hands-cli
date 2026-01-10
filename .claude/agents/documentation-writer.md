@@ -2,7 +2,7 @@
 name: documentation-writer
 description: |
   Documentation writer specialist. Writes knowledge-base documentation using file references. Triggers: "write docs", "document domain".
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit, LSP
 model: inherit
 color: yellow
 ---
@@ -121,7 +121,7 @@ Authentication uses JWT for stateless sessions. The signing implementation [ref:
 - `notes`: guidance from taxonomist
 
 **OUTPUTS** (to main agent):
-- `{ success: true }` - documentation written and committed
+- `{ success: true }` - documentation written (main agent commits after all writers complete)
 
 **STEPS:**
 1. Search existing knowledge: `envoy knowledge search "<domain> decisions patterns"`
@@ -158,7 +158,7 @@ Authentication uses JWT for stateless sessions. The signing implementation [ref:
    - `detailed`: + rationale, tradeoffs, edge cases
    - `comprehensive`: + all major patterns, troubleshooting
 
-6. Validate before commit:
+6. Validate before returning:
 
    a. Run: `envoy docs validate --path docs/<domain>/`
    b. Check response:
@@ -170,18 +170,14 @@ Authentication uses JWT for stateless sessions. The signing implementation [ref:
    d. If any check fails:
       - Fix the issue
       - Re-validate
-      - Do NOT commit until all checks pass
 
-7. Commit changes:
-   - `git add docs/`
-   - `git commit -m "docs(<domain>): <summary>"`
-   - Commit hook validates references
+7. Return `{ success: true }`
 
-8. Return `{ success: true }`
+**IMPORTANT:** Do NOT commit. Main agent commits all writer changes together after parallel execution completes.
 
 **On failure:**
 - If AST symbol not found: use file-only ref `[ref:file::hash]`
-- If commit validation fails: fix references, retry commit
+- If validation fails: fix references, re-validate
 </write_workflow>
 
 <fix_workflow>
@@ -206,9 +202,7 @@ Authentication uses JWT for stateless sessions. The signing implementation [ref:
    - If file moved: update file path
    - If file deleted: remove ref, update knowledge
 
-3. Commit fixes: `git commit -m "docs: update stale references"`
-
-4. Return fix summary
+3. Return fix summary (main agent commits)
 </fix_workflow>
 
 <audit_fix_workflow>
@@ -290,9 +284,7 @@ changes:
 
 5. Validate changes: `envoy docs validate --path <doc_file>`
 
-6. Commit: `git commit -m "docs: fix stale/invalid refs in <doc_file>"`
-
-7. Return changes summary
+6. Return changes summary (main agent commits)
 </audit_fix_workflow>
 
 <documentation_format>
@@ -302,6 +294,15 @@ changes:
 description: 1-2 sentence summary enabling semantic search discovery
 ---
 ```
+
+**Description quality guidelines:**
+- GOOD: "Authentication system using JWT tokens with refresh rotation and Redis session storage"
+- GOOD: "CLI argument parsing with subcommand routing and help generation"
+- BAD: "Documentation for auth" (too vague)
+- BAD: "Code documentation" (useless for search)
+- BAD: "This file documents the system" (describes the doc, not the code)
+
+The description should answer: "What would someone search for to find this?"
 
 **Structure (REQUIRED sections marked with *):**
 
@@ -347,7 +348,8 @@ Adjust structure based on domain. The structure serves knowledge transfer, not c
 - MUST include `description` in front-matter
 - MUST include Overview, Key Decisions, and Use Cases sections
 - MUST focus on decisions, rationale, patterns - NOT capabilities
-- MUST validate with `envoy docs validate` before committing
+- MUST validate with `envoy docs validate` before returning
+- MUST NOT commit - main agent commits after all writers complete
 - NEVER write inline code blocks (zero fenced blocks allowed)
 - NEVER document what's obvious from reading code
 - NEVER create capability tables (Command/Purpose, Option/Description)

@@ -35,6 +35,8 @@ export {
   CompletePromptCommand,
   GetPromptWalkthroughCommand,
   MarkPromptExtractedCommand,
+  GetAllWalkthroughsCommand,
+  MarkAllDocumentedCommand,
   ReleaseAllPromptsCommand,
   CompleteCommand,
 } from "./lifecycle.js";
@@ -77,6 +79,8 @@ import {
   CompletePromptCommand,
   GetPromptWalkthroughCommand,
   MarkPromptExtractedCommand,
+  GetAllWalkthroughsCommand,
+  MarkAllDocumentedCommand,
   ReleaseAllPromptsCommand,
   CompleteCommand,
 } from "./lifecycle.js";
@@ -121,6 +125,8 @@ export const COMMANDS = {
   "complete-prompt": CompletePromptCommand,
   "get-prompt-walkthrough": GetPromptWalkthroughCommand,
   "mark-prompt-extracted": MarkPromptExtractedCommand,
+  "get-all-walkthroughs": GetAllWalkthroughsCommand,
+  "mark-all-documented": MarkAllDocumentedCommand,
   "release-all-prompts": ReleaseAllPromptsCommand,
   complete: CompleteCommand,
   // Gates

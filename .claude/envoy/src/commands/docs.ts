@@ -16,7 +16,6 @@ import matter from "gray-matter";
 import { BaseCommand, CommandResult } from "./base.js";
 import {
   findSymbol,
-  symbolExists,
   getFileComplexity,
 } from "../lib/tree-sitter-utils.js";
 import { getSupportedExtensions } from "../lib/ast-queries.js";
@@ -514,9 +513,9 @@ class ValidateCommand extends BaseCommand {
         continue;
       }
 
-      // Check if symbol exists
-      const symbolFound = await symbolExists(absoluteRefFile, ref.refSymbol!);
-      if (!symbolFound) {
+      // Check if symbol exists and get its location
+      const symbol = await findSymbol(absoluteRefFile, ref.refSymbol!);
+      if (!symbol) {
         const reason = "Symbol not found";
         invalid.push({
           doc_file: ref.file,
@@ -528,12 +527,6 @@ class ValidateCommand extends BaseCommand {
           reason,
         });
         continue;
-      }
-
-      // Get current hash for symbol
-      const symbol = await findSymbol(absoluteRefFile, ref.refSymbol!);
-      if (!symbol) {
-        continue; // Already validated above
       }
 
       const { hash: mostRecentHash, success } = getMostRecentHashForRange(

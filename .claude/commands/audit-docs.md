@@ -129,14 +129,20 @@ changes:
 <step name="verify_and_report">
 After all agents complete:
 
-1. Run validation again:
+1. Commit all documentation fixes:
+```bash
+git add docs/
+git commit -m "docs: fix stale/invalid references"
+```
+
+2. Run validation again:
 ```bash
 envoy docs validate [--path <docs_path>]
 ```
 
-2. If issues remain, report which failed and why
+3. If issues remain, report which failed and why
 
-3. Report completion:
+4. Report completion:
 ```markdown
 ## Audit Complete
 

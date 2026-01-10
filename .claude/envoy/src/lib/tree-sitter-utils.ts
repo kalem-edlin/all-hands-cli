@@ -23,6 +23,7 @@ export interface ParseResult {
   language?: string;
   symbols?: SymbolLocation[];
   error?: string;
+  warnings?: string[]; // Non-fatal issues during parsing (e.g., query failures)
 }
 
 // Tree-sitter Query types
@@ -111,7 +112,23 @@ async function getParser(language: string): Promise<ParserData | null> {
     parserCache.set(language, cached);
     return cached;
   } catch (e) {
-    console.error(`Failed to load parser for ${language}:`, e);
+    // Detect native binding failures
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    if (
+      errorMsg.includes("MODULE_NOT_FOUND") ||
+      errorMsg.includes("invalid ELF header") ||
+      errorMsg.includes("was compiled against a different Node.js version") ||
+      errorMsg.includes("dlopen") ||
+      errorMsg.includes(".node")
+    ) {
+      console.error(
+        `Native binding error for ${language} parser. ` +
+        `This usually means tree-sitter was compiled for a different Node.js version. ` +
+        `Try: rm -rf node_modules && npm install`
+      );
+    } else {
+      console.error(`Failed to load parser for ${language}:`, e);
+    }
     return null;
   }
 }
@@ -157,12 +174,13 @@ export async function parseFile(filePath: string): Promise<ParseResult> {
       };
     }
 
-    const symbols = extractSymbols(tree, queries, parserData.grammar, parserData.QueryClass);
+    const { symbols, warnings } = extractSymbols(tree, queries, parserData.grammar, parserData.QueryClass);
 
     return {
       success: true,
       language,
       symbols,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   } catch (e) {
     return {
@@ -202,6 +220,11 @@ export async function symbolExists(
 // Cache compiled queries to avoid recompilation
 const queryCache = new Map<string, Query>();
 
+interface ExtractResult {
+  symbols: SymbolLocation[];
+  warnings: string[];
+}
+
 /**
  * Extract symbols from a parsed tree using tree-sitter's Query API.
  * This uses the declarative query patterns from ast-queries.ts.
@@ -211,8 +234,9 @@ function extractSymbols(
   queries: LanguageQueries,
   grammar: unknown,
   QueryClass: QueryConstructor
-): SymbolLocation[] {
+): ExtractResult {
   const symbols: SymbolLocation[] = [];
+  const warnings: string[] = [];
   const root = (tree as { rootNode: unknown }).rootNode;
 
   for (const [symbolType, queryDef] of Object.entries(queries)) {
@@ -224,8 +248,8 @@ function extractSymbols(
         query = new QueryClass(grammar, queryDef.query);
         queryCache.set(cacheKey, query);
       } catch (e) {
-        // Query compilation failed - skip this symbol type
-        console.error(`Failed to compile query for ${symbolType}:`, e);
+        const msg = `Query compile failed for ${symbolType}: ${e instanceof Error ? e.message : String(e)}`;
+        warnings.push(msg);
         continue;
       }
     }
@@ -234,23 +258,28 @@ function extractSymbols(
       const matches = query.matches(root);
       for (const match of matches) {
         const nameCapture = match.captures.find(c => c.name === queryDef.nameCapture);
-        if (nameCapture) {
+        // Use defCapture for range if available, otherwise fall back to nameCapture
+        const defCaptureName = queryDef.defCapture || queryDef.nameCapture;
+        const defCapture = match.captures.find(c => c.name === defCaptureName);
+        const rangeNode = defCapture?.node || nameCapture?.node;
+
+        if (nameCapture && rangeNode) {
           symbols.push({
             name: nameCapture.node.text,
-            startLine: nameCapture.node.startPosition.row + 1,
-            endLine: nameCapture.node.endPosition.row + 1,
+            startLine: rangeNode.startPosition.row + 1,
+            endLine: rangeNode.endPosition.row + 1,
             type: symbolType,
           });
         }
       }
     } catch (e) {
-      // Query execution failed - skip this symbol type
-      console.error(`Failed to execute query for ${symbolType}:`, e);
+      const msg = `Query exec failed for ${symbolType}: ${e instanceof Error ? e.message : String(e)}`;
+      warnings.push(msg);
       continue;
     }
   }
 
-  return symbols;
+  return { symbols, warnings };
 }
 
 /**
