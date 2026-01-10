@@ -1,6 +1,6 @@
 ## General Rules
 
-- Never leave comments that mark a update in code given a user prompt to change code - if you can't remove them, don't leave them.
+- Never leave comments that mark a update in code given a user prompt to change code - if you can't justify them, don't leave them.
 - When deleting files/functions, be sure to use LSP to understand the implications of the change. If LSP calls lack results, use GREP for further references.
 
 ## Human Checkpoints
