@@ -1,6 +1,6 @@
 ---
 name: claude-code-patterns
-description: Use when building agents, skills, hooks, or tool configs. Contains Claude Code native feature documentation and structure patterns.
+description: Use when building agents, skills, hooks, commands, or Claude Code tool configs. Contains Claude Code native feature documentation and structure patterns.
 ---
 
 <objective>

@@ -131,6 +131,7 @@ Authentication uses JWT for stateless sessions. The signing implementation [ref:
 2. Analyze source files for KNOWLEDGE extraction:
    - Read files matching glob patterns
    - Identify design decisions and rationale
+   - If rationale is not clear, make logical assumptions
    - Find key patterns worth documenting
    - Understand why things were built this way
 
@@ -267,9 +268,10 @@ changes:
    a. Parse reference to extract file_path and symbol_name
 
    b. **Determine what happened:**
-      - Search for similar symbol names: `grep -r "<symbol_name>" <directory>`
-      - Search for similar file names: `find . -name "*<partial_name>*"`
-      - Check git log for renames: `git log --diff-filter=R --summary -- <file_path>`
+      Use your available tools prioritizing LSP and then others (Grep, Glob, git commands) to investigate:
+      - Search for similar symbol names
+      - Search for similar file names
+      - Check git history for renames or deletions
 
    c. **Take action based on finding:**
       - If symbol/file was RENAMED:

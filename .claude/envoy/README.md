@@ -71,7 +71,7 @@ These tools read files directly and pass to external LLMs. Claude only receives 
 |----------|--------------|-------------|
 | `PERPLEXITY_API_KEY` | perplexity | Perplexity API key |
 | `TAVILY_API_KEY` | tavily | Tavily API key |
-| `VERTEX_API_KEY` | vertex | Google AI API key (Vertex Express) |
+| `GEMINI_API_KEY` | gemini | Google AI API key (Gemini) |
 | `X_AI_API_KEY` | xai | xAI Grok API key |
 | `CONTEXT7_API_KEY` | context7 | Context7 API key (upstash.com) |
 | `ENVOY_TIMEOUT_MS` | optional | Global timeout (default: 120000) |
