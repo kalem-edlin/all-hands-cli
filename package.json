@@ -8,7 +8,8 @@
   },
   "files": [
     "bin/",
-    ".claude/"
+    ".claude/",
+    ".allhands-manifest.json"
   ],
   "scripts": {
     "build": "esbuild src/cli.ts --bundle --platform=node --target=node18 --outfile=bin/cli.js --format=esm --banner:js=\"#!/usr/bin/env node\"",

@@ -18,7 +18,7 @@ The architecture enforces a strict separation between discovery (read-only analy
 
 **Envoy-mediated persistence over return values**: Discovery agents write findings to plan files via envoy commands rather than returning bulk context. This pattern acknowledges that findings often exceed what the main agent can usefully process in its context window. The main agent receives confirmation plus a path, reading details only when needed.
 
-**Skills as loadable expertise rather than inline instructions**: Skills [ref:.claude/skills/discovery-mode/SKILL.md::dbb53d3] provide domain knowledge that agents load on demand. This prevents the CLAUDE.md [ref:CLAUDE.md::6607b05] file from becoming bloated with every possible instruction. The curator agent [ref:.claude/agents/curator.md::6607b05] enforces this by auditing for redundancy.
+**Skills as loadable expertise rather than inline instructions**: Skills [ref:.claude/skills/knowledge-discovery/SKILL.md::dbb53d3] provide domain knowledge that agents load on demand. This prevents the CLAUDE.md [ref:CLAUDE.md::6607b05] file from becoming bloated with every possible instruction. The curator agent [ref:.claude/agents/curator.md::6607b05] enforces this by auditing for redundancy.
 
 **Branch-based isolation for parallel work**: Implementation happens in git worktrees derived from a feature branch. This allows multiple variants of the same prompt to be implemented in parallel, with a gate determining which becomes the main solution. Rejected variants become archive branches rather than lost work.
 

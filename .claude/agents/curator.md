@@ -2,7 +2,7 @@
 name: curator
 description: |
   Claude Code and agentic orchestration expert. ALWAYS DELEGATE for: .claude/, CLAUDE.md, hooks, skills, agents, slash commands, claude-envoy, MCP, workflow orchestration. Use when creating/modifying any orchestration component or researching external patterns.
-skills: claude-code-patterns, research-tools, claude-envoy-patterns, orchestration-idols, skills-development, subagents-development, hooks-development, commands-development, discovery-mode
+skills: claude-code-patterns, research-tools, skills-development, subagents-development, hooks-development, commands-development
 tools: Read, Glob, Grep, Bash, Write, Edit
 model: opus
 color: cyan
