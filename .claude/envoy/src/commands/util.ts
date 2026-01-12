@@ -26,20 +26,27 @@ async function readStdinJson(): Promise<HookInput> {
   return new Promise((resolve, reject) => {
     let data = "";
     process.stdin.setEncoding("utf8");
+
+    const timer = setTimeout(() => {
+      process.stdin.removeAllListeners();
+      resolve({});
+    }, 1000);
+
     process.stdin.on("data", (chunk) => (data += chunk));
+
     process.stdin.on("end", () => {
+      clearTimeout(timer);
       try {
         resolve(data.trim() ? JSON.parse(data) : {});
       } catch (e) {
         reject(new Error(`Invalid JSON input: ${e}`));
       }
     });
-    process.stdin.on("error", reject);
 
-    // Timeout after 1s if no stdin
-    setTimeout(() => {
-      if (!data) resolve({});
-    }, 1000);
+    process.stdin.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
