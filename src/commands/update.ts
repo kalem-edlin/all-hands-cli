@@ -4,6 +4,7 @@ import { Manifest, filesAreDifferent } from '../lib/manifest.js';
 import { isGitRepo, getStagedFiles } from '../lib/git.js';
 import { getAllhandsRoot } from '../lib/paths.js';
 import { ConflictResolution, askConflictResolution, confirm, getNextBackupPath } from '../lib/ui.js';
+import { restoreDotfiles } from '../lib/dotfiles.js';
 
 export async function cmdUpdate(autoYes: boolean = false): Promise<number> {
   const targetRoot = process.cwd();
@@ -15,8 +16,8 @@ export async function cmdUpdate(autoYes: boolean = false): Promise<number> {
 
   const allhandsRoot = getAllhandsRoot();
 
-  if (!existsSync(join(allhandsRoot, '.allhands-manifest.json'))) {
-    console.error(`Error: Manifest not found at ${allhandsRoot}`);
+  if (!existsSync(join(allhandsRoot, '.internal.json'))) {
+    console.error(`Error: Internal config not found at ${allhandsRoot}`);
     console.error('Set ALLHANDS_PATH to your claude-all-hands directory');
     return 1;
   }
@@ -139,6 +140,9 @@ export async function cmdUpdate(autoYes: boolean = false): Promise<number> {
       created++;
     }
   }
+
+  // Restore dotfiles (gitignore → .gitignore, etc.)
+  restoreDotfiles(targetRoot);
 
   // Handle deleted files
   if (deletedInSource.length > 0) {

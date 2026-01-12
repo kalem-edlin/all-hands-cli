@@ -9,7 +9,8 @@
   "scripts": {
     "start": "tsx src/cli.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/download-wasm.mjs"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",
@@ -29,9 +30,9 @@
     "tree-sitter-python": "^0.23.0",
     "tree-sitter-ruby": "^0.23.0",
     "tree-sitter-rust": "^0.23.0",
-    "tree-sitter-swift": "^0.7.1",
     "tree-sitter-typescript": "^0.23.0",
     "usearch": "^2.21.4",
+    "web-tree-sitter": "^0.25.0",
     "yaml": "^2.3.4",
     "zod": "^3.23.0"
   },

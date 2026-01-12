@@ -1,0 +1,8 @@
+# WASM grammars (downloaded via postinstall)
+envoy/wasm/
+envoy/.knowledge/
+envoy/dist/
+envoy/node_modules/
+envoy.log
+settings.local.json
+plans

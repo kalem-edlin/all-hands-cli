@@ -4,13 +4,14 @@
  * Commands:
  *   envoy knowledge search <query> [--metadata-only] [--force-aggregate] [--no-aggregate]
  *   envoy knowledge reindex-all
- *   envoy knowledge reindex-from-changes --files <json_array>
+ *   envoy knowledge reindex-from-changes [--files <json_array>]
  */
 
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { Command } from "commander";
+import { spawnSync } from "child_process";
 import { BaseCommand, CommandResult } from "./base.js";
 import { KnowledgeService, type FileChange } from "../lib/knowledge.js";
 import {
@@ -18,6 +19,7 @@ import {
   type AggregatorOutput,
   type SearchResult,
 } from "../lib/agents/index.js";
+import { getBaseBranch } from "../lib/git.js";
 
 const getProjectRoot = (): string => {
   return process.env.PROJECT_ROOT || process.cwd();
@@ -32,6 +34,58 @@ const getAggregatorPrompt = (): string => {
 };
 
 const DEFAULT_TOKEN_THRESHOLD = 3500;
+
+/**
+ * Auto-detect doc file changes since branch diverged from base.
+ * Returns FileChange[] for docs/ files only.
+ */
+function getDocChangesFromGit(): FileChange[] {
+  const baseBranch = getBaseBranch();
+  const cwd = getProjectRoot();
+
+  // Get merge-base commit
+  const mergeBaseResult = spawnSync("git", ["merge-base", baseBranch, "HEAD"], {
+    encoding: "utf-8",
+    cwd,
+  });
+
+  if (mergeBaseResult.status !== 0) {
+    return [];
+  }
+
+  const mergeBase = mergeBaseResult.stdout.trim();
+
+  // Get changed files since merge-base, filtered to docs/
+  const diffResult = spawnSync(
+    "git",
+    ["diff", "--name-status", `${mergeBase}..HEAD`, "--", "docs/"],
+    { encoding: "utf-8", cwd }
+  );
+
+  if (diffResult.status !== 0 || !diffResult.stdout.trim()) {
+    return [];
+  }
+
+  const changes: FileChange[] = [];
+  const lines = diffResult.stdout.trim().split("\n");
+
+  for (const line of lines) {
+    const [status, filePath] = line.split("\t");
+    if (!filePath || !filePath.endsWith(".md")) continue;
+    // Skip README.md files (navigation only, not indexed)
+    if (filePath.endsWith("README.md")) continue;
+
+    if (status === "A") {
+      changes.push({ path: filePath, added: true });
+    } else if (status === "M") {
+      changes.push({ path: filePath, modified: true });
+    } else if (status === "D") {
+      changes.push({ path: filePath, deleted: true });
+    }
+  }
+
+  return changes;
+}
 
 /**
  * Search command - semantic search against docs index with hybrid aggregation
@@ -216,47 +270,43 @@ class ReindexAllCommand extends BaseCommand {
 }
 
 /**
- * Reindex-from-changes command - incremental index update from file changes
+ * Reindex-from-changes command - incremental index update from file changes.
+ * Auto-detects changes from git merge-base if --files not provided.
  */
 class ReindexFromChangesCommand extends BaseCommand {
   readonly name = "reindex-from-changes";
-  readonly description = "Update docs index from changed files (for git hooks)";
+  readonly description = "Update docs index from changed files (auto-detects from git if --files omitted)";
 
   defineArguments(cmd: Command): void {
-    cmd.requiredOption("--files <json>", "JSON array of file changes");
+    cmd.option("--files <json>", "JSON array of file changes (optional, auto-detects from git merge-base if omitted)");
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const filesJson = args.files as string;
-
-    if (!filesJson) {
-      return this.error("validation_error", "--files is required");
-    }
+    const filesJson = args.files as string | undefined;
 
     let changes: FileChange[];
-    try {
-      changes = JSON.parse(filesJson);
-    } catch {
-      return this.error("validation_error", "Invalid JSON in --files parameter");
+
+    if (filesJson) {
+      // Explicit --files provided
+      try {
+        changes = JSON.parse(filesJson);
+      } catch {
+        return this.error("validation_error", "Invalid JSON in --files parameter");
+      }
+    } else {
+      // Auto-detect from git merge-base
+      changes = getDocChangesFromGit();
+      if (changes.length === 0) {
+        return this.success({
+          message: "No doc changes detected since branch diverged from base",
+          files: [],
+        });
+      }
     }
 
     try {
       const service = new KnowledgeService(getProjectRoot());
       const result = await service.reindexFromChanges(changes);
-
-      if (!result.success) {
-        return {
-          status: "error",
-          error: {
-            type: "missing_references",
-            message: result.message,
-          },
-          data: {
-            missing_references: result.missing_references,
-            files: result.files,
-          },
-        };
-      }
 
       return this.success({
         message: result.message,

@@ -20,13 +20,13 @@
       "Bash(git:*)",
       "Bash(gh:*)",
       "Bash(cat:*)",
+      "Bash(rm:*)",
       "Bash(ls:*)",
       "Bash(rg:*)",
       "Bash(mkdir:*)",
       "Bash(mkdir -p:*)",
       "Read(~/.claude-code-docs/docs/*)",
-      "Bash(envoy:*)",
-      "SlashCommand(/plan:*)"
+      "Bash(envoy:*)"
     ],
     "deny": ["Task(claude-code-guide)"],
     "ask": []

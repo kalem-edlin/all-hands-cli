@@ -10,7 +10,7 @@ export function getAllhandsRoot(): string {
   const envPath = process.env.ALLHANDS_PATH;
   if (envPath) {
     const resolved = resolve(envPath);
-    if (existsSync(resolved) && existsSync(resolve(resolved, '.allhands-manifest.json'))) {
+    if (existsSync(resolved) && existsSync(resolve(resolved, '.internal.json'))) {
       return resolved;
     }
   }
@@ -22,13 +22,13 @@ export function getAllhandsRoot(): string {
 
   // bin/cli.js -> package root (go up one level from bin/)
   let packageRoot = resolve(__dirname, '..');
-  if (existsSync(resolve(packageRoot, '.allhands-manifest.json'))) {
+  if (existsSync(resolve(packageRoot, '.internal.json'))) {
     return packageRoot;
   }
 
   // Try going up two levels (in case of dist/lib/paths.js structure)
   packageRoot = resolve(__dirname, '../..');
-  if (existsSync(resolve(packageRoot, '.allhands-manifest.json'))) {
+  if (existsSync(resolve(packageRoot, '.internal.json'))) {
     return packageRoot;
   }
 

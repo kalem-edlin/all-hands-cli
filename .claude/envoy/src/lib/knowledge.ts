@@ -67,13 +67,6 @@ const DOCS_CONFIG: IndexConfig = {
   hasFrontmatter: true,
 };
 
-// File reference patterns for auto-populating relevant_files
-const FILE_REF_PATTERNS = [
-  /`([a-zA-Z0-9_\-./]+\.[a-zA-Z]+)`/g,
-  /\[.*?\]\(([a-zA-Z0-9_\-./]+\.[a-zA-Z]+)\)/g,
-  /(?:src|lib|components|utils|hooks|services)\/[a-zA-Z0-9_\-./]+\.[a-zA-Z]+/g,
-];
-
 // Environment config with defaults
 const SEARCH_SIMILARITY_THRESHOLD = parseFloat(
   process.env.SEARCH_SIMILARITY_THRESHOLD ?? "0.65"
@@ -342,48 +335,11 @@ export class KnowledgeService {
         }
         this.walkDir(fullPath, extensions, files, projectRoot);
       } else if (entry.isFile() && extensions.includes(extname(entry.name))) {
+        // Exclude README.md from docs indexing
+        if (entry.name === "README.md") continue;
         files.push(relative(projectRoot, fullPath));
       }
     }
-  }
-
-  /**
-   * Extract file references from document content
-   */
-  private extractFileReferences(content: string): string[] {
-    const refs = new Set<string>();
-
-    for (const pattern of FILE_REF_PATTERNS) {
-      const regex = new RegExp(pattern.source, pattern.flags);
-      let match;
-      while ((match = regex.exec(content)) !== null) {
-        const ref = match[1] || match[0];
-        if (ref && !ref.startsWith("http") && !ref.startsWith("#")) {
-          refs.add(ref);
-        }
-      }
-    }
-
-    return Array.from(refs);
-  }
-
-  /**
-   * Validate file references exist
-   */
-  private validateFileReferences(refs: string[]): { valid: string[]; missing: string[] } {
-    const valid: string[] = [];
-    const missing: string[] = [];
-
-    for (const ref of refs) {
-      const fullPath = join(this.projectRoot, ref);
-      if (existsSync(fullPath)) {
-        valid.push(ref);
-      } else {
-        missing.push(ref);
-      }
-    }
-
-    return { valid, missing };
   }
 
   /**
@@ -396,10 +352,12 @@ export class KnowledgeService {
     content: string,
     frontMatterData: Record<string, unknown>
   ): Promise<bigint> {
-    // Assign or reuse ID
+    // Assign or reuse ID, removing old entry if exists
     let id: bigint;
     if (meta.path_to_id[path]) {
       id = BigInt(meta.path_to_id[path]);
+      // Remove old entry before re-adding (usearch doesn't allow duplicate keys)
+      index.remove(id);
     } else {
       id = BigInt(meta.next_id++);
       meta.id_to_path[id.toString()] = path;
@@ -540,7 +498,6 @@ export class KnowledgeService {
   async reindexFromChanges(changes: FileChange[]): Promise<{
     success: boolean;
     message: string;
-    missing_references?: { doc_path: string; missing_files: string[] }[];
     files: { path: string; action: string }[];
   }> {
     console.error(`[knowledge] Incremental reindex: ${changes.length} change(s)`);
@@ -548,14 +505,14 @@ export class KnowledgeService {
 
     const { index, meta } = await this.loadIndex();
     const processedFiles: { path: string; action: string }[] = [];
-    const missingReferences: { doc_path: string; missing_files: string[] }[] = [];
 
     for (const change of changes) {
       const { path, added, deleted, modified } = change;
 
-      // Check if file matches docs config
+      // Check if file matches docs config (excluding README.md)
       const matchesConfig = DOCS_CONFIG.paths.some((p: string) => path.startsWith(p)) &&
-        DOCS_CONFIG.extensions.includes(extname(path));
+        DOCS_CONFIG.extensions.includes(extname(path)) &&
+        basename(path) !== "README.md";
 
       if (!matchesConfig) continue;
 
@@ -578,27 +535,11 @@ export class KnowledgeService {
         const content = readFileSync(fullPath, "utf-8");
         let frontMatter: Record<string, unknown> = {};
 
-        // Process front-matter and file references
+        // Process front-matter
         if (path.endsWith(".md")) {
           try {
             const parsed = matter(content);
             frontMatter = parsed.data;
-
-            // Extract and validate file references
-            const refs = this.extractFileReferences(parsed.content);
-            const { valid, missing } = this.validateFileReferences(refs);
-
-            if (missing.length > 0) {
-              missingReferences.push({ doc_path: path, missing_files: missing });
-            }
-
-            // Auto-populate relevant_files
-            if (valid.length > 0) {
-              frontMatter.relevant_files = valid;
-              // Write back with updated front-matter
-              const newContent = matter.stringify(parsed.content, frontMatter);
-              writeFileSync(fullPath, newContent);
-            }
           } catch {
             // Skip files with invalid front-matter
           }
@@ -616,15 +557,6 @@ export class KnowledgeService {
     await this.saveIndex(index, meta);
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[knowledge] Incremental reindex complete: ${processedFiles.length} file(s) in ${duration}s`);
-
-    if (missingReferences.length > 0) {
-      return {
-        success: false,
-        message: "Documents contain references to missing files",
-        missing_references: missingReferences,
-        files: processedFiles,
-      };
-    }
 
     return {
       success: true,

@@ -4,12 +4,16 @@
  */
 
 import { readFileSync, existsSync } from "fs";
-import { extname } from "path";
+import { extname, dirname, join } from "path";
+import { fileURLToPath } from "url";
 import {
   getLanguageForExtension,
   getQueriesForLanguage,
   type LanguageQueries,
 } from "./ast-queries.js";
+
+// Web-tree-sitter for Swift (WASM-based, avoids ABI issues)
+// Note: web-tree-sitter@0.25.0 types don't match runtime exports, using any
 
 export interface SymbolLocation {
   name: string;
@@ -59,12 +63,94 @@ interface ParserData {
 // Lazy-loaded parsers cache - stores parser, grammar, and Query class
 const parserCache = new Map<string, ParserData>();
 
+// WASM-based Swift parser (separate from native parsers)
+let swiftWasmParser: ParserData | null = null;
+let swiftWasmInitialized = false;
+
+/**
+ * Initialize Swift parser using web-tree-sitter (WASM).
+ * This avoids ABI compatibility issues with native tree-sitter-swift bindings.
+ */
+async function getSwiftWasmParser(): Promise<ParserData | null> {
+  if (swiftWasmInitialized) {
+    return swiftWasmParser;
+  }
+
+  try {
+    // Load Swift WASM grammar
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    // Navigate from src/lib or dist/lib to wasm directory
+    const wasmPath = join(__dirname, "..", "..", "wasm", "tree-sitter-swift.wasm");
+
+    if (!existsSync(wasmPath)) {
+      console.error(`[Swift WASM] Grammar not found at ${wasmPath}`);
+      return null;
+    }
+
+    // Dynamic import web-tree-sitter (web-tree-sitter@0.25.0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const WebTreeSitter = await import("web-tree-sitter") as any;
+    const { Parser: WParser, Language: WLanguage, Query: WQuery } = WebTreeSitter;
+
+    // Initialize web-tree-sitter WASM runtime
+    await WParser.init();
+
+    // Read WASM file manually to avoid fs/promises issue with tsx
+    const wasmBuffer = readFileSync(wasmPath);
+    const SwiftLang = await WLanguage.load(new Uint8Array(wasmBuffer));
+    const parser = new WParser();
+    parser.setLanguage(SwiftLang);
+
+    // Create a Query wrapper compatible with our interface
+    const QueryClass = class WasmQueryWrapper {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      private query: any;
+
+      constructor(grammar: unknown, queryString: string) {
+        this.query = new WQuery(grammar, queryString);
+      }
+
+      matches(node: unknown): QueryMatch[] {
+        const wasmMatches = this.query.matches(node);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return wasmMatches.map((m: any) => ({
+          pattern: m.pattern,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          captures: m.captures.map((c: any) => ({
+            name: c.name,
+            node: {
+              text: c.node.text,
+              startPosition: { row: c.node.startPosition.row, column: c.node.startPosition.column },
+              endPosition: { row: c.node.endPosition.row, column: c.node.endPosition.column },
+            }
+          }))
+        }));
+      }
+    } as unknown as QueryConstructor;
+
+    swiftWasmParser = { parser, grammar: SwiftLang, QueryClass };
+    swiftWasmInitialized = true;
+    return swiftWasmParser;
+  } catch (e) {
+    console.error(`[Swift WASM] Failed to initialize:`, e);
+    return null;
+  }
+}
+
 /**
  * Get or create a tree-sitter parser for a language.
  * Lazily loads grammars to avoid startup cost.
  * Returns parser, grammar, and Query class (needed for Query API).
+ *
+ * Note: Swift uses web-tree-sitter (WASM) due to ABI incompatibility
+ * between tree-sitter-swift native bindings and tree-sitter runtime.
  */
 async function getParser(language: string): Promise<ParserData | null> {
+  // Swift uses WASM parser to avoid ABI issues
+  if (language === "swift") {
+    return getSwiftWasmParser();
+  }
+
   if (parserCache.has(language)) {
     return parserCache.get(language)!;
   }
@@ -98,9 +184,6 @@ async function getParser(language: string): Promise<ParserData | null> {
         break;
       case "ruby":
         grammar = (await import("tree-sitter-ruby")).default;
-        break;
-      case "swift":
-        grammar = (await import("tree-sitter-swift")).default;
         break;
       default:
         return null;
@@ -174,7 +257,7 @@ export async function parseFile(filePath: string): Promise<ParseResult> {
       };
     }
 
-    const { symbols, warnings } = extractSymbols(tree, queries, parserData.grammar, parserData.QueryClass);
+    const { symbols, warnings } = extractSymbols(tree, queries, parserData.grammar, parserData.QueryClass, language);
 
     return {
       success: true,
@@ -233,14 +316,16 @@ function extractSymbols(
   tree: unknown,
   queries: LanguageQueries,
   grammar: unknown,
-  QueryClass: QueryConstructor
+  QueryClass: QueryConstructor,
+  language: string
 ): ExtractResult {
   const symbols: SymbolLocation[] = [];
   const warnings: string[] = [];
   const root = (tree as { rootNode: unknown }).rootNode;
 
   for (const [symbolType, queryDef] of Object.entries(queries)) {
-    const cacheKey = `${symbolType}:${queryDef.query}`;
+    // Include language in cache key to avoid mixing native/WASM queries
+    const cacheKey = `${language}:${symbolType}:${queryDef.query}`;
 
     let query = queryCache.get(cacheKey);
     if (!query) {

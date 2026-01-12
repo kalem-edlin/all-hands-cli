@@ -1,15 +1,14 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { dirname, join, relative } from 'path';
+import { dirname, join } from 'path';
 import { minimatch } from 'minimatch';
 import * as readline from 'readline';
-import { git, isGitRepo } from '../lib/git.js';
+import { git, isGitRepo, getGitFiles } from '../lib/git.js';
 import { checkGhAuth, checkGhInstalled, getGhUser, gh } from '../lib/gh.js';
 import { Manifest, filesAreDifferent } from '../lib/manifest.js';
 import { getAllhandsRoot, UPSTREAM_REPO } from '../lib/paths.js';
 import { askQuestion, confirm } from '../lib/ui.js';
-import { SYNC_CONFIG_FILENAME } from '../lib/constants.js';
-import { walkDir } from '../lib/fs-utils.js';
+import { PUSH_BLOCKLIST, SYNC_CONFIG_FILENAME } from '../lib/constants.js';
 
 interface SyncConfig {
   includes?: string[];
@@ -34,21 +33,14 @@ function loadSyncConfig(cwd: string): SyncConfig | null {
   try {
     const content = readFileSync(configPath, 'utf-8');
     return JSON.parse(content);
-  } catch {
-    console.error(`Error: Failed to parse ${SYNC_CONFIG_FILENAME}`);
-    process.exit(1);
+  } catch (e) {
+    throw new Error(`Failed to parse ${SYNC_CONFIG_FILENAME}: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
 function expandGlob(pattern: string, baseDir: string): string[] {
-  const results: string[] = [];
-  walkDir(baseDir, (filePath) => {
-    const relPath = relative(baseDir, filePath);
-    if (minimatch(relPath, pattern, { dot: true })) {
-      results.push(relPath);
-    }
-  });
-  return results;
+  const allFiles = getGitFiles(baseDir);
+  return allFiles.filter((relPath) => minimatch(relPath, pattern, { dot: true }));
 }
 
 async function askMultiLineInput(prompt: string): Promise<string> {
@@ -112,8 +104,18 @@ function collectFilesToPush(
   const upstreamFiles = manifest.getDistributableFiles();
   const filesToPush: FileEntry[] = [];
 
+  // Get non-ignored files in user's repo (respects .gitignore)
+  const localGitFiles = new Set(getGitFiles(cwd));
+
   for (const relPath of upstreamFiles) {
+    if (PUSH_BLOCKLIST.includes(relPath)) {
+      continue;
+    }
     if (finalExcludes.some((pattern) => minimatch(relPath, pattern, { dot: true }))) {
+      continue;
+    }
+    // Skip files that are gitignored in user's repo
+    if (!localGitFiles.has(relPath)) {
       continue;
     }
 
@@ -128,7 +130,18 @@ function collectFilesToPush(
   for (const pattern of finalIncludes) {
     const matchedFiles = expandGlob(pattern, cwd);
     for (const relPath of matchedFiles) {
+      if (PUSH_BLOCKLIST.includes(relPath)) continue;
+      if (finalExcludes.some((p) => minimatch(relPath, p, { dot: true }))) continue;
       if (filesToPush.some((f) => f.path === relPath)) continue;
+
+      const localFile = join(cwd, relPath);
+      const upstreamFile = join(allhandsRoot, relPath);
+
+      // Skip files that exist in upstream and are identical
+      if (existsSync(upstreamFile) && !filesAreDifferent(localFile, upstreamFile)) {
+        continue;
+      }
+
       filesToPush.push({ path: relPath, type: 'A' });
     }
   }
@@ -273,7 +286,13 @@ export async function cmdPush(
   }
   const ghUser = prereqs.ghUser!;
 
-  const syncConfig = loadSyncConfig(cwd);
+  let syncConfig: SyncConfig | null = null;
+  try {
+    syncConfig = loadSyncConfig(cwd);
+  } catch (e) {
+    console.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
   const finalIncludes = include.length > 0 ? include : (syncConfig?.includes || []);
   const finalExcludes = exclude.length > 0 ? exclude : (syncConfig?.excludes || []);
 

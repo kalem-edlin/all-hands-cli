@@ -41,3 +41,23 @@ export function checkGitInstalled(): boolean {
     return false;
   }
 }
+
+/**
+ * Get all files tracked by git plus untracked files, excluding gitignored files.
+ * This respects .gitignore at all levels.
+ */
+export function getGitFiles(repoPath: string): string[] {
+  // Get tracked files
+  const tracked = git(['ls-files'], repoPath);
+  // Get untracked files that are NOT ignored
+  const untracked = git(['ls-files', '--others', '--exclude-standard'], repoPath);
+
+  const files: string[] = [];
+  if (tracked.success && tracked.stdout) {
+    files.push(...tracked.stdout.split('\n').filter(Boolean));
+  }
+  if (untracked.success && untracked.stdout) {
+    files.push(...untracked.stdout.split('\n').filter(Boolean));
+  }
+  return files;
+}

@@ -1,18 +1,11 @@
 {
   "name": "claude-all-hands",
-  "version": "1.0.26",
+  "version": "1.0.39",
   "description": "CLI for syncing Claude agent configurations to all-hands repository",
   "type": "module",
   "bin": {
     "claude-all-hands": "./bin/cli.js"
   },
-  "files": [
-    "bin/",
-    ".claude/",
-    ".allhands-manifest.json",
-    "CLAUDE.md",
-    "CLAUDE.project.md"
-  ],
   "scripts": {
     "build": "esbuild src/cli.ts --bundle --platform=node --target=node18 --outfile=bin/cli.js --format=esm --banner:js=\"#!/usr/bin/env node\"",
     "dev": "npm run build -- --watch",

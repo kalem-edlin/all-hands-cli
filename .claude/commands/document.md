@@ -4,7 +4,7 @@ argument-hint: [...optional paths] [optional context]
 ---
 
 <objective>
-Create comprehensive documentation for the codebase from scratch. Uses taxonomy-based approach with parallel documentation writers. Taxonomist ensures non-overlapping output directories, so writers work directly on the branch without conflicts.
+Create comprehensive documentation for the codebase from scratch. Uses taxonomy-based approach with parallel documentation writers. Taxonomist ensures non-overlapping output directories, so writers work directly on the branch without conflicts. Includes confirmation workflow to audit coverage and generate README files.
 </objective>
 
 <context>
@@ -19,9 +19,12 @@ Main agent responsibilities:
 1. Setup branch (create docs branch if on base)
 2. Parse arguments (paths, context)
 3. Verify clean git state
-4. Delegate to taxonomist with raw inputs
-5. Orchestrate writers based on taxonomist output
-6. Handle merging, validation, and PR creation
+4. Delegate to taxonomist for init workflow
+5. Orchestrate writers based on taxonomist assignments (up to 15 agents)
+6. Delegate to taxonomist for confirmation workflow (coverage audit + READMEs)
+7. Handle redelegation if gaps found
+8. Handle overflow if 15-agent limit reached
+9. Validation, commit, and PR creation
 </main_agent_role>
 
 <process>
@@ -77,10 +80,10 @@ Before delegating to taxonomist, verify clean git state:
    Must return empty.
 </step>
 
-<step name="delegate_to_taxonomist">
+<step name="delegate_to_taxonomist_init">
 Delegate to **documentation-taxonomist agent** with init-workflow.
 
-Taxonomist handles ALL discovery: analyzing codebase structure, checking existing docs, identifying products/features, creating directory structure, assigning writers.
+Taxonomist handles ALL discovery: workspace detection, domain classification, subdomain analysis, technology detection, agent allocation, and directory creation.
 
 **INPUTS:**
 ```yaml
@@ -93,34 +96,99 @@ feature_branch: "<current_branch>"
 **OUTPUTS:**
 ```yaml
 success: true
-segments:
+structure_created: true
+assignments:
   - domain: "<domain-name>"
-    files: ["<glob-patterns>"]
-    output_path: "docs/<domain>/"
-    depth: "overview" | "detailed" | "comprehensive"
-    notes: "<guidance>"
+    domain_type: "simple" | "medium" | "complex"
+    doc_directory: "docs/<domain>/"
+    subdomains:
+      - name: "<subdomain-name>"
+        doc_directory: "docs/<domain>/<subdomain>/"
+        source_directories: [...]
+        critical_technologies: [...]
+        target_file_count: 3-6
+        complexity_score: 0.75
+    coverage_requirement: "full"
+    existing_docs: [...]
+    notes: "..."
+uncovered_domains: []  # domains that couldn't fit in 15-agent limit
 ```
+
+**Store `assignments` for use in confirmation workflow.**
 </step>
 
 <step name="parallel_writers">
-For each segment from taxonomist, delegate to **documentation-writer agent** in parallel:
+For each assignment from taxonomist, delegate to **documentation-writer agent** in parallel.
+
+**Agent allocation:**
+- Simple domain: 1 agent
+- Medium domain: 1-2 agents (split subdomains)
+- Complex domain: 2-3 agents (group subdomains)
+
+**Maximum 15 agents per run.** If taxonomist returns `uncovered_domains`, handle after this run completes.
 
 **INPUTS (per writer):**
 ```yaml
 mode: "write"
-domain: "<segment.domain>"
-files: <segment.files>
-output_path: "<segment.output_path>"
-depth: "<segment.depth>"
-notes: "<segment.notes>"
+domain: "<assignment.domain>"
+subdomains: <assignment.subdomains>  # 1+ subdomains per writer
+coverage_requirement: "<assignment.coverage_requirement>"
+existing_docs: <assignment.existing_docs>
+notes: "<assignment.notes>"
 ```
 
 **OUTPUTS:**
 ```yaml
 success: true
+files_created: [...]
+coverage_gaps: []  # any gaps found
 ```
 
-Writers work directly on the branch without committing. Taxonomist ensures non-overlapping output directories, so no conflicts occur. Main agent commits all changes after writers complete.
+Writers work directly on the branch without committing. Taxonomist ensures non-overlapping output directories, so no conflicts occur.
+
+**Launch all agents in parallel using single message with multiple Task tool calls.**
+</step>
+
+<step name="delegate_to_taxonomist_confirm">
+After ALL writers complete, delegate to **documentation-taxonomist agent** with confirmation workflow.
+
+This step audits coverage, generates README files, and handles redelegation if gaps found.
+
+**INPUTS:**
+```yaml
+mode: "confirm"
+original_assignments: <assignments from init workflow>
+doc_directory: "docs/"
+```
+
+**OUTPUTS:**
+```yaml
+success: true
+coverage_complete: true | false
+gaps_found: []  # if any
+redelegation_assignments: []  # if gaps found
+readmes_written: ["docs/domain1/README.md", ...]
+```
+
+**Note:** README.md files provide navigation but are excluded from validation and knowledge indexing.
+
+**If `redelegation_assignments` returned:**
+1. Dispatch additional writers for gap coverage
+2. Re-invoke confirmation workflow
+3. Repeat until `coverage_complete: true` or max 2 redelegation rounds
+
+**If `gaps_found` after redelegation attempts:**
+- Report gaps to user
+- Continue with commit (partial coverage better than none)
+</step>
+
+<step name="handle_overflow">
+If taxonomist returned `uncovered_domains` in init workflow:
+
+1. After current documentation committed and PR created
+2. Report to user: "Documentation complete for {N} domains. {M} domains remain: {list}"
+3. User can reinvoke `/document` for remaining domains
+4. Do NOT automatically reinvoke - let user decide timing
 </step>
 
 <step name="validate_docs">
@@ -142,38 +210,20 @@ Commit ALL documentation changes from parallel writers:
 2. If changes exist:
    ```bash
    git add docs/
-   git commit -m "docs: finalize documentation"
+   git commit -m "docs: initialize codebase documentation"
    ```
-
-3. Track documentation files for reindex:
-   - Get list of all doc files created/modified since branch diverged from base:
-   ```bash
-   git diff --name-only $(git merge-base HEAD <base_branch>)..HEAD -- docs/
-   ```
-   - Store this list for the reindex step
 </step>
 
 <step name="reindex_knowledge">
 Update semantic search index with new documentation:
 
-1. Build file changes JSON from tracked doc files:
-   ```json
-   [
-     {"path": "docs/domain/index.md", "added": true},
-     {"path": "docs/domain/subdomain/index.md", "added": true}
-   ]
-   ```
-   - Use `added: true` for new files
-   - Use `modified: true` for updated files
+```bash
+envoy knowledge reindex-from-changes
+```
 
-2. Call reindex:
-   ```bash
-   envoy knowledge reindex-from-changes --files '<json_array>'
-   ```
+Command auto-detects doc changes from git merge-base. README.md files excluded automatically.
 
-3. If reindex reports missing references:
-   - Log warning but continue (docs may reference code not yet indexed)
-   - These will resolve on next full reindex
+If reindex reports missing references, log warning but continue (docs may reference code not yet indexed).
 </step>
 
 <step name="create_pr">
@@ -182,18 +232,26 @@ Create PR:
 envoy git create-pr --title "docs: initialize codebase documentation" --body "<summary>"
 ```
 
+**Summary should include:**
+- Number of domains documented
+- Number of files created
+- Any remaining gaps or uncovered domains
+- Critical technologies documented
+
 Report completion with PR link.
 </step>
 </process>
 
 <success_criteria>
 - Branch setup complete (docs branch from base OR stay on feature)
-- Taxonomist segmented codebase with non-overlapping output directories
-- Writers created docs in parallel
-- Validation passed
+- Taxonomist segmented codebase with workspace detection and complexity classification
+- Writers created docs in parallel (up to 15 agents)
+- Confirmation workflow completed (coverage audit + READMEs)
+- Validation passed (README.md excluded from validation)
 - Documentation committed
-- Knowledge index updated
+- Knowledge index updated (README.md excluded from indexing)
 - PR created
+- Any overflow domains reported for future runs
 </success_criteria>
 
 <constraints>
@@ -201,8 +259,11 @@ Report completion with PR link.
 - MUST NOT run envoy docs tree, envoy docs complexity, or envoy knowledge search
 - MUST verify clean git state before documentation (ensure_committed_state step)
 - MUST only create docs branch if already on base branch
-- MUST delegate to taxonomist for all segmentation and discovery
-- MUST run writers in parallel
+- MUST delegate to taxonomist for init workflow (assignments)
+- MUST delegate to taxonomist for confirmation workflow (audit + READMEs)
+- MUST run writers in parallel (max 15 agents per run)
+- MUST handle redelegation if confirmation finds gaps
+- MUST report overflow domains if 15-agent limit exceeded
 - MUST validate before PR
 - MUST commit documentation changes before reindex (reindex reads from disk)
 - MUST reindex knowledge base after documentation committed

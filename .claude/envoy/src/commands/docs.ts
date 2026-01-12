@@ -245,7 +245,7 @@ class ValidateCommand extends BaseCommand {
 
     const refs: RefInfo[] = [];
 
-    // Recursively find all markdown files
+    // Recursively find all markdown files (excluding README.md)
     const findMarkdownFiles = (dir: string): string[] => {
       const files: string[] = [];
       const entries = readdirSync(dir);
@@ -254,7 +254,7 @@ class ValidateCommand extends BaseCommand {
         const stat = statSync(fullPath);
         if (stat.isDirectory()) {
           files.push(...findMarkdownFiles(fullPath));
-        } else if (entry.endsWith(".md")) {
+        } else if (entry.endsWith(".md") && entry !== "README.md") {
           files.push(fullPath);
         }
       }
@@ -789,10 +789,10 @@ class TreeCommand extends BaseCommand {
 
         // Check for docs coverage
         // Convention: docs/path/to/dir.md or docs/path/to/file.md
+        // Note: README.md excluded from docs system, index.md for subdomains only
         const possibleDocPaths = [
           join(docsPath, entryRelPath + ".md"),
           join(docsPath, dirname(entryRelPath), entry.replace(extname(entry), ".md")),
-          join(docsPath, entryRelPath, "README.md"),
           join(docsPath, entryRelPath, "index.md"),
         ];
 

@@ -1,0 +1,18 @@
+{
+  "$comment": "Files explicitly withheld from distribution - everything else (minus gitignored) is distributed",
+  "internal": [
+    "src/**",
+    "bin/**",
+    "tsconfig.json",
+    "scripts/**",
+    ".internal.json",
+    ".github/**",
+    ".gitignore",
+    "docs/**",
+    "README.md",
+    "package.json",
+    "package-lock.json",
+    "ISSUES.md",
+    ".env.example"
+  ]
+}
