@@ -30,7 +30,7 @@ fi
 branch=$(git branch --show-current 2>/dev/null)
 if [ -n "$branch" ]; then
     if [ "$branch" = "main" ] || [ "$branch" = "master" ] || [ "$branch" = "develop" ] || [ "$branch" = "development" ] || [ "$branch" = "dev" ] || [ "$branch" = "staging" ] || [ "$branch" = "stage" ] || [ "$branch" = "production" ] || [ "$branch" = "prod" ] || [[ "$branch" == quick/* ]] || [[ "$branch" == curator/* ]] || [[ "$branch" == docs/* ]]; then
-        # echo "Mode: Direct (no planning) - on $branch branch"
+        : # echo "Mode: Direct (no planning) - on $branch branch"
     else
         # Feature branch - ensure plan directory exists
         "$CLAUDE_PROJECT_DIR/.claude/envoy/envoy" plan init > /dev/null 2>&1
