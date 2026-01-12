@@ -6534,6 +6534,7 @@ function filesAreDifferent(file1, file2) {
 import { existsSync as existsSync2 } from "fs";
 import { dirname as dirname3, resolve as resolve5 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
+var UPSTREAM_REPO = "kalem-edlin/claude-all-hands";
 function getAllhandsRoot() {
   const envPath = process.env.ALLHANDS_PATH;
   if (envPath) {
@@ -6628,6 +6629,12 @@ function getNextBackupPath(filePath) {
 }
 
 // src/commands/init.ts
+var SYNC_CONFIG_FILENAME = ".allhands-sync-config.json";
+var SYNC_CONFIG_TEMPLATE = {
+  $comment: "Customization for claude-all-hands push command",
+  includes: [],
+  excludes: []
+};
 var ENVOY_SHELL_FUNCTION = `
 # AllHands envoy command - resolves to .claude/envoy/envoy from current directory
 envoy() {
@@ -6792,6 +6799,20 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     console.log("  Could not detect shell config (add manually to your shell rc):");
     console.log('    envoy() { "$PWD/.claude/envoy/envoy" "$@"; }');
   }
+  const syncConfigPath = join3(resolvedTarget, SYNC_CONFIG_FILENAME);
+  let syncConfigCreated = false;
+  if (existsSync4(syncConfigPath)) {
+    console.log(`
+${SYNC_CONFIG_FILENAME} already exists - skipping`);
+  } else if (!autoYes) {
+    console.log("\nThe push command lets you contribute changes back to claude-all-hands.");
+    console.log("A sync config file lets you customize which files to include/exclude.");
+    if (await confirm(`Create ${SYNC_CONFIG_FILENAME}?`)) {
+      writeFileSync(syncConfigPath, JSON.stringify(SYNC_CONFIG_TEMPLATE, null, 2) + "\n");
+      syncConfigCreated = true;
+      console.log(`  Created ${SYNC_CONFIG_FILENAME}`);
+    }
+  }
   console.log(`
 ${"=".repeat(60)}`);
   console.log(`Done: ${copied} copied, ${skipped} unchanged`);
@@ -6800,6 +6821,9 @@ ${"=".repeat(60)}`);
   }
   if (resolution === "backup" && conflicts.length > 0) {
     console.log(`Created ${conflicts.length} backup file(s)`);
+  }
+  if (syncConfigCreated) {
+    console.log(`Created ${SYNC_CONFIG_FILENAME} for push customization`);
   }
   console.log("\nProject-specific files preserved (never overwritten):");
   console.log("  - CLAUDE.project.md");
@@ -6944,6 +6968,293 @@ Updated: ${updated}, Created: ${created}`);
   return 0;
 }
 
+// src/commands/pull-manifest.ts
+import { existsSync as existsSync6, writeFileSync as writeFileSync2 } from "fs";
+import { join as join5 } from "path";
+var SYNC_CONFIG_FILENAME2 = ".allhands-sync-config.json";
+var TEMPLATE_CONFIG = {
+  $comment: "Customization for claude-all-hands push command",
+  includes: [],
+  excludes: []
+};
+async function cmdPullManifest() {
+  const cwd = process.cwd();
+  if (!isGitRepo(cwd)) {
+    console.error("Error: Not in a git repository");
+    return 1;
+  }
+  const configPath = join5(cwd, SYNC_CONFIG_FILENAME2);
+  if (existsSync6(configPath)) {
+    console.error(`Error: ${SYNC_CONFIG_FILENAME2} already exists`);
+    console.error("Remove it first if you want to regenerate");
+    return 1;
+  }
+  writeFileSync2(configPath, JSON.stringify(TEMPLATE_CONFIG, null, 2) + "\n");
+  console.log(`Created ${SYNC_CONFIG_FILENAME2}`);
+  console.log("\nUsage:");
+  console.log('  - Add file paths to "includes" to push additional files');
+  console.log('  - Add file paths to "excludes" to skip tracking changes');
+  console.log("  - Commit this file to persist your push configuration");
+  return 0;
+}
+
+// src/commands/push.ts
+import { copyFileSync as copyFileSync3, existsSync as existsSync7, mkdirSync as mkdirSync3, readFileSync as readFileSync6, readdirSync as readdirSync4, rmSync } from "fs";
+import { tmpdir } from "os";
+import { dirname as dirname7, join as join6 } from "path";
+import * as readline2 from "readline";
+
+// src/lib/gh.ts
+import { execSync as execSync2, spawnSync as spawnSync2 } from "child_process";
+function gh(args, cwd) {
+  const result = spawnSync2("gh", args, {
+    cwd: cwd || process.cwd(),
+    encoding: "utf-8",
+    maxBuffer: 10 * 1024 * 1024
+  });
+  return {
+    success: result.status === 0,
+    stdout: result.stdout?.trim() || "",
+    stderr: result.stderr?.trim() || ""
+  };
+}
+function checkGhInstalled() {
+  try {
+    execSync2("gh --version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+function checkGhAuth() {
+  const result = gh(["auth", "status"]);
+  return result.success;
+}
+function getGhUser() {
+  const result = gh(["api", "user", "-q", ".login"]);
+  return result.success ? result.stdout : null;
+}
+
+// src/commands/push.ts
+var SYNC_CONFIG_FILENAME3 = ".allhands-sync-config.json";
+function loadSyncConfig(cwd) {
+  const configPath = join6(cwd, SYNC_CONFIG_FILENAME3);
+  if (!existsSync7(configPath)) {
+    return null;
+  }
+  try {
+    const content = readFileSync6(configPath, "utf-8");
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+function expandGlob(pattern, baseDir) {
+  const results = [];
+  walkDir(baseDir, (filePath) => {
+    const relPath = filePath.substring(baseDir.length + 1);
+    if (minimatch(relPath, pattern, { dot: true })) {
+      results.push(relPath);
+    }
+  });
+  return results;
+}
+function walkDir(dir, callback) {
+  if (!existsSync7(dir)) return;
+  const entries = readdirSync4(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === ".git" || entry.name === "node_modules") {
+      continue;
+    }
+    const fullPath = join6(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkDir(fullPath, callback);
+    } else if (entry.isFile()) {
+      callback(fullPath);
+    }
+  }
+}
+async function askMultiLineInput(prompt) {
+  console.log(prompt);
+  console.log("(Enter an empty line to finish)");
+  const lines = [];
+  const rl = readline2.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  return new Promise((resolve7) => {
+    const askLine = () => {
+      rl.question("", (line) => {
+        if (line === "") {
+          rl.close();
+          resolve7(lines.join("\n"));
+        } else {
+          lines.push(line);
+          askLine();
+        }
+      });
+    };
+    askLine();
+  });
+}
+async function cmdPush(include, exclude, dryRun, titleArg, bodyArg) {
+  const cwd = process.cwd();
+  if (!checkGhInstalled()) {
+    console.error("Error: gh CLI required. Install: https://cli.github.com");
+    return 1;
+  }
+  if (!checkGhAuth()) {
+    console.error("Error: Not authenticated. Run: gh auth login");
+    return 1;
+  }
+  if (!isGitRepo(cwd)) {
+    console.error("Error: Not in a git repository");
+    return 1;
+  }
+  const syncConfig = loadSyncConfig(cwd);
+  const finalIncludes = include.length > 0 ? include : syncConfig?.includes || [];
+  const finalExcludes = exclude.length > 0 ? exclude : syncConfig?.excludes || [];
+  const allhandsRoot = getAllhandsRoot();
+  const manifest = new Manifest(allhandsRoot);
+  const upstreamFiles = manifest.getDistributableFiles();
+  const filesToPush = [];
+  for (const relPath of upstreamFiles) {
+    if (finalExcludes.some((pattern) => minimatch(relPath, pattern, { dot: true }))) {
+      continue;
+    }
+    const localFile = join6(cwd, relPath);
+    const upstreamFile = join6(allhandsRoot, relPath);
+    if (existsSync7(localFile) && filesAreDifferent(localFile, upstreamFile)) {
+      filesToPush.push({ path: relPath, type: "M" });
+    }
+  }
+  for (const pattern of finalIncludes) {
+    const matchedFiles = expandGlob(pattern, cwd);
+    for (const relPath of matchedFiles) {
+      if (filesToPush.some((f) => f.path === relPath)) continue;
+      filesToPush.push({ path: relPath, type: "A" });
+    }
+  }
+  if (filesToPush.length === 0) {
+    console.log("No changes to push");
+    return 0;
+  }
+  console.log("\nFiles to be included in PR:");
+  for (const file of filesToPush.sort((a, b) => a.path.localeCompare(b.path))) {
+    const marker = file.type === "M" ? "M" : "A";
+    const label = file.type === "M" ? "modified" : "included";
+    console.log(`  ${marker} ${file.path} (${label})`);
+  }
+  console.log();
+  if (dryRun) {
+    console.log("Dry run - no PR created");
+    return 0;
+  }
+  const title = titleArg || await askQuestion("PR title: ");
+  if (!title.trim()) {
+    console.error("Error: Title cannot be empty");
+    return 1;
+  }
+  const body = bodyArg !== void 0 ? bodyArg : await askMultiLineInput("\nPR body:");
+  if (!titleArg) {
+    console.log();
+    if (!await confirm(`Create PR with title "${title}"?`)) {
+      console.log("Aborted");
+      return 0;
+    }
+  } else {
+    console.log(`
+Creating PR: "${title}"`);
+  }
+  const ghUser = getGhUser();
+  if (!ghUser) {
+    console.error("Error: Could not determine GitHub username");
+    return 1;
+  }
+  console.log(`
+Using GitHub account: ${ghUser}`);
+  const repoName = UPSTREAM_REPO.split("/")[1];
+  const forkCheck = gh(["repo", "view", `${ghUser}/${repoName}`, "--json", "name"]);
+  if (!forkCheck.success) {
+    console.log("Creating fork...");
+    const forkResult = gh(["repo", "fork", UPSTREAM_REPO, "--clone=false"]);
+    if (!forkResult.success) {
+      console.error("Error creating fork:", forkResult.stderr);
+      return 1;
+    }
+    await new Promise((r) => setTimeout(r, 2e3));
+  }
+  const tempDir = join6(tmpdir(), `allhands-push-${Date.now()}`);
+  mkdirSync3(tempDir, { recursive: true });
+  try {
+    console.log("Cloning fork...");
+    const cloneResult = gh(["repo", "clone", `${ghUser}/${repoName}`, tempDir, "--", "--depth=1"]);
+    if (!cloneResult.success) {
+      console.error("Error cloning fork:", cloneResult.stderr);
+      return 1;
+    }
+    console.log("Fetching upstream...");
+    git(["remote", "add", "upstream", `https://github.com/${UPSTREAM_REPO}`], tempDir);
+    const fetchResult = git(["fetch", "upstream", "main", "--depth=1"], tempDir);
+    if (!fetchResult.success) {
+      console.error("Error fetching upstream:", fetchResult.stderr);
+      return 1;
+    }
+    const branchName = `contrib/${ghUser}/${Date.now()}`;
+    console.log(`Creating branch: ${branchName}`);
+    const checkoutResult = git(["checkout", "-b", branchName, "upstream/main"], tempDir);
+    if (!checkoutResult.success) {
+      console.error("Error creating branch:", checkoutResult.stderr);
+      return 1;
+    }
+    console.log("Copying files...");
+    for (const file of filesToPush) {
+      const src = join6(cwd, file.path);
+      const dest = join6(tempDir, file.path);
+      mkdirSync3(dirname7(dest), { recursive: true });
+      copyFileSync3(src, dest);
+    }
+    git(["add", "."], tempDir);
+    const commitResult = git(["commit", "-m", title], tempDir);
+    if (!commitResult.success) {
+      console.error("Error committing:", commitResult.stderr);
+      return 1;
+    }
+    console.log("Pushing to fork...");
+    const pushResult = git(["push", "-u", "origin", branchName], tempDir);
+    if (!pushResult.success) {
+      console.error("Error pushing:", pushResult.stderr);
+      return 1;
+    }
+    console.log("Creating PR...");
+    const prArgs = [
+      "pr",
+      "create",
+      "--repo",
+      UPSTREAM_REPO,
+      "--head",
+      `${ghUser}:${branchName}`,
+      "--title",
+      title,
+      "--body",
+      body || "Contribution via claude-all-hands push"
+    ];
+    const prResult = gh(prArgs);
+    if (!prResult.success) {
+      console.error("Error creating PR:", prResult.stderr);
+      return 1;
+    }
+    console.log("\nPR created successfully!");
+    console.log(prResult.stdout);
+    return 0;
+  } finally {
+    try {
+      rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+    }
+  }
+}
+
 // src/cli.ts
 import { createRequire } from "module";
 var require2 = createRequire(import.meta.url);
@@ -6986,6 +7297,53 @@ async function main() {
     },
     async (argv2) => {
       const code = await cmdUpdate(argv2.yes);
+      process.exit(code);
+    }
+  ).command(
+    "pull-manifest",
+    "Create sync config for push customization",
+    () => {
+    },
+    async () => {
+      const code = await cmdPullManifest();
+      process.exit(code);
+    }
+  ).command(
+    "push",
+    "Create PR to upstream with local changes",
+    (yargs) => {
+      return yargs.option("include", {
+        alias: "i",
+        type: "array",
+        describe: "Additional files/patterns to include",
+        default: []
+      }).option("exclude", {
+        alias: "e",
+        type: "array",
+        describe: "Files/patterns to exclude",
+        default: []
+      }).option("dry-run", {
+        type: "boolean",
+        describe: "Preview without creating PR",
+        default: false
+      }).option("title", {
+        alias: "t",
+        type: "string",
+        describe: "PR title (skips prompt)"
+      }).option("body", {
+        alias: "b",
+        type: "string",
+        describe: "PR body (skips prompt)"
+      });
+    },
+    async (argv2) => {
+      const code = await cmdPush(
+        argv2.include,
+        argv2.exclude,
+        argv2.dryRun,
+        argv2.title,
+        argv2.body
+      );
       process.exit(code);
     }
   ).demandCommand(1, "Please specify a command").strict().help().alias("h", "help").parse();
