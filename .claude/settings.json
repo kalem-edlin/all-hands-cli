@@ -103,8 +103,9 @@
     "padding": 0
   },
   "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true,
     "vtsls@claude-code-lsps": true,
-    "pyright@claude-code-lsps": true,
+    "basedpyright@claude-code-lsps": true,
     "vscode-langservers@claude-code-lsps": true
   }
 }
