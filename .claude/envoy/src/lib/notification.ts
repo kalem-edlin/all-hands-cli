@@ -14,7 +14,7 @@
 import { spawnSync } from "child_process";
 import { existsSync } from "fs";
 import { logInfo, logWarn } from "./observability.js";
-import { getBranch } from "./git.js";
+import { getBranch, getRepoName } from "./git.js";
 
 export interface NotifyOptions {
   title: string;           // Event type (required)
@@ -56,13 +56,15 @@ export function sendNotification(options: NotifyOptions): boolean {
     return false;
   }
 
+  const repo = getRepoName();
   const branch = getBranch() || "unknown";
+  const subtitle = repo ? `${repo} ${branch}` : branch;
   const notifType = options.type || "banner";
 
   const args: string[] = [
     "--type", notifType,
     "--title", options.title,
-    "--subtitle", branch,
+    "--subtitle", subtitle,
     "--message", options.message,
   ];
 
