@@ -5,6 +5,7 @@ import { isGitRepo } from '../lib/git.js';
 import { Manifest, filesAreDifferent } from '../lib/manifest.js';
 import { getAllhandsRoot } from '../lib/paths.js';
 import { ConflictResolution, askConflictResolution, confirm, getNextBackupPath } from '../lib/ui.js';
+import { SYNC_CONFIG_FILENAME, SYNC_CONFIG_TEMPLATE } from '../lib/constants.js';
 
 const ENVOY_SHELL_FUNCTION = `
 # AllHands envoy command - resolves to .claude/envoy/envoy from current directory
@@ -232,6 +233,22 @@ export async function cmdInit(target: string, autoYes: boolean = false): Promise
     console.log('    envoy() { "$PWD/.claude/envoy/envoy" "$@"; }');
   }
 
+  // Offer to create sync config for push command
+  const syncConfigPath = join(resolvedTarget, SYNC_CONFIG_FILENAME);
+  let syncConfigCreated = false;
+
+  if (existsSync(syncConfigPath)) {
+    console.log(`\n${SYNC_CONFIG_FILENAME} already exists - skipping`);
+  } else if (!autoYes) {
+    console.log('\nThe push command lets you contribute changes back to claude-all-hands.');
+    console.log('A sync config file lets you customize which files to include/exclude.');
+    if (await confirm(`Create ${SYNC_CONFIG_FILENAME}?`)) {
+      writeFileSync(syncConfigPath, JSON.stringify(SYNC_CONFIG_TEMPLATE, null, 2) + '\n');
+      syncConfigCreated = true;
+      console.log(`  Created ${SYNC_CONFIG_FILENAME}`);
+    }
+  }
+
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Done: ${copied} copied, ${skipped} unchanged`);
   if (claudeMdMigrated) {
@@ -239,6 +256,9 @@ export async function cmdInit(target: string, autoYes: boolean = false): Promise
   }
   if (resolution === 'backup' && conflicts.length > 0) {
     console.log(`Created ${conflicts.length} backup file(s)`);
+  }
+  if (syncConfigCreated) {
+    console.log(`Created ${SYNC_CONFIG_FILENAME} for push customization`);
   }
   console.log('\nProject-specific files preserved (never overwritten):');
   console.log('  - CLAUDE.project.md');

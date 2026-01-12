@@ -2,6 +2,8 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { cmdInit } from './commands/init.js';
 import { cmdUpdate } from './commands/update.js';
+import { cmdPullManifest } from './commands/pull-manifest.js';
+import { cmdPush } from './commands/push.js';
 import { checkGitInstalled } from './lib/git.js';
 import { createRequire } from 'module';
 
@@ -55,6 +57,59 @@ async function main() {
       },
       async (argv) => {
         const code = await cmdUpdate(argv.yes as boolean);
+        process.exit(code);
+      }
+    )
+    .command(
+      'pull-manifest',
+      'Create sync config for push customization',
+      () => {},
+      async () => {
+        const code = await cmdPullManifest();
+        process.exit(code);
+      }
+    )
+    .command(
+      'push',
+      'Create PR to upstream with local changes',
+      (yargs) => {
+        return yargs
+          .option('include', {
+            alias: 'i',
+            type: 'array',
+            describe: 'Additional files/patterns to include',
+            default: [],
+          })
+          .option('exclude', {
+            alias: 'e',
+            type: 'array',
+            describe: 'Files/patterns to exclude',
+            default: [],
+          })
+          .option('dry-run', {
+            type: 'boolean',
+            describe: 'Preview without creating PR',
+            default: false,
+          })
+          .option('title', {
+            alias: 't',
+            type: 'string',
+            describe: 'PR title (skips prompt)',
+          })
+          .option('body', {
+            alias: 'b',
+            type: 'string',
+            describe: 'PR body (skips prompt)',
+          });
+      },
+      async (argv) => {
+        const code = await cmdPush(
+          argv.include as string[],
+          argv.exclude as string[],
+          argv.dryRun as boolean,
+          argv.title as string | undefined,
+          argv.body as string | undefined
+        );
         process.exit(code);
       }
     )

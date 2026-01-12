@@ -1,6 +1,7 @@
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { minimatch } from 'minimatch';
+import { walkDir } from './fs-utils.js';
 
 interface ManifestData {
   distribute?: string[];
@@ -57,7 +58,7 @@ export class Manifest {
 
   getDistributableFiles(): Set<string> {
     const allFiles = new Set<string>();
-    this.walkDir(this.allhandsRoot, (filePath) => {
+    walkDir(this.allhandsRoot, (filePath) => {
       allFiles.add(relative(this.allhandsRoot, filePath));
     });
 
@@ -69,21 +70,6 @@ export class Manifest {
     }
 
     return filtered;
-  }
-
-  private walkDir(dir: string, callback: (filePath: string) => void): void {
-    const entries = readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.name === '.git' || entry.name === 'node_modules') {
-        continue;
-      }
-      const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        this.walkDir(fullPath, callback);
-      } else if (entry.isFile()) {
-        callback(fullPath);
-      }
-    }
   }
 }
 
