@@ -167,8 +167,7 @@ export function writeTestingGateFeedback(
   writeFileSync(logsPath, "<!-- Paste test logs here -->\n", "utf-8");
 
   logInfo("feedback.write", { type: "testing_gate", yamlPath, logsPath, promptNum, variant });
-  const promptId = variant ? `${promptNum}_${variant}` : `${promptNum}`;
-  sendGateNotification("Testing", `Testing gate ready for prompt ${promptId}`);
+  sendGateNotification("Testing", `Testing gate ready for prompt ${getPromptId(promptNum, variant)}`);
   return { yamlPath, logsPath };
 }
 
