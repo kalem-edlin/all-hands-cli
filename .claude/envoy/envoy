@@ -13,13 +13,21 @@ fi
 
 # Auto-install if node_modules missing
 if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
-    npm install --prefix "$SCRIPT_DIR" --silent 2>/dev/null
+    echo "Installing envoy dependencies..." >&2
+    if ! npm install --prefix "$SCRIPT_DIR"; then
+        echo "ERROR: npm install failed for claude-envoy" >&2
+        exit 1
+    fi
     cp "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null
 fi
 
 # Reinstall if package.json changed
 if ! cmp -s "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null; then
-    npm install --prefix "$SCRIPT_DIR" --silent 2>/dev/null
+    echo "Updating envoy dependencies..." >&2
+    if ! npm install --prefix "$SCRIPT_DIR"; then
+        echo "ERROR: npm install failed for claude-envoy" >&2
+        exit 1
+    fi
     cp "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null
 fi
 
