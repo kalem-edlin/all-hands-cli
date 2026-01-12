@@ -51,6 +51,9 @@ jobs:
 
       - run: npm run build --if-present
 
+      - name: Rename dotfiles for npm pack
+        run: ./scripts/pre-pack.sh
+
       - name: Publish to npm
         run: npm publish
         env:
