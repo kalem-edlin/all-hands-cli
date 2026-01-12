@@ -4856,9 +4856,9 @@ var Yargs = YargsFactory(esm_default);
 var yargs_default = Yargs;
 
 // src/commands/init.ts
-import { appendFileSync, copyFileSync, existsSync as existsSync5, mkdirSync, readFileSync as readFileSync5, renameSync, writeFileSync } from "fs";
+import { appendFileSync, copyFileSync, existsSync as existsSync6, mkdirSync, readFileSync as readFileSync6, renameSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { basename as basename3, dirname as dirname5, join as join4, resolve as resolve6 } from "path";
+import { basename as basename3, dirname as dirname6, join as join5, resolve as resolve6 } from "path";
 
 // src/lib/git.ts
 import { execSync, spawnSync } from "child_process";
@@ -4907,8 +4907,8 @@ function getGitFiles(repoPath) {
 }
 
 // src/lib/manifest.ts
-import { readFileSync as readFileSync4, existsSync as existsSync2, statSync as statSync3 } from "fs";
-import { join as join2, relative as relative2 } from "path";
+import { readFileSync as readFileSync5, existsSync as existsSync3, statSync as statSync3 } from "fs";
+import { join as join3 } from "path";
 
 // node_modules/@isaacs/balanced-match/dist/esm/index.js
 var balanced = (a, b, str) => {
@@ -6462,6 +6462,10 @@ minimatch.Minimatch = Minimatch;
 minimatch.escape = escape;
 minimatch.unescape = unescape;
 
+// src/lib/gitignore.ts
+import { existsSync as existsSync2, readFileSync as readFileSync4 } from "fs";
+import { join as join2, relative as relative2, dirname as dirname3 } from "path";
+
 // src/lib/fs-utils.ts
 import { existsSync, readdirSync as readdirSync2 } from "fs";
 import { join } from "path";
@@ -6481,57 +6485,159 @@ function walkDir(dir, callback) {
   }
 }
 
+// src/lib/gitignore.ts
+function parseGitignoreFile(content, directory) {
+  const rules = [];
+  const lines = content.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    let pattern = trimmed;
+    let negated = false;
+    if (pattern.startsWith("!")) {
+      negated = true;
+      pattern = pattern.slice(1);
+    }
+    pattern = pattern.replace(/(?<!\\)\s+$/, "");
+    if (!pattern) continue;
+    rules.push({ pattern, negated, directory });
+  }
+  return rules;
+}
+function matchesPattern(filePath, rule) {
+  const { pattern, directory } = rule;
+  let relativePath = filePath;
+  if (directory) {
+    if (!filePath.startsWith(directory + "/") && filePath !== directory) {
+      return false;
+    }
+    relativePath = filePath.slice(directory.length + 1);
+  }
+  let matchPattern = pattern;
+  if (pattern.startsWith("/")) {
+    matchPattern = pattern.slice(1);
+  }
+  if (matchPattern.endsWith("/")) {
+    matchPattern = matchPattern.slice(0, -1) + "/**";
+  }
+  const hasSlash = pattern.includes("/") && !pattern.endsWith("/");
+  if (!hasSlash && !pattern.startsWith("/")) {
+    matchPattern = "**/" + matchPattern;
+  }
+  const opts = { dot: true, matchBase: false };
+  if (minimatch(relativePath, matchPattern, opts)) {
+    return true;
+  }
+  if (minimatch(relativePath, matchPattern + "/**", opts)) {
+    return true;
+  }
+  return false;
+}
+var GitignoreFilter = class {
+  rules = [];
+  rootDir;
+  constructor(rootDir) {
+    this.rootDir = rootDir;
+    this.loadGitignoreFiles();
+  }
+  /**
+   * Walk the directory tree and load all .gitignore files.
+   */
+  loadGitignoreFiles() {
+    const rootGitignore = join2(this.rootDir, ".gitignore");
+    if (existsSync2(rootGitignore)) {
+      const content = readFileSync4(rootGitignore, "utf-8");
+      this.rules.push(...parseGitignoreFile(content, ""));
+    }
+    walkDir(this.rootDir, (filePath) => {
+      const relativePath = relative2(this.rootDir, filePath);
+      if (relativePath.endsWith(".gitignore") && relativePath !== ".gitignore") {
+        const content = readFileSync4(filePath, "utf-8");
+        const directory = dirname3(relativePath);
+        this.rules.push(...parseGitignoreFile(content, directory));
+      }
+    });
+  }
+  /**
+   * Check if a file should be ignored based on all gitignore rules.
+   */
+  isIgnored(filePath) {
+    let ignored = false;
+    for (const rule of this.rules) {
+      if (matchesPattern(filePath, rule)) {
+        ignored = !rule.negated;
+      }
+    }
+    return ignored;
+  }
+  /**
+   * Get all non-ignored files from the directory tree.
+   */
+  getNonIgnoredFiles() {
+    const files = [];
+    walkDir(this.rootDir, (filePath) => {
+      const relativePath = relative2(this.rootDir, filePath);
+      if (!this.isIgnored(relativePath)) {
+        files.push(relativePath);
+      }
+    });
+    return files;
+  }
+};
+
 // src/lib/manifest.ts
+var INTERNAL_FILENAME = ".internal.json";
 var Manifest = class {
   allhandsRoot;
-  manifestPath;
+  internalPath;
   data;
+  gitignoreFilter;
   constructor(allhandsRoot) {
     this.allhandsRoot = allhandsRoot;
-    this.manifestPath = join2(allhandsRoot, ".allhands-manifest.json");
+    this.internalPath = join3(allhandsRoot, INTERNAL_FILENAME);
     this.data = this.load();
+    this.gitignoreFilter = new GitignoreFilter(allhandsRoot);
   }
   load() {
-    if (!existsSync2(this.manifestPath)) {
-      throw new Error(`Manifest not found: ${this.manifestPath}`);
+    if (!existsSync3(this.internalPath)) {
+      throw new Error(`Internal config not found: ${this.internalPath}`);
     }
-    const content = readFileSync4(this.manifestPath, "utf-8");
+    const content = readFileSync5(this.internalPath, "utf-8");
     return JSON.parse(content);
-  }
-  get distributePatterns() {
-    return this.data.distribute || [];
   }
   get internalPatterns() {
     return this.data.internal || [];
   }
-  get excludePatterns() {
-    return this.data.exclude || [];
-  }
-  isExcluded(path2) {
-    return this.excludePatterns.some((pattern) => this.matches(path2, pattern));
-  }
-  isDistributable(path2) {
-    return this.distributePatterns.some((pattern) => this.matches(path2, pattern));
-  }
+  /**
+   * Check if a file is marked as internal (should not be distributed).
+   */
   isInternal(path2) {
-    return this.internalPatterns.some((pattern) => this.matches(path2, pattern));
+    return this.internalPatterns.some((pattern) => minimatch(path2, pattern, { dot: true }));
   }
-  matches(path2, pattern) {
-    return minimatch(path2, pattern, { dot: true });
+  /**
+   * Check if a file is gitignored.
+   */
+  isGitignored(path2) {
+    return this.gitignoreFilter.isIgnored(path2);
   }
+  /**
+   * Check if a file should be distributed.
+   * A file is distributable if it's NOT internal AND NOT gitignored.
+   */
+  isDistributable(path2) {
+    return !this.isInternal(path2) && !this.isGitignored(path2);
+  }
+  /**
+   * Get all distributable files from the allhands root.
+   * Returns files that are NOT internal AND NOT gitignored.
+   */
   getDistributableFiles() {
-    let allFiles;
-    if (isGitRepo(this.allhandsRoot)) {
-      allFiles = getGitFiles(this.allhandsRoot);
-    } else {
-      allFiles = [];
-      walkDir(this.allhandsRoot, (filePath) => {
-        allFiles.push(relative2(this.allhandsRoot, filePath));
-      });
-    }
+    const allFiles = this.gitignoreFilter.getNonIgnoredFiles();
     const filtered = /* @__PURE__ */ new Set();
     for (const file of allFiles) {
-      if (this.isDistributable(file) && !this.isExcluded(file)) {
+      if (!this.isInternal(file)) {
         filtered.add(file);
       }
     }
@@ -6539,7 +6645,7 @@ var Manifest = class {
   }
 };
 function filesAreDifferent(file1, file2) {
-  if (!existsSync2(file1) || !existsSync2(file2)) {
+  if (!existsSync3(file1) || !existsSync3(file2)) {
     return true;
   }
   const stat1 = statSync3(file1);
@@ -6547,32 +6653,32 @@ function filesAreDifferent(file1, file2) {
   if (stat1.size !== stat2.size) {
     return true;
   }
-  const content1 = readFileSync4(file1);
-  const content2 = readFileSync4(file2);
+  const content1 = readFileSync5(file1);
+  const content2 = readFileSync5(file2);
   return !content1.equals(content2);
 }
 
 // src/lib/paths.ts
-import { existsSync as existsSync3 } from "fs";
-import { dirname as dirname3, resolve as resolve5 } from "path";
+import { existsSync as existsSync4 } from "fs";
+import { dirname as dirname4, resolve as resolve5 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 var UPSTREAM_REPO = "kalem-edlin/claude-all-hands";
 function getAllhandsRoot() {
   const envPath = process.env.ALLHANDS_PATH;
   if (envPath) {
     const resolved = resolve5(envPath);
-    if (existsSync3(resolved) && existsSync3(resolve5(resolved, ".allhands-manifest.json"))) {
+    if (existsSync4(resolved) && existsSync4(resolve5(resolved, ".internal.json"))) {
       return resolved;
     }
   }
   const __filename = fileURLToPath2(import.meta.url);
-  const __dirname2 = dirname3(__filename);
+  const __dirname2 = dirname4(__filename);
   let packageRoot = resolve5(__dirname2, "..");
-  if (existsSync3(resolve5(packageRoot, ".allhands-manifest.json"))) {
+  if (existsSync4(resolve5(packageRoot, ".internal.json"))) {
     return packageRoot;
   }
   packageRoot = resolve5(__dirname2, "../..");
-  if (existsSync3(resolve5(packageRoot, ".allhands-manifest.json"))) {
+  if (existsSync4(resolve5(packageRoot, ".internal.json"))) {
     return packageRoot;
   }
   throw new Error(
@@ -6581,8 +6687,8 @@ function getAllhandsRoot() {
 }
 
 // src/lib/ui.ts
-import { existsSync as existsSync4, readdirSync as readdirSync3 } from "fs";
-import { basename as basename2, dirname as dirname4, extname as extname2, join as join3 } from "path";
+import { existsSync as existsSync5, readdirSync as readdirSync3 } from "fs";
+import { basename as basename2, dirname as dirname5, extname as extname2, join as join4 } from "path";
 import * as readline from "readline";
 async function askQuestion(question) {
   const rl = readline.createInterface({
@@ -6632,11 +6738,11 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function getNextBackupPath(filePath) {
-  const dir = dirname4(filePath);
+  const dir = dirname5(filePath);
   const ext2 = extname2(filePath);
   const base = basename2(filePath, ext2);
   let n = 1;
-  if (existsSync4(dir)) {
+  if (existsSync5(dir)) {
     const files = readdirSync3(dir);
     const backupPattern = new RegExp(`^${escapeRegex(base)}\\.backup_(\\d+)${escapeRegex(ext2)}$`);
     for (const file of files) {
@@ -6647,7 +6753,7 @@ function getNextBackupPath(filePath) {
       }
     }
   }
-  return join3(dir, `${base}.backup_${n}${ext2}`);
+  return join4(dir, `${base}.backup_${n}${ext2}`);
 }
 
 // src/lib/constants.ts
@@ -6667,17 +6773,17 @@ envoy() {
 }
 `;
 function syncGitignore(allhandsRoot, target) {
-  const sourceGitignore = join4(allhandsRoot, ".gitignore");
-  const targetGitignore = join4(target, ".gitignore");
-  if (!existsSync5(sourceGitignore)) {
+  const sourceGitignore = join5(allhandsRoot, ".gitignore");
+  const targetGitignore = join5(target, ".gitignore");
+  if (!existsSync6(sourceGitignore)) {
     return { added: [], unchanged: true };
   }
-  const sourceContent = readFileSync5(sourceGitignore, "utf-8");
+  const sourceContent = readFileSync6(sourceGitignore, "utf-8");
   const sourceLines = sourceContent.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
   let targetLines = [];
   let targetContent = "";
-  if (existsSync5(targetGitignore)) {
-    targetContent = readFileSync5(targetGitignore, "utf-8");
+  if (existsSync6(targetGitignore)) {
+    targetContent = readFileSync6(targetGitignore, "utf-8");
     targetLines = targetContent.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
   }
   const targetSet = new Set(targetLines);
@@ -6698,17 +6804,17 @@ function setupEnvoyShellFunction() {
   const shell = process.env.SHELL || "";
   let shellRc = null;
   if (shell.includes("zsh")) {
-    shellRc = join4(homedir(), ".zshrc");
+    shellRc = join5(homedir(), ".zshrc");
   } else if (shell.includes("bash")) {
-    const bashProfile = join4(homedir(), ".bash_profile");
-    const bashRc = join4(homedir(), ".bashrc");
-    shellRc = existsSync5(bashProfile) ? bashProfile : bashRc;
+    const bashProfile = join5(homedir(), ".bash_profile");
+    const bashRc = join5(homedir(), ".bashrc");
+    shellRc = existsSync6(bashProfile) ? bashProfile : bashRc;
   }
   if (!shellRc) {
     return { added: false, shellRc: null };
   }
-  if (existsSync5(shellRc)) {
-    const content = readFileSync5(shellRc, "utf-8");
+  if (existsSync6(shellRc)) {
+    const content = readFileSync6(shellRc, "utf-8");
     if (content.includes("envoy()") || content.includes(".claude/envoy/envoy")) {
       return { added: false, shellRc };
     }
@@ -6722,7 +6828,7 @@ async function cmdInit(target, autoYes = false) {
   const manifest = new Manifest(allhandsRoot);
   console.log(`Initializing allhands in: ${resolvedTarget}`);
   console.log(`Source: ${allhandsRoot}`);
-  if (!existsSync5(resolvedTarget)) {
+  if (!existsSync6(resolvedTarget)) {
     console.error(`Error: Target directory does not exist: ${resolvedTarget}`);
     return 1;
   }
@@ -6735,10 +6841,10 @@ async function cmdInit(target, autoYes = false) {
       }
     }
   }
-  const targetClaudeMd = join4(resolvedTarget, "CLAUDE.md");
-  const targetProjectMd = join4(resolvedTarget, "CLAUDE.project.md");
+  const targetClaudeMd = join5(resolvedTarget, "CLAUDE.md");
+  const targetProjectMd = join5(resolvedTarget, "CLAUDE.project.md");
   let claudeMdMigrated = false;
-  if (existsSync5(targetClaudeMd) && !existsSync5(targetProjectMd)) {
+  if (existsSync6(targetClaudeMd) && !existsSync6(targetProjectMd)) {
     console.log("\nMigrating CLAUDE.md \u2192 CLAUDE.project.md...");
     renameSync(targetClaudeMd, targetProjectMd);
     claudeMdMigrated = true;
@@ -6749,10 +6855,10 @@ async function cmdInit(target, autoYes = false) {
   const conflicts = [];
   for (const relPath of distributable) {
     if (relPath === "CLAUDE.md" && claudeMdMigrated) continue;
-    if (projectSpecificFiles.has(relPath) && existsSync5(join4(resolvedTarget, relPath))) continue;
-    const sourceFile = join4(allhandsRoot, relPath);
-    const targetFile = join4(resolvedTarget, relPath);
-    if (existsSync5(targetFile) && existsSync5(sourceFile)) {
+    if (projectSpecificFiles.has(relPath) && existsSync6(join5(resolvedTarget, relPath))) continue;
+    const sourceFile = join5(allhandsRoot, relPath);
+    const targetFile = join5(resolvedTarget, relPath);
+    if (existsSync6(targetFile) && existsSync6(sourceFile)) {
       if (filesAreDifferent(sourceFile, targetFile)) {
         conflicts.push(relPath);
       }
@@ -6774,7 +6880,7 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     if (resolution === "backup") {
       console.log("\nCreating backups...");
       for (const relPath of conflicts) {
-        const targetFile = join4(resolvedTarget, relPath);
+        const targetFile = join5(resolvedTarget, relPath);
         const backupPath = getNextBackupPath(targetFile);
         copyFileSync(targetFile, backupPath);
         console.log(`  ${relPath} \u2192 ${basename3(backupPath)}`);
@@ -6786,15 +6892,15 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
   let copied = 0;
   let skipped = 0;
   for (const relPath of [...distributable].sort()) {
-    const sourceFile = join4(allhandsRoot, relPath);
-    const targetFile = join4(resolvedTarget, relPath);
-    if (projectSpecificFiles.has(relPath) && existsSync5(targetFile)) {
+    const sourceFile = join5(allhandsRoot, relPath);
+    const targetFile = join5(resolvedTarget, relPath);
+    if (projectSpecificFiles.has(relPath) && existsSync6(targetFile)) {
       skipped++;
       continue;
     }
-    if (!existsSync5(sourceFile)) continue;
-    mkdirSync(dirname5(targetFile), { recursive: true });
-    if (existsSync5(targetFile)) {
+    if (!existsSync6(sourceFile)) continue;
+    mkdirSync(dirname6(targetFile), { recursive: true });
+    if (existsSync6(targetFile)) {
       if (!filesAreDifferent(sourceFile, targetFile)) {
         skipped++;
         continue;
@@ -6824,9 +6930,9 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     console.log("  Could not detect shell config (add manually to your shell rc):");
     console.log('    envoy() { "$PWD/.claude/envoy/envoy" "$@"; }');
   }
-  const syncConfigPath = join4(resolvedTarget, SYNC_CONFIG_FILENAME);
+  const syncConfigPath = join5(resolvedTarget, SYNC_CONFIG_FILENAME);
   let syncConfigCreated = false;
-  if (existsSync5(syncConfigPath)) {
+  if (existsSync6(syncConfigPath)) {
     console.log(`
 ${SYNC_CONFIG_FILENAME} already exists - skipping`);
   } else if (!autoYes) {
@@ -6861,8 +6967,8 @@ ${"=".repeat(60)}`);
 }
 
 // src/commands/update.ts
-import { existsSync as existsSync6, mkdirSync as mkdirSync2, copyFileSync as copyFileSync2, unlinkSync, renameSync as renameSync2 } from "fs";
-import { join as join5, dirname as dirname6, basename as basename4 } from "path";
+import { existsSync as existsSync7, mkdirSync as mkdirSync2, copyFileSync as copyFileSync2, unlinkSync, renameSync as renameSync2 } from "fs";
+import { join as join6, dirname as dirname7, basename as basename4 } from "path";
 async function cmdUpdate(autoYes = false) {
   const targetRoot = process.cwd();
   if (!isGitRepo(targetRoot)) {
@@ -6870,8 +6976,8 @@ async function cmdUpdate(autoYes = false) {
     return 1;
   }
   const allhandsRoot = getAllhandsRoot();
-  if (!existsSync6(join5(allhandsRoot, ".allhands-manifest.json"))) {
-    console.error(`Error: Manifest not found at ${allhandsRoot}`);
+  if (!existsSync7(join6(allhandsRoot, ".internal.json"))) {
+    console.error(`Error: Internal config not found at ${allhandsRoot}`);
     console.error("Set ALLHANDS_PATH to your claude-all-hands directory");
     return 1;
   }
@@ -6890,10 +6996,10 @@ async function cmdUpdate(autoYes = false) {
     console.error("\nRun 'git stash' or commit first.");
     return 1;
   }
-  const targetClaudeMd = join5(targetRoot, "CLAUDE.md");
-  const targetProjectMd = join5(targetRoot, "CLAUDE.project.md");
+  const targetClaudeMd = join6(targetRoot, "CLAUDE.md");
+  const targetProjectMd = join6(targetRoot, "CLAUDE.project.md");
   let claudeMdMigrated = false;
-  if (existsSync6(targetClaudeMd) && !existsSync6(targetProjectMd)) {
+  if (existsSync7(targetClaudeMd) && !existsSync7(targetProjectMd)) {
     console.log("\nMigrating CLAUDE.md \u2192 CLAUDE.project.md...");
     renameSync2(targetClaudeMd, targetProjectMd);
     claudeMdMigrated = true;
@@ -6906,15 +7012,15 @@ async function cmdUpdate(autoYes = false) {
   for (const relPath of distributable) {
     if (relPath === "CLAUDE.md" && claudeMdMigrated) continue;
     if (projectSpecificFiles.has(relPath)) continue;
-    const sourceFile = join5(allhandsRoot, relPath);
-    const targetFile = join5(targetRoot, relPath);
-    if (!existsSync6(sourceFile)) {
-      if (existsSync6(targetFile)) {
+    const sourceFile = join6(allhandsRoot, relPath);
+    const targetFile = join6(targetRoot, relPath);
+    if (!existsSync7(sourceFile)) {
+      if (existsSync7(targetFile)) {
         deletedInSource.push(relPath);
       }
       continue;
     }
-    if (existsSync6(targetFile)) {
+    if (existsSync7(targetFile)) {
       if (filesAreDifferent(sourceFile, targetFile)) {
         conflicts.push(relPath);
       }
@@ -6936,7 +7042,7 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     if (resolution === "backup") {
       console.log("\nCreating backups...");
       for (const relPath of conflicts) {
-        const targetFile = join5(targetRoot, relPath);
+        const targetFile = join6(targetRoot, relPath);
         const backupPath = getNextBackupPath(targetFile);
         copyFileSync2(targetFile, backupPath);
         console.log(`  ${relPath} \u2192 ${basename4(backupPath)}`);
@@ -6947,11 +7053,11 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
   let created = 0;
   for (const relPath of [...distributable].sort()) {
     if (projectSpecificFiles.has(relPath)) continue;
-    const sourceFile = join5(allhandsRoot, relPath);
-    const targetFile = join5(targetRoot, relPath);
-    if (!existsSync6(sourceFile)) continue;
-    mkdirSync2(dirname6(targetFile), { recursive: true });
-    if (existsSync6(targetFile)) {
+    const sourceFile = join6(allhandsRoot, relPath);
+    const targetFile = join6(targetRoot, relPath);
+    if (!existsSync7(sourceFile)) continue;
+    mkdirSync2(dirname7(targetFile), { recursive: true });
+    if (existsSync7(targetFile)) {
       if (filesAreDifferent(sourceFile, targetFile)) {
         copyFileSync2(sourceFile, targetFile);
         updated++;
@@ -6970,8 +7076,8 @@ ${deletedInSource.length} files removed from allhands source:`);
     const shouldDelete = autoYes || await confirm("Delete these from target?");
     if (shouldDelete) {
       for (const f of deletedInSource) {
-        const targetFile = join5(targetRoot, f);
-        if (existsSync6(targetFile)) {
+        const targetFile = join6(targetRoot, f);
+        if (existsSync7(targetFile)) {
           unlinkSync(targetFile);
           console.log(`  Deleted: ${f}`);
         }
@@ -6994,16 +7100,16 @@ Updated: ${updated}, Created: ${created}`);
 }
 
 // src/commands/pull-manifest.ts
-import { existsSync as existsSync7, writeFileSync as writeFileSync2 } from "fs";
-import { join as join6 } from "path";
+import { existsSync as existsSync8, writeFileSync as writeFileSync2 } from "fs";
+import { join as join7 } from "path";
 async function cmdPullManifest() {
   const cwd = process.cwd();
   if (!isGitRepo(cwd)) {
     console.error("Error: Not in a git repository");
     return 1;
   }
-  const configPath = join6(cwd, SYNC_CONFIG_FILENAME);
-  if (existsSync7(configPath)) {
+  const configPath = join7(cwd, SYNC_CONFIG_FILENAME);
+  if (existsSync8(configPath)) {
     console.error(`Error: ${SYNC_CONFIG_FILENAME} already exists`);
     console.error("Remove it first if you want to regenerate");
     return 1;
@@ -7018,9 +7124,9 @@ async function cmdPullManifest() {
 }
 
 // src/commands/push.ts
-import { copyFileSync as copyFileSync3, existsSync as existsSync8, mkdirSync as mkdirSync3, readFileSync as readFileSync6, rmSync } from "fs";
+import { copyFileSync as copyFileSync3, existsSync as existsSync9, mkdirSync as mkdirSync3, readFileSync as readFileSync7, rmSync } from "fs";
 import { tmpdir } from "os";
-import { dirname as dirname7, join as join7 } from "path";
+import { dirname as dirname8, join as join8 } from "path";
 import * as readline2 from "readline";
 
 // src/lib/gh.ts
@@ -7056,12 +7162,12 @@ function getGhUser() {
 
 // src/commands/push.ts
 function loadSyncConfig(cwd) {
-  const configPath = join7(cwd, SYNC_CONFIG_FILENAME);
-  if (!existsSync8(configPath)) {
+  const configPath = join8(cwd, SYNC_CONFIG_FILENAME);
+  if (!existsSync9(configPath)) {
     return null;
   }
   try {
-    const content = readFileSync6(configPath, "utf-8");
+    const content = readFileSync7(configPath, "utf-8");
     return JSON.parse(content);
   } catch {
     console.error(`Error: Failed to parse ${SYNC_CONFIG_FILENAME}`);
@@ -7131,9 +7237,9 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
     if (!localGitFiles.has(relPath)) {
       continue;
     }
-    const localFile = join7(cwd, relPath);
-    const upstreamFile = join7(allhandsRoot, relPath);
-    if (existsSync8(localFile) && filesAreDifferent(localFile, upstreamFile)) {
+    const localFile = join8(cwd, relPath);
+    const upstreamFile = join8(allhandsRoot, relPath);
+    if (existsSync9(localFile) && filesAreDifferent(localFile, upstreamFile)) {
       filesToPush.push({ path: relPath, type: "M" });
     }
   }
@@ -7143,9 +7249,9 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
       if (PUSH_BLOCKLIST.includes(relPath)) continue;
       if (finalExcludes.some((p) => minimatch(relPath, p, { dot: true }))) continue;
       if (filesToPush.some((f) => f.path === relPath)) continue;
-      const localFile = join7(cwd, relPath);
-      const upstreamFile = join7(allhandsRoot, relPath);
-      if (existsSync8(upstreamFile) && !filesAreDifferent(localFile, upstreamFile)) {
+      const localFile = join8(cwd, relPath);
+      const upstreamFile = join8(allhandsRoot, relPath);
+      if (existsSync9(upstreamFile) && !filesAreDifferent(localFile, upstreamFile)) {
         continue;
       }
       filesToPush.push({ path: relPath, type: "A" });
@@ -7178,7 +7284,7 @@ async function createPullRequest(cwd, ghUser, filesToPush, title, body) {
       return 1;
     }
   }
-  const tempDir = join7(tmpdir(), `allhands-push-${Date.now()}`);
+  const tempDir = join8(tmpdir(), `allhands-push-${Date.now()}`);
   mkdirSync3(tempDir, { recursive: true });
   try {
     console.log("Cloning fork...");
@@ -7207,9 +7313,9 @@ async function createPullRequest(cwd, ghUser, filesToPush, title, body) {
     }
     console.log("Copying files...");
     for (const file of filesToPush) {
-      const src = join7(cwd, file.path);
-      const dest = join7(tempDir, file.path);
-      mkdirSync3(dirname7(dest), { recursive: true });
+      const src = join8(cwd, file.path);
+      const dest = join8(tempDir, file.path);
+      mkdirSync3(dirname8(dest), { recursive: true });
       copyFileSync3(src, dest);
     }
     const addResult = git(["add", "."], tempDir);

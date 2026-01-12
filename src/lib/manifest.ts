@@ -1,78 +1,71 @@
 import { readFileSync, existsSync, statSync } from 'fs';
-import { join, relative } from 'path';
+import { join } from 'path';
 import { minimatch } from 'minimatch';
-import { getGitFiles, isGitRepo } from './git.js';
-import { walkDir } from './fs-utils.js';
+import { GitignoreFilter } from './gitignore.js';
 
-interface ManifestData {
-  distribute?: string[];
+interface InternalData {
   internal?: string[];
-  exclude?: string[];
 }
+
+const INTERNAL_FILENAME = '.internal.json';
 
 export class Manifest {
   private allhandsRoot: string;
-  private manifestPath: string;
-  private data: ManifestData;
+  private internalPath: string;
+  private data: InternalData;
+  private gitignoreFilter: GitignoreFilter;
 
   constructor(allhandsRoot: string) {
     this.allhandsRoot = allhandsRoot;
-    this.manifestPath = join(allhandsRoot, '.allhands-manifest.json');
+    this.internalPath = join(allhandsRoot, INTERNAL_FILENAME);
     this.data = this.load();
+    this.gitignoreFilter = new GitignoreFilter(allhandsRoot);
   }
 
-  private load(): ManifestData {
-    if (!existsSync(this.manifestPath)) {
-      throw new Error(`Manifest not found: ${this.manifestPath}`);
+  private load(): InternalData {
+    if (!existsSync(this.internalPath)) {
+      throw new Error(`Internal config not found: ${this.internalPath}`);
     }
-    const content = readFileSync(this.manifestPath, 'utf-8');
+    const content = readFileSync(this.internalPath, 'utf-8');
     return JSON.parse(content);
-  }
-
-  get distributePatterns(): string[] {
-    return this.data.distribute || [];
   }
 
   get internalPatterns(): string[] {
     return this.data.internal || [];
   }
 
-  get excludePatterns(): string[] {
-    return this.data.exclude || [];
-  }
-
-  isExcluded(path: string): boolean {
-    return this.excludePatterns.some(pattern => this.matches(path, pattern));
-  }
-
-  isDistributable(path: string): boolean {
-    return this.distributePatterns.some(pattern => this.matches(path, pattern));
-  }
-
+  /**
+   * Check if a file is marked as internal (should not be distributed).
+   */
   isInternal(path: string): boolean {
-    return this.internalPatterns.some(pattern => this.matches(path, pattern));
+    return this.internalPatterns.some(pattern => minimatch(path, pattern, { dot: true }));
   }
 
-  private matches(path: string, pattern: string): boolean {
-    return minimatch(path, pattern, { dot: true });
+  /**
+   * Check if a file is gitignored.
+   */
+  isGitignored(path: string): boolean {
+    return this.gitignoreFilter.isIgnored(path);
   }
 
+  /**
+   * Check if a file should be distributed.
+   * A file is distributable if it's NOT internal AND NOT gitignored.
+   */
+  isDistributable(path: string): boolean {
+    return !this.isInternal(path) && !this.isGitignored(path);
+  }
+
+  /**
+   * Get all distributable files from the allhands root.
+   * Returns files that are NOT internal AND NOT gitignored.
+   */
   getDistributableFiles(): Set<string> {
-    // Use git ls-files to respect .gitignore when in a git repo (local dev)
-    // Fall back to walkDir for npx installs (npm already excludes gitignored files)
-    let allFiles: string[];
-    if (isGitRepo(this.allhandsRoot)) {
-      allFiles = getGitFiles(this.allhandsRoot);
-    } else {
-      allFiles = [];
-      walkDir(this.allhandsRoot, (filePath) => {
-        allFiles.push(relative(this.allhandsRoot, filePath));
-      });
-    }
-
+    const allFiles = this.gitignoreFilter.getNonIgnoredFiles();
     const filtered = new Set<string>();
+
     for (const file of allFiles) {
-      if (this.isDistributable(file) && !this.isExcluded(file)) {
+      if (!this.isInternal(file)) {
         filtered.add(file);
       }
     }

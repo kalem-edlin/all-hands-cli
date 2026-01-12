@@ -15,8 +15,8 @@ export async function cmdUpdate(autoYes: boolean = false): Promise<number> {
 
   const allhandsRoot = getAllhandsRoot();
 
-  if (!existsSync(join(allhandsRoot, '.allhands-manifest.json'))) {
-    console.error(`Error: Manifest not found at ${allhandsRoot}`);
+  if (!existsSync(join(allhandsRoot, '.internal.json'))) {
+    console.error(`Error: Internal config not found at ${allhandsRoot}`);
     console.error('Set ALLHANDS_PATH to your claude-all-hands directory');
     return 1;
   }
