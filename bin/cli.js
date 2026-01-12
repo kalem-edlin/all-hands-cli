@@ -6905,11 +6905,7 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     copyFileSync(sourceFile, targetFile);
     copied++;
   }
-  const dotfileResult = restoreDotfiles(resolvedTarget);
-  if (dotfileResult.renamed.length > 0) {
-    console.log(`
-Restored ${dotfileResult.renamed.length} dotfile(s)`);
-  }
+  restoreDotfiles(resolvedTarget);
   console.log("\nSetting up envoy shell command...");
   const envoyResult = setupEnvoyShellFunction();
   if (envoyResult.added && envoyResult.shellRc) {
@@ -7058,11 +7054,7 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
       created++;
     }
   }
-  const dotfileResult = restoreDotfiles(targetRoot);
-  if (dotfileResult.renamed.length > 0) {
-    console.log(`
-Restored ${dotfileResult.renamed.length} dotfile(s)`);
-  }
+  restoreDotfiles(targetRoot);
   if (deletedInSource.length > 0) {
     console.log(`
 ${deletedInSource.length} files removed from allhands source:`);

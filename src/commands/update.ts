@@ -142,10 +142,7 @@ export async function cmdUpdate(autoYes: boolean = false): Promise<number> {
   }
 
   // Restore dotfiles (gitignore → .gitignore, etc.)
-  const dotfileResult = restoreDotfiles(targetRoot);
-  if (dotfileResult.renamed.length > 0) {
-    console.log(`\nRestored ${dotfileResult.renamed.length} dotfile(s)`);
-  }
+  restoreDotfiles(targetRoot);
 
   // Handle deleted files
   if (deletedInSource.length > 0) {

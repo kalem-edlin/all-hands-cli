@@ -166,10 +166,7 @@ export async function cmdInit(target: string, autoYes: boolean = false): Promise
 
   // Restore dotfiles (gitignore → .gitignore, etc.)
   // npm excludes these files, so we ship them without dots and rename here
-  const dotfileResult = restoreDotfiles(resolvedTarget);
-  if (dotfileResult.renamed.length > 0) {
-    console.log(`\nRestored ${dotfileResult.renamed.length} dotfile(s)`);
-  }
+  restoreDotfiles(resolvedTarget);
 
   // Setup envoy shell function
   console.log('\nSetting up envoy shell command...');
