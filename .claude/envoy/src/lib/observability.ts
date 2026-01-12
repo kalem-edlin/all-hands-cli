@@ -69,9 +69,13 @@ function ensureObservabilityDir(): void {
 
 /**
  * Recursively trim all strings in an object/array to max length.
- * Adds ellipsis when truncated.
+ * Adds ellipsis when truncated. Handles circular references.
  */
-function trimStrings(value: unknown, maxLen = MAX_LOG_STRING_LENGTH): unknown {
+function trimStrings(
+  value: unknown,
+  maxLen = MAX_LOG_STRING_LENGTH,
+  visited = new WeakSet<object>()
+): unknown {
   if (value === null || value === undefined) return value;
 
   if (typeof value === "string") {
@@ -79,13 +83,17 @@ function trimStrings(value: unknown, maxLen = MAX_LOG_STRING_LENGTH): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => trimStrings(item, maxLen));
+    if (visited.has(value)) return "[Circular Reference]";
+    visited.add(value);
+    return value.map((item) => trimStrings(item, maxLen, visited));
   }
 
   if (typeof value === "object") {
+    if (visited.has(value)) return "[Circular Reference]";
+    visited.add(value);
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
-      result[k] = trimStrings(v, maxLen);
+      result[k] = trimStrings(v, maxLen, visited);
     }
     return result;
   }
