@@ -9,9 +9,11 @@ url = data.get("tool_input", {}).get("url", "")
 if not url:
     sys.exit(0)
 
-# JSON output with additionalContext for Claude self-correction
 print(json.dumps({
-    "continue": False,
-    "additionalContext": "WebFetch blocked.\n\nMain agent: delegate to researcher agent.\nSubagent: use `envoy tavily extract \"<url>\"` instead."
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "WebFetch blocked. Main agent: delegate to researcher agent. Subagent: use `envoy tavily extract \"<url>\"` instead."
+    }
 }))
 sys.exit(0)
