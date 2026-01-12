@@ -33,9 +33,8 @@ function loadSyncConfig(cwd: string): SyncConfig | null {
   try {
     const content = readFileSync(configPath, 'utf-8');
     return JSON.parse(content);
-  } catch {
-    console.error(`Error: Failed to parse ${SYNC_CONFIG_FILENAME}`);
-    process.exit(1);
+  } catch (e) {
+    throw new Error(`Failed to parse ${SYNC_CONFIG_FILENAME}: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -287,7 +286,13 @@ export async function cmdPush(
   }
   const ghUser = prereqs.ghUser!;
 
-  const syncConfig = loadSyncConfig(cwd);
+  let syncConfig: SyncConfig | null = null;
+  try {
+    syncConfig = loadSyncConfig(cwd);
+  } catch (e) {
+    console.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
   const finalIncludes = include.length > 0 ? include : (syncConfig?.includes || []);
   const finalExcludes = exclude.length > 0 ? exclude : (syncConfig?.excludes || []);
 

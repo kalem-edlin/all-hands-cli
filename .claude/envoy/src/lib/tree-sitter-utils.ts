@@ -87,9 +87,6 @@ async function getSwiftWasmParser(): Promise<ParserData | null> {
       return null;
     }
 
-    // Set flag only after we've verified the file exists
-    swiftWasmInitialized = true;
-
     // Dynamic import web-tree-sitter (web-tree-sitter@0.25.0)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const WebTreeSitter = await import("web-tree-sitter") as any;
@@ -132,6 +129,7 @@ async function getSwiftWasmParser(): Promise<ParserData | null> {
     } as unknown as QueryConstructor;
 
     swiftWasmParser = { parser, grammar: SwiftLang, QueryClass };
+    swiftWasmInitialized = true;
     return swiftWasmParser;
   } catch (e) {
     console.error(`[Swift WASM] Failed to initialize:`, e);
