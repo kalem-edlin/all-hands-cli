@@ -3,7 +3,7 @@
  * Each run spawns a fresh server instance, executes the agent, and cleans up.
  */
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 import { createOpencode } from "@opencode-ai/sdk";
 import type { AgentConfig, AgentResult } from "./index.js";
@@ -173,7 +173,8 @@ export class AgentRunner {
   }
 
   private hasExpansionRequest(text: string): boolean {
-    return EXPANSION_PATTERN.test(text);
+    const regex = new RegExp(EXPANSION_PATTERN.source, EXPANSION_PATTERN.flags);
+    return regex.test(text);
   }
 
   private extractExpansionPaths(text: string): string[] {
@@ -190,12 +191,19 @@ export class AgentRunner {
 
   private readFiles(paths: string[]): Map<string, string | null> {
     const contents = new Map<string, string | null>();
+    const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
     for (const path of paths) {
       const fullPath = join(this.projectRoot, path);
       if (existsSync(fullPath)) {
         try {
-          contents.set(path, readFileSync(fullPath, "utf-8"));
+          const stats = statSync(fullPath);
+          if (stats.size > MAX_FILE_SIZE) {
+            const partial = readFileSync(fullPath, "utf-8").slice(0, MAX_FILE_SIZE);
+            contents.set(path, `${partial}\n\n[TRUNCATED: file exceeds 1MB limit]`);
+          } else {
+            contents.set(path, readFileSync(fullPath, "utf-8"));
+          }
         } catch {
           contents.set(path, null);
         }

@@ -76,10 +76,11 @@ class SearchCommand extends BaseCommand {
 
       // Calculate total tokens
       const totalTokens = results.reduce((sum, r) => sum + r.token_count, 0);
-      const threshold = parseInt(
+      const parsedThreshold = parseInt(
         process.env.KNOWLEDGE_AGGREGATOR_TOKEN_THRESHOLD ?? String(DEFAULT_TOKEN_THRESHOLD),
         10
       );
+      const threshold = Number.isNaN(parsedThreshold) ? DEFAULT_TOKEN_THRESHOLD : parsedThreshold;
 
       // Skip aggregation if below threshold
       if (totalTokens < threshold && !forceAggregate) {
