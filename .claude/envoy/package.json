@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "tsx src/cli.ts",
+    "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

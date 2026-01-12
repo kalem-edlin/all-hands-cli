@@ -2,9 +2,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { cmdInit } from './commands/init.js';
 import { cmdUpdate } from './commands/update.js';
-import { cmdSyncBack } from './commands/sync-back.js';
-import { cmdCheckIgnored } from './commands/check-ignored.js';
-import { checkGitInstalled, checkGhInstalled } from './lib/git.js';
+import { checkGitInstalled } from './lib/git.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -57,52 +55,6 @@ async function main() {
       },
       async (argv) => {
         const code = await cmdUpdate(argv.yes as boolean);
-        process.exit(code);
-      }
-    )
-    .command(
-      'sync-back',
-      'Sync changes back to allhands as PR',
-      (yargs) => {
-        return yargs
-          .option('auto', {
-            type: 'boolean',
-            describe: 'Non-interactive mode (for hooks/CI)',
-            default: false,
-          })
-          .option('list', {
-            type: 'boolean',
-            describe: 'List files that would sync (no PR created)',
-            default: false,
-          });
-      },
-      async (argv) => {
-        // gh CLI only needed if not --list mode
-        if (!argv.list && !checkGhInstalled()) {
-          console.error('Error: GitHub CLI (gh) is not installed. Please install it first.');
-          console.error('Visit: https://cli.github.com/');
-          process.exit(1);
-        }
-        const code = await cmdSyncBack({
-          auto: argv.auto as boolean,
-          list: argv.list as boolean,
-        });
-        process.exit(code);
-      }
-    )
-    .command(
-      'check-ignored [files..]',
-      'Filter files through .allhandsignore',
-      (yargs) => {
-        return yargs.positional('files', {
-          describe: 'Files to check',
-          type: 'string',
-          array: true,
-          default: [],
-        });
-      },
-      (argv) => {
-        const code = cmdCheckIgnored(argv.files as string[]);
         process.exit(code);
       }
     )

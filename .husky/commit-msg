@@ -1,4 +1,0 @@
-#!/bin/sh
-
-# Project-specific commit-msg
-[ -f "$(dirname "$0")/project/commit-msg" ] && . "$(dirname "$0")/project/commit-msg" "$@"

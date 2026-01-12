@@ -1,18 +1,23 @@
 /**
- * Core plan commands: init, status, check
+ * Core plan commands: init, status, check, cleanup-orphaned
  */
 
 import { Command } from "commander";
+import { readdirSync, rmSync, statSync } from "fs";
+import { join } from "path";
+import { spawnSync } from "child_process";
 import {
   ensurePlanDir,
   getBaseBranch,
   getBranch,
+  getProjectRoot,
   getPromptId,
   planExists,
   readAllPrompts,
   readPlan,
   readSummary,
   readUserInput,
+  sanitizeBranch,
 } from "../../lib/index.js";
 import { BaseCommand, CommandResult } from "../base.js";
 
@@ -130,5 +135,79 @@ export class CheckCommand extends BaseCommand {
     }
 
     return this.success(response);
+  }
+}
+
+/**
+ * Clean up orphaned plan directories (branches no longer exist).
+ */
+export class CleanupOrphanedCommand extends BaseCommand {
+  readonly name = "cleanup-orphaned";
+  readonly description = "Remove plan directories for deleted branches";
+
+  defineArguments(_cmd: Command): void {
+    // No arguments
+  }
+
+  async execute(_args: Record<string, unknown>): Promise<CommandResult> {
+    const root = getProjectRoot();
+    const plansDir = join(root, ".claude", "plans");
+
+    // Exit if plans directory doesn't exist
+    try {
+      statSync(plansDir);
+    } catch {
+      return this.success({ cleaned: [], message: "No plans directory" });
+    }
+
+    // Get all local branches (sanitized)
+    const branchResult = spawnSync("git", ["branch", "--format=%(refname:short)"], {
+      encoding: "utf-8",
+      cwd: root,
+    });
+    if (branchResult.status !== 0) {
+      return this.error("git_error", "Failed to list branches");
+    }
+
+    const localBranches = new Set(
+      branchResult.stdout
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map(sanitizeBranch)
+    );
+
+    // Find orphaned plan directories
+    const cleaned: string[] = [];
+    let entries: string[];
+    try {
+      entries = readdirSync(plansDir);
+    } catch {
+      return this.success({ cleaned: [], message: "Plans directory empty or inaccessible" });
+    }
+
+    for (const entry of entries) {
+      const entryPath = join(plansDir, entry);
+      try {
+        if (!statSync(entryPath).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+
+      // Remove if no matching branch
+      if (!localBranches.has(entry)) {
+        try {
+          rmSync(entryPath, { recursive: true, force: true });
+          cleaned.push(entry);
+        } catch {
+          // Skip if removal fails
+        }
+      }
+    }
+
+    return this.success({
+      cleaned,
+      cleaned_count: cleaned.length,
+    });
   }
 }

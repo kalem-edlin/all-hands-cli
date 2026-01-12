@@ -3,7 +3,7 @@
  */
 
 // Core commands
-export { InitCommand, StatusCommand, CheckCommand } from "./core.js";
+export { InitCommand, StatusCommand, CheckCommand, CleanupOrphanedCommand } from "./core.js";
 
 // Plan file commands
 export { WritePlanCommand, GetFullPlanCommand, AppendUserInputCommand } from "./plan-file.js";
@@ -55,7 +55,7 @@ export {
 export { ProtocolCommand, CleanupDebugLogsCommand } from "./protocols.js";
 
 // Import all command classes for COMMANDS object
-import { InitCommand, StatusCommand, CheckCommand } from "./core.js";
+import { InitCommand, StatusCommand, CheckCommand, CleanupOrphanedCommand } from "./core.js";
 import { WritePlanCommand, GetFullPlanCommand, AppendUserInputCommand } from "./plan-file.js";
 import {
   WritePromptCommand,
@@ -101,6 +101,7 @@ export const COMMANDS = {
   init: InitCommand,
   status: StatusCommand,
   check: CheckCommand,
+  "cleanup-orphaned": CleanupOrphanedCommand,
   // Plan file
   "write-plan": WritePlanCommand,
   "get-full-plan": GetFullPlanCommand,

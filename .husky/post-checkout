@@ -1,9 +1,0 @@
-#!/bin/sh
-# Clean up orphaned plan directories first
-. "$(dirname "$0")/claude/cleanup-plan.sh"
-
-# Setup plan for new branch
-. "$(dirname "$0")/claude/setup-plan.sh" "$@"
-
-# Project-specific post-checkout
-[ -f "$(dirname "$0")/project/post-checkout" ] && . "$(dirname "$0")/project/post-checkout" "$@"

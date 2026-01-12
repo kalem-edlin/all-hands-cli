@@ -8,8 +8,6 @@
     ".claude/envoy/**",
     ".claude/output-styles/**",
     ".claude/settings.json",
-    ".husky/**",
-    ".github/workflows/allhands-sync.yml",
     "CLAUDE.md",
     "CLAUDE.project.md"
   ],

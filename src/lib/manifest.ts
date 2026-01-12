@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { minimatch } from 'minimatch';
 
@@ -87,25 +87,23 @@ export class Manifest {
   }
 }
 
-export function loadIgnorePatterns(targetRoot: string): string[] {
-  const ignoreFile = join(targetRoot, '.allhandsignore');
-  if (!existsSync(ignoreFile)) {
-    return [];
+/**
+ * Compare two files byte-by-byte.
+ */
+export function filesAreDifferent(file1: string, file2: string): boolean {
+  if (!existsSync(file1) || !existsSync(file2)) {
+    return true;
   }
 
-  const content = readFileSync(ignoreFile, 'utf-8');
-  const patterns: string[] = [];
+  const stat1 = statSync(file1);
+  const stat2 = statSync(file2);
 
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      patterns.push(trimmed);
-    }
+  if (stat1.size !== stat2.size) {
+    return true;
   }
 
-  return patterns;
-}
+  const content1 = readFileSync(file1);
+  const content2 = readFileSync(file2);
 
-export function isIgnored(path: string, patterns: string[]): boolean {
-  return patterns.some(pattern => minimatch(path, pattern, { dot: true }));
+  return !content1.equals(content2);
 }

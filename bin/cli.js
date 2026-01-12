@@ -4856,9 +4856,9 @@ var Yargs = YargsFactory(esm_default);
 var yargs_default = Yargs;
 
 // src/commands/init.ts
-import { spawnSync as spawnSync2 } from "child_process";
-import { copyFileSync, existsSync as existsSync3, mkdirSync, readFileSync as readFileSync5, renameSync, writeFileSync } from "fs";
-import { dirname as dirname4, join as join2, resolve as resolve6 } from "path";
+import { appendFileSync, copyFileSync, existsSync as existsSync3, mkdirSync, readFileSync as readFileSync5, renameSync, readdirSync as readdirSync3, writeFileSync } from "fs";
+import { homedir } from "os";
+import { basename as basename2, dirname as dirname4, extname as extname2, join as join2, resolve as resolve6 } from "path";
 import * as readline from "readline";
 
 // src/lib/git.ts
@@ -4875,21 +4875,6 @@ function git(args, cwd) {
     stderr: result.stderr?.trim() || ""
   };
 }
-function getCurrentBranch(repoPath) {
-  const result = git(["rev-parse", "--abbrev-ref", "HEAD"], repoPath);
-  return result.success ? result.stdout : "";
-}
-function getRepoName(repoPath) {
-  const result = git(["remote", "get-url", "origin"], repoPath);
-  if (result.success) {
-    let name = result.stdout.split("/").pop() || "";
-    if (name.endsWith(".git")) {
-      name = name.slice(0, -4);
-    }
-    return name;
-  }
-  return repoPath.split("/").pop() || "unknown";
-}
 function getStagedFiles(repoPath) {
   const result = git(["diff", "--cached", "--name-only"], repoPath);
   if (!result.success || !result.stdout) {
@@ -4901,18 +4886,6 @@ function isGitRepo(path2) {
   const result = git(["rev-parse", "--git-dir"], path2);
   return result.success;
 }
-function ghCli(args, cwd) {
-  const result = spawnSync("gh", args, {
-    cwd,
-    encoding: "utf-8",
-    maxBuffer: 10 * 1024 * 1024
-  });
-  return {
-    success: result.status === 0,
-    stdout: result.stdout?.trim() || "",
-    stderr: result.stderr?.trim() || ""
-  };
-}
 function checkGitInstalled() {
   try {
     execSync("git --version", { stdio: "ignore" });
@@ -4921,17 +4894,9 @@ function checkGitInstalled() {
     return false;
   }
 }
-function checkGhInstalled() {
-  try {
-    execSync("gh --version", { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // src/lib/manifest.ts
-import { readFileSync as readFileSync4, existsSync, readdirSync as readdirSync2 } from "fs";
+import { readFileSync as readFileSync4, existsSync, readdirSync as readdirSync2, statSync as statSync3 } from "fs";
 import { join, relative as relative2 } from "path";
 
 // node_modules/@isaacs/balanced-match/dist/esm/index.js
@@ -6552,30 +6517,24 @@ var Manifest = class {
     }
   }
 };
-function loadIgnorePatterns(targetRoot) {
-  const ignoreFile = join(targetRoot, ".allhandsignore");
-  if (!existsSync(ignoreFile)) {
-    return [];
+function filesAreDifferent(file1, file2) {
+  if (!existsSync(file1) || !existsSync(file2)) {
+    return true;
   }
-  const content = readFileSync4(ignoreFile, "utf-8");
-  const patterns = [];
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      patterns.push(trimmed);
-    }
+  const stat1 = statSync3(file1);
+  const stat2 = statSync3(file2);
+  if (stat1.size !== stat2.size) {
+    return true;
   }
-  return patterns;
-}
-function isIgnored(path2, patterns) {
-  return patterns.some((pattern) => minimatch(path2, pattern, { dot: true }));
+  const content1 = readFileSync4(file1);
+  const content2 = readFileSync4(file2);
+  return !content1.equals(content2);
 }
 
 // src/lib/paths.ts
 import { existsSync as existsSync2 } from "fs";
 import { dirname as dirname3, resolve as resolve5 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
-var UPSTREAM_REPO = "kalem-edlin/claude-all-hands";
 function getAllhandsRoot() {
   const envPath = process.env.ALLHANDS_PATH;
   if (envPath) {
@@ -6600,19 +6559,12 @@ function getAllhandsRoot() {
 }
 
 // src/commands/init.ts
-var MIGRATION_MAP = {
-  "CLAUDE.md": "CLAUDE.project.md",
-  ".claude/settings.json": ".claude/settings.local.json"
-};
-var HUSKY_HOOKS = [
-  "pre-commit",
-  "post-merge",
-  "commit-msg",
-  "pre-push",
-  "pre-rebase",
-  "post-checkout",
-  "post-rewrite"
-];
+var ENVOY_SHELL_FUNCTION = `
+# AllHands envoy command - resolves to .claude/envoy/envoy from current directory
+envoy() {
+  "$PWD/.claude/envoy/envoy" "$@"
+}
+`;
 function syncGitignore(allhandsRoot, target) {
   const sourceGitignore = join2(allhandsRoot, ".gitignore");
   const targetGitignore = join2(target, ".gitignore");
@@ -6641,49 +6593,89 @@ function syncGitignore(allhandsRoot, target) {
   writeFileSync(targetGitignore, newContent);
   return { added: linesToAdd, unchanged: false };
 }
-async function confirm(message) {
+async function askQuestion(question) {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
   });
   return new Promise((resolve7) => {
-    rl.question(`${message} [y/N]: `, (answer) => {
+    rl.question(question, (answer) => {
       rl.close();
-      resolve7(answer.toLowerCase() === "y");
+      resolve7(answer.trim());
     });
   });
 }
-function migrateExistingFiles(target) {
-  const migrated = {};
-  for (const [orig, dest] of Object.entries(MIGRATION_MAP)) {
-    const origPath = join2(target, orig);
-    const destPath = join2(target, dest);
-    if (existsSync3(origPath) && !existsSync3(destPath)) {
-      mkdirSync(dirname4(destPath), { recursive: true });
-      renameSync(origPath, destPath);
-      migrated[orig] = dest;
-      console.log(`  Migrated: ${orig} \u2192 ${dest}`);
+async function confirm(message) {
+  const answer = await askQuestion(`${message} [y/N]: `);
+  return answer.toLowerCase() === "y";
+}
+async function askConflictResolution(conflicts) {
+  console.log(`
+${"!".repeat(60)}`);
+  console.log("CONFLICTS DETECTED - The following files differ from source:");
+  console.log(`${"!".repeat(60)}`);
+  for (const f of conflicts.sort()) {
+    console.log(`  \u2192 ${f}`);
+  }
+  console.log();
+  console.log("How would you like to handle these conflicts?");
+  console.log("  [b] Create backups (file.backup_N.ext) and overwrite");
+  console.log("  [o] Overwrite all (lose local changes)");
+  console.log("  [c] Cancel (make no changes)");
+  console.log();
+  while (true) {
+    const answer = await askQuestion("Choice [b/o/c]: ");
+    switch (answer.toLowerCase()) {
+      case "b":
+        return "backup";
+      case "o":
+        return "overwrite";
+      case "c":
+        return "cancel";
+      default:
+        console.log("Please enter b, o, or c");
     }
   }
-  const huskyDir = join2(target, ".husky");
-  const projectDir = join2(huskyDir, "project");
-  if (existsSync3(huskyDir)) {
-    for (const hook of HUSKY_HOOKS) {
-      const hookPath = join2(huskyDir, hook);
-      const projectHook = join2(projectDir, hook);
-      if (existsSync3(hookPath) && !existsSync3(projectHook)) {
-        const content = readFileSync5(hookPath, "utf-8");
-        if (content.includes("claude/") || content.includes("project/")) {
-          continue;
-        }
-        mkdirSync(projectDir, { recursive: true });
-        renameSync(hookPath, projectHook);
-        migrated[`.husky/${hook}`] = `.husky/project/${hook}`;
-        console.log(`  Migrated: .husky/${hook} \u2192 .husky/project/${hook}`);
+}
+function getNextBackupPath(filePath) {
+  const dir = dirname4(filePath);
+  const ext2 = extname2(filePath);
+  const base = basename2(filePath, ext2);
+  let n = 1;
+  if (existsSync3(dir)) {
+    const files = readdirSync3(dir);
+    const backupPattern = new RegExp(`^${base}\\.backup_(\\d+)${ext2.replace(".", "\\.")}$`);
+    for (const file of files) {
+      const match2 = file.match(backupPattern);
+      if (match2) {
+        const num = parseInt(match2[1], 10);
+        if (num >= n) n = num + 1;
       }
     }
   }
-  return migrated;
+  return join2(dir, `${base}.backup_${n}${ext2}`);
+}
+function setupEnvoyShellFunction() {
+  const shell = process.env.SHELL || "";
+  let shellRc = null;
+  if (shell.includes("zsh")) {
+    shellRc = join2(homedir(), ".zshrc");
+  } else if (shell.includes("bash")) {
+    const bashProfile = join2(homedir(), ".bash_profile");
+    const bashRc = join2(homedir(), ".bashrc");
+    shellRc = existsSync3(bashProfile) ? bashProfile : bashRc;
+  }
+  if (!shellRc) {
+    return { added: false, shellRc: null };
+  }
+  if (existsSync3(shellRc)) {
+    const content = readFileSync5(shellRc, "utf-8");
+    if (content.includes("envoy()") || content.includes(".claude/envoy/envoy")) {
+      return { added: false, shellRc };
+    }
+  }
+  appendFileSync(shellRc, ENVOY_SHELL_FUNCTION);
+  return { added: true, shellRc };
 }
 async function cmdInit(target, autoYes = false) {
   const resolvedTarget = resolve6(process.cwd(), target);
@@ -6704,40 +6696,49 @@ async function cmdInit(target, autoYes = false) {
       }
     }
   }
-  console.log("\nMigrating existing files...");
-  const migrated = migrateExistingFiles(resolvedTarget);
-  if (Object.keys(migrated).length === 0) {
-    console.log("  No files to migrate");
+  const targetClaudeMd = join2(resolvedTarget, "CLAUDE.md");
+  const targetProjectMd = join2(resolvedTarget, "CLAUDE.project.md");
+  const sourceClaudeMd = join2(allhandsRoot, "CLAUDE.md");
+  let claudeMdMigrated = false;
+  if (existsSync3(targetClaudeMd) && !existsSync3(targetProjectMd)) {
+    console.log("\nMigrating CLAUDE.md \u2192 CLAUDE.project.md...");
+    renameSync(targetClaudeMd, targetProjectMd);
+    claudeMdMigrated = true;
+    console.log("  Done - your instructions preserved in CLAUDE.project.md");
   }
-  const migratedDestinations = new Set(Object.values(migrated));
   const distributable = manifest.getDistributableFiles();
-  const willOverwrite = [];
+  const conflicts = [];
   for (const relPath of distributable) {
-    if (migratedDestinations.has(relPath)) continue;
+    if (relPath === "CLAUDE.md" && claudeMdMigrated) continue;
+    if (relPath === "CLAUDE.project.md" && claudeMdMigrated) continue;
     const sourceFile = join2(allhandsRoot, relPath);
     const targetFile = join2(resolvedTarget, relPath);
     if (existsSync3(targetFile) && existsSync3(sourceFile)) {
-      const sourceContent = readFileSync5(sourceFile);
-      const targetContent = readFileSync5(targetFile);
-      if (!sourceContent.equals(targetContent)) {
-        willOverwrite.push(relPath);
+      if (filesAreDifferent(sourceFile, targetFile)) {
+        conflicts.push(relPath);
       }
     }
   }
-  if (willOverwrite.length > 0) {
-    console.log(`
-${"!".repeat(60)}`);
-    console.log("WARNING: The following files will be OVERWRITTEN:");
-    console.log("(These files exist in target but have no migration path)");
-    console.log(`${"!".repeat(60)}`);
-    for (const f of willOverwrite.sort()) {
-      console.log(`  \u2192 ${f}`);
-    }
-    console.log();
-    if (!autoYes) {
-      if (!await confirm("Continue and overwrite these files?")) {
+  let resolution = "overwrite";
+  if (conflicts.length > 0) {
+    if (autoYes) {
+      resolution = "overwrite";
+      console.log(`
+Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
+    } else {
+      resolution = await askConflictResolution(conflicts);
+      if (resolution === "cancel") {
         console.log("Aborted. No changes made.");
         return 1;
+      }
+    }
+    if (resolution === "backup") {
+      console.log("\nCreating backups...");
+      for (const relPath of conflicts) {
+        const targetFile = join2(resolvedTarget, relPath);
+        const backupPath = getNextBackupPath(targetFile);
+        copyFileSync(targetFile, backupPath);
+        console.log(`  ${relPath} \u2192 ${basename2(backupPath)}`);
       }
     }
   }
@@ -6746,7 +6747,7 @@ ${"!".repeat(60)}`);
   let copied = 0;
   let skipped = 0;
   for (const relPath of [...distributable].sort()) {
-    if (migratedDestinations.has(relPath)) {
+    if (relPath === "CLAUDE.project.md" && claudeMdMigrated) {
       skipped++;
       continue;
     }
@@ -6755,9 +6756,7 @@ ${"!".repeat(60)}`);
     if (!existsSync3(sourceFile)) continue;
     mkdirSync(dirname4(targetFile), { recursive: true });
     if (existsSync3(targetFile)) {
-      const sourceContent = readFileSync5(sourceFile);
-      const targetContent = readFileSync5(targetFile);
-      if (sourceContent.equals(targetContent)) {
+      if (!filesAreDifferent(sourceFile, targetFile)) {
         skipped++;
         continue;
       }
@@ -6775,119 +6774,98 @@ ${"!".repeat(60)}`);
       console.log(`    + ${entry}`);
     }
   }
-  const ignoreFile = join2(resolvedTarget, ".allhandsignore");
-  if (!existsSync3(ignoreFile)) {
-    const ignoreContent = `# AllHands Ignore - Exclude files from sync-back to claude-all-hands
-# Uses gitignore-style patterns (globs supported)
-#
-# \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
-# \u2502 PROJECT-SPECIFIC (add here - stays in THIS repo only):         \u2502
-# \u2502   \u2022 Project-specific agents, skills, commands                   \u2502
-# \u2502   \u2022 Local configurations and settings                           \u2502
-# \u2502   \u2022 Domain-specific hooks                                       \u2502
-# \u2502   \u2022 Any file that only makes sense for THIS project             \u2502
-# \u251C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524
-# \u2502 SYNC BACK (do NOT add here - benefits ALL repos):              \u2502
-# \u2502   \u2022 Bug fixes to existing framework files                       \u2502
-# \u2502   \u2022 New reusable patterns/skills discovered during development  \u2502
-# \u2502   \u2022 Documentation improvements                                  \u2502
-# \u2502   \u2022 Hook/envoy enhancements                                     \u2502
-# \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518
-
-# Project-specific files (auto-added)
-CLAUDE.project.md
-.claude/settings.local.json
-.husky/project/**
-
-# Project-specific agents
-# .claude/agents/my-project-specialist.md
-
-# Project-specific skills
-# .claude/skills/my-domain-skill/**
-
-# Project-specific commands
-# .claude/commands/my-project-command.md
-`;
-    writeFileSync(ignoreFile, ignoreContent);
-    console.log("Created .allhandsignore template");
-  }
-  console.log("\nSetting up husky...");
-  const result = spawnSync2("npx", ["husky", "install"], {
-    cwd: resolvedTarget,
-    encoding: "utf-8"
-  });
-  if (result.status === 0) {
-    console.log("  Husky installed");
+  console.log("\nSetting up envoy shell command...");
+  const envoyResult = setupEnvoyShellFunction();
+  if (envoyResult.added && envoyResult.shellRc) {
+    console.log(`  Added envoy function to ${envoyResult.shellRc}`);
+    console.log("  Run `source " + envoyResult.shellRc + "` or restart terminal to use");
+  } else if (envoyResult.shellRc) {
+    console.log("  envoy function already configured");
   } else {
-    console.log("  Husky install skipped (may already be configured)");
-    if (result.stderr) {
-      console.log(`  Details: ${result.stderr.trim()}`);
-    }
-  }
-  if (!autoYes) {
-    const remoteResult = git(["remote", "get-url", "origin"], resolvedTarget);
-    const hasGitHubRemote = remoteResult.success && remoteResult.stdout.includes("github.com");
-    if (hasGitHubRemote) {
-      console.log("\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500");
-      console.log("\u{1F4E6} Auto-sync setup (optional)");
-      console.log("\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500");
-      console.log("Enable automatic sync-back to claude-all-hands on merge?");
-      console.log("This requires a GitHub PAT with repo scope.\n");
-      if (await confirm("Set up auto-sync now?")) {
-        const repoMatch = remoteResult.stdout.match(/github\.com[:/](.+?)(?:\.git)?$/);
-        const repoName = repoMatch ? repoMatch[1].replace(".git", "") : null;
-        if (repoName) {
-          console.log(`
-Setting secret for ${repoName}...`);
-          console.log("You will be prompted to enter your PAT:\n");
-          const secretResult = spawnSync2("gh", ["secret", "set", "ALL_HANDS_SYNC_TOKEN", "--repo", repoName], {
-            cwd: resolvedTarget,
-            stdio: "inherit"
-            // Pass through stdin/stdout for secure input
-          });
-          if (secretResult.status === 0) {
-            console.log("\n\u2705 Auto-sync configured! PRs will sync on merge to protected branches.");
-          } else {
-            console.log("\n\u26A0\uFE0F  Secret setup failed. You can set it manually later:");
-            console.log(`   gh secret set ALL_HANDS_SYNC_TOKEN --repo ${repoName}`);
-          }
-        }
-      } else {
-        console.log("Skipped. You can set up auto-sync later with:");
-        console.log("  gh secret set ALL_HANDS_SYNC_TOKEN --repo <your-repo>");
-      }
-    }
+    console.log("  Could not detect shell config (add manually to your shell rc):");
+    console.log('    envoy() { "$PWD/.claude/envoy/envoy" "$@"; }');
   }
   console.log(`
 ${"=".repeat(60)}`);
   console.log(`Done: ${copied} copied, ${skipped} unchanged`);
-  if (Object.keys(migrated).length > 0) {
-    console.log(`Migrated ${Object.keys(migrated).length} existing files to project-specific locations`);
+  if (claudeMdMigrated) {
+    console.log("Migrated CLAUDE.md \u2192 CLAUDE.project.md");
+  }
+  if (resolution === "backup" && conflicts.length > 0) {
+    console.log(`Created ${conflicts.length} backup file(s)`);
   }
   console.log(`${"=".repeat(60)}`);
   console.log("\nNext steps:");
   console.log("  1. Review CLAUDE.project.md for your project-specific instructions");
-  console.log("  2. Review .husky/project/ for your project-specific hooks");
-  console.log("  3. Add project-specific files to .allhandsignore");
-  console.log("  4. Commit the changes");
+  console.log("  2. Commit the changes");
   return 0;
 }
 
 // src/commands/update.ts
-import { existsSync as existsSync4, readFileSync as readFileSync6, mkdirSync as mkdirSync2, copyFileSync as copyFileSync2, unlinkSync } from "fs";
-import { join as join3, dirname as dirname5 } from "path";
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, copyFileSync as copyFileSync2, unlinkSync, readdirSync as readdirSync4, renameSync as renameSync2 } from "fs";
+import { join as join3, dirname as dirname5, basename as basename3, extname as extname3 } from "path";
 import * as readline2 from "readline";
-async function confirm2(message) {
+async function askQuestion2(question) {
   const rl = readline2.createInterface({
     input: process.stdin,
     output: process.stdout
   });
   return new Promise((resolve7) => {
-    rl.question(`${message} [y/N]: `, (answer) => {
+    rl.question(question, (answer) => {
       rl.close();
-      resolve7(answer.toLowerCase() === "y");
+      resolve7(answer.trim());
     });
   });
+}
+async function confirm2(message) {
+  const answer = await askQuestion2(`${message} [y/N]: `);
+  return answer.toLowerCase() === "y";
+}
+async function askConflictResolution2(conflicts) {
+  console.log(`
+${"!".repeat(60)}`);
+  console.log("CONFLICTS DETECTED - The following files differ from source:");
+  console.log(`${"!".repeat(60)}`);
+  for (const f of conflicts.sort()) {
+    console.log(`  \u2192 ${f}`);
+  }
+  console.log();
+  console.log("How would you like to handle these conflicts?");
+  console.log("  [b] Create backups (file.backup_N.ext) and overwrite");
+  console.log("  [o] Overwrite all (lose local changes)");
+  console.log("  [c] Cancel (make no changes)");
+  console.log();
+  while (true) {
+    const answer = await askQuestion2("Choice [b/o/c]: ");
+    switch (answer.toLowerCase()) {
+      case "b":
+        return "backup";
+      case "o":
+        return "overwrite";
+      case "c":
+        return "cancel";
+      default:
+        console.log("Please enter b, o, or c");
+    }
+  }
+}
+function getNextBackupPath2(filePath) {
+  const dir = dirname5(filePath);
+  const ext2 = extname3(filePath);
+  const base = basename3(filePath, ext2);
+  let n = 1;
+  if (existsSync4(dir)) {
+    const files = readdirSync4(dir);
+    const backupPattern = new RegExp(`^${base}\\.backup_(\\d+)${ext2.replace(".", "\\.")}$`);
+    for (const file of files) {
+      const match2 = file.match(backupPattern);
+      if (match2) {
+        const num = parseInt(match2[1], 10);
+        if (num >= n) n = num + 1;
+      }
+    }
+  }
+  return join3(dir, `${base}.backup_${n}${ext2}`);
 }
 async function cmdUpdate(autoYes = false) {
   const targetRoot = process.cwd();
@@ -6907,19 +6885,31 @@ async function cmdUpdate(autoYes = false) {
   const staged = getStagedFiles(targetRoot);
   const distributable = manifest.getDistributableFiles();
   const managedPaths = new Set(distributable);
-  const conflicts = [...staged].filter((f) => managedPaths.has(f));
-  if (conflicts.length > 0) {
+  const stagedConflicts = [...staged].filter((f) => managedPaths.has(f));
+  if (stagedConflicts.length > 0) {
     console.error("Error: Staged changes detected in managed files:");
-    for (const f of conflicts.sort()) {
+    for (const f of stagedConflicts.sort()) {
       console.error(`  - ${f}`);
     }
     console.error("\nRun 'git stash' or commit first.");
     return 1;
   }
+  const targetClaudeMd = join3(targetRoot, "CLAUDE.md");
+  const targetProjectMd = join3(targetRoot, "CLAUDE.project.md");
+  let claudeMdMigrated = false;
+  if (existsSync4(targetClaudeMd) && !existsSync4(targetProjectMd)) {
+    console.log("\nMigrating CLAUDE.md \u2192 CLAUDE.project.md...");
+    renameSync2(targetClaudeMd, targetProjectMd);
+    claudeMdMigrated = true;
+    console.log("  Done - your instructions preserved in CLAUDE.project.md");
+  }
   console.log(`Found ${distributable.size} distributable files`);
-  const willOverwrite = [];
+  const conflicts = [];
   const deletedInSource = [];
+  const projectSpecificFiles = /* @__PURE__ */ new Set(["CLAUDE.project.md", ".claude/settings.local.json"]);
   for (const relPath of distributable) {
+    if (relPath === "CLAUDE.md" && claudeMdMigrated) continue;
+    if (projectSpecificFiles.has(relPath)) continue;
     const sourceFile = join3(allhandsRoot, relPath);
     const targetFile = join3(targetRoot, relPath);
     if (!existsSync4(sourceFile)) {
@@ -6929,40 +6919,44 @@ async function cmdUpdate(autoYes = false) {
       continue;
     }
     if (existsSync4(targetFile)) {
-      const sourceContent = readFileSync6(sourceFile);
-      const targetContent = readFileSync6(targetFile);
-      if (!sourceContent.equals(targetContent)) {
-        willOverwrite.push(relPath);
+      if (filesAreDifferent(sourceFile, targetFile)) {
+        conflicts.push(relPath);
       }
     }
   }
-  if (willOverwrite.length > 0) {
-    console.log(`
-${"!".repeat(60)}`);
-    console.log("WARNING: The following files will be OVERWRITTEN:");
-    console.log(`${"!".repeat(60)}`);
-    for (const f of willOverwrite.sort()) {
-      console.log(`  \u2192 ${f}`);
-    }
-    console.log();
-    if (!autoYes) {
-      if (!await confirm2("Continue and overwrite these files?")) {
+  let resolution = "overwrite";
+  if (conflicts.length > 0) {
+    if (autoYes) {
+      resolution = "overwrite";
+      console.log(`
+Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
+    } else {
+      resolution = await askConflictResolution2(conflicts);
+      if (resolution === "cancel") {
         console.log("Aborted. No changes made.");
         return 1;
+      }
+    }
+    if (resolution === "backup") {
+      console.log("\nCreating backups...");
+      for (const relPath of conflicts) {
+        const targetFile = join3(targetRoot, relPath);
+        const backupPath = getNextBackupPath2(targetFile);
+        copyFileSync2(targetFile, backupPath);
+        console.log(`  ${relPath} \u2192 ${basename3(backupPath)}`);
       }
     }
   }
   let updated = 0;
   let created = 0;
   for (const relPath of [...distributable].sort()) {
+    if (projectSpecificFiles.has(relPath)) continue;
     const sourceFile = join3(allhandsRoot, relPath);
     const targetFile = join3(targetRoot, relPath);
     if (!existsSync4(sourceFile)) continue;
     mkdirSync2(dirname5(targetFile), { recursive: true });
     if (existsSync4(targetFile)) {
-      const sourceContent = readFileSync6(sourceFile);
-      const targetContent = readFileSync6(targetFile);
-      if (!sourceContent.equals(targetContent)) {
+      if (filesAreDifferent(sourceFile, targetFile)) {
         copyFileSync2(sourceFile, targetFile);
         updated++;
       }
@@ -6990,229 +6984,16 @@ ${deletedInSource.length} files removed from allhands source:`);
   }
   console.log(`
 Updated: ${updated}, Created: ${created}`);
+  if (claudeMdMigrated) {
+    console.log("Migrated CLAUDE.md \u2192 CLAUDE.project.md");
+  }
+  if (resolution === "backup" && conflicts.length > 0) {
+    console.log(`Created ${conflicts.length} backup file(s)`);
+  }
   console.log("\nUpdate complete!");
   console.log("\nNote: Project-specific files preserved:");
   console.log("  - CLAUDE.project.md");
   console.log("  - .claude/settings.local.json");
-  console.log("  - .husky/project/*");
-  return 0;
-}
-
-// src/commands/sync-back.ts
-import { existsSync as existsSync5, readFileSync as readFileSync7, writeFileSync as writeFileSync3, mkdirSync as mkdirSync3, readdirSync as readdirSync3, rmSync } from "fs";
-import { join as join4, relative as relative3, dirname as dirname6 } from "path";
-import { tmpdir } from "os";
-var PROTECTED_BRANCHES = /* @__PURE__ */ new Set(["main", "master", "develop", "staging", "production"]);
-function walkDir(dir, callback) {
-  if (!existsSync5(dir)) return;
-  const entries = readdirSync3(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = join4(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkDir(fullPath, callback);
-    } else if (entry.isFile()) {
-      callback(fullPath);
-    }
-  }
-}
-function getChangedManagedFiles(targetRoot, allhandsRoot, manifest, ignorePatterns) {
-  const changes = [];
-  for (const relPath of manifest.getDistributableFiles()) {
-    if (isIgnored(relPath, ignorePatterns)) continue;
-    const sourceFile = join4(allhandsRoot, relPath);
-    const targetFile = join4(targetRoot, relPath);
-    if (!existsSync5(targetFile)) continue;
-    if (!existsSync5(sourceFile)) {
-      changes.push(relPath);
-      continue;
-    }
-    const sourceContent = readFileSync7(sourceFile);
-    const targetContent = readFileSync7(targetFile);
-    if (!sourceContent.equals(targetContent)) {
-      changes.push(relPath);
-    }
-  }
-  return changes;
-}
-function getNewFilesInManagedDirs(targetRoot, allhandsRoot, manifest, ignorePatterns) {
-  const newFiles = [];
-  const claudeDir = join4(targetRoot, ".claude");
-  if (existsSync5(claudeDir)) {
-    walkDir(claudeDir, (targetFile) => {
-      const relPath = relative3(targetRoot, targetFile);
-      if (isIgnored(relPath, ignorePatterns)) return;
-      const sourceFile = join4(allhandsRoot, relPath);
-      if (!existsSync5(sourceFile) && manifest.isDistributable(relPath)) {
-        newFiles.push(relPath);
-      }
-    });
-  }
-  return newFiles;
-}
-function cloneAllhandsToTemp() {
-  const tempDir = join4(tmpdir(), `allhands-sync-${Date.now()}`);
-  console.log(`Cloning ${UPSTREAM_REPO} to temp directory...`);
-  const result = ghCli(["repo", "clone", UPSTREAM_REPO, tempDir, "--", "--depth=1"], process.cwd());
-  if (!result.success) {
-    console.error(`Failed to clone: ${result.stderr}`);
-    return null;
-  }
-  return tempDir;
-}
-function cleanupTempDir(tempDir) {
-  try {
-    rmSync(tempDir, { recursive: true, force: true });
-  } catch (e) {
-  }
-}
-async function cmdSyncBack(options = {}) {
-  const { auto = false, list = false } = options;
-  const targetRoot = process.cwd();
-  if (!isGitRepo(targetRoot)) {
-    if (!list) console.error("Error: Not in a git repository");
-    return 1;
-  }
-  const currentBranch = getCurrentBranch(targetRoot);
-  if (!currentBranch) {
-    if (auto) return 0;
-    if (!list) {
-      console.error("Error: Could not determine current branch");
-      console.error("Ensure you have at least one commit and are on a branch");
-    }
-    return 1;
-  }
-  if (auto && !PROTECTED_BRANCHES.has(currentBranch)) {
-    return 0;
-  }
-  const sourceRoot = getAllhandsRoot();
-  if (!existsSync5(join4(sourceRoot, ".allhands-manifest.json"))) {
-    if (!list) console.error(`Error: Manifest not found at ${sourceRoot}`);
-    return 1;
-  }
-  const manifest = new Manifest(sourceRoot);
-  const ignorePatterns = loadIgnorePatterns(targetRoot);
-  const changedFiles = getChangedManagedFiles(targetRoot, sourceRoot, manifest, ignorePatterns);
-  const newFiles = getNewFilesInManagedDirs(targetRoot, sourceRoot, manifest, ignorePatterns);
-  const filesToSync = [...changedFiles, ...newFiles];
-  if (list) {
-    for (const f of filesToSync) {
-      console.log(f);
-    }
-    return 0;
-  }
-  if (filesToSync.length === 0) {
-    console.log("No changes to sync back");
-    return 0;
-  }
-  const authResult = ghCli(["auth", "status"], targetRoot);
-  if (!authResult.success) {
-    console.error("Error: Not authenticated with GitHub CLI");
-    console.error("Run: gh auth login");
-    return 1;
-  }
-  const repoName = getRepoName(targetRoot);
-  const prBranch = `sync/${repoName}/${currentBranch}`;
-  console.log(`
-\u{1F4CB} Syncing ${filesToSync.length} file(s) to ${UPSTREAM_REPO}`);
-  console.log(`   Branch: ${prBranch}
-`);
-  for (const f of filesToSync) {
-    const isNew = newFiles.includes(f);
-    console.log(`   ${isNew ? "[NEW]" : "[MOD]"} ${f}`);
-  }
-  console.log();
-  const allhandsClone = cloneAllhandsToTemp();
-  if (!allhandsClone) {
-    return 1;
-  }
-  try {
-    git(["fetch", "origin"], allhandsClone);
-    const branchCheck = git(["ls-remote", "--heads", "origin", prBranch], allhandsClone);
-    const branchExists = branchCheck.stdout.includes(prBranch);
-    if (branchExists) {
-      console.log(`Checking out existing branch: ${prBranch}`);
-      git(["checkout", "-B", prBranch, `origin/${prBranch}`], allhandsClone);
-    } else {
-      console.log(`Creating new branch: ${prBranch}`);
-      git(["checkout", "-B", prBranch, "origin/main"], allhandsClone);
-    }
-    for (const relPath of filesToSync) {
-      const source = join4(targetRoot, relPath);
-      const dest = join4(allhandsClone, relPath);
-      if (existsSync5(source)) {
-        mkdirSync3(dirname6(dest), { recursive: true });
-        writeFileSync3(dest, readFileSync7(source));
-      }
-    }
-    git(["add", "-A"], allhandsClone);
-    const diffResult = git(["diff", "--cached", "--quiet"], allhandsClone);
-    if (diffResult.success) {
-      console.log("\u2705 No changes to commit (files already synced)");
-      return 0;
-    }
-    const commitMsg = `sync: ${repoName}/${currentBranch}`;
-    git(["commit", "-m", commitMsg], allhandsClone);
-    console.log(`Pushing to origin/${prBranch}...`);
-    const pushResult = git(["push", "-u", "origin", prBranch], allhandsClone);
-    if (!pushResult.success) {
-      console.error(`Push failed: ${pushResult.stderr}`);
-      return 1;
-    }
-    const prViewResult = ghCli(["pr", "view", prBranch, "--repo", UPSTREAM_REPO], allhandsClone);
-    if (prViewResult.success) {
-      console.log(`
-\u2705 PR updated: ${prBranch}`);
-      const prUrlResult = ghCli(["pr", "view", prBranch, "--repo", UPSTREAM_REPO, "--json", "url", "-q", ".url"], allhandsClone);
-      if (prUrlResult.success) {
-        console.log(`   ${prUrlResult.stdout}`);
-      }
-    } else {
-      const fileList = filesToSync.map((f) => `- \`${f}\``).join("\n");
-      const prBody = `Automated sync-back from target repository.
-
-**Source repo:** ${repoName}
-**Branch:** \`${currentBranch}\`
-**Files changed:** ${filesToSync.length}
-
-${fileList}`;
-      const prCreateResult = ghCli([
-        "pr",
-        "create",
-        "--repo",
-        UPSTREAM_REPO,
-        "--title",
-        `sync: ${repoName}/${currentBranch}`,
-        "--body",
-        prBody,
-        "--base",
-        "main",
-        "--head",
-        prBranch
-      ], allhandsClone);
-      if (prCreateResult.success) {
-        console.log(`
-\u2705 PR created: ${prCreateResult.stdout}`);
-      } else {
-        console.error(`
-\u274C PR creation failed: ${prCreateResult.stderr}`);
-        return auto ? 0 : 1;
-      }
-    }
-    return 0;
-  } finally {
-    console.log("Cleaning up temp directory...");
-    cleanupTempDir(allhandsClone);
-  }
-}
-
-// src/commands/check-ignored.ts
-function cmdCheckIgnored(files) {
-  const patterns = loadIgnorePatterns(process.cwd());
-  for (const f of files) {
-    if (!isIgnored(f, patterns)) {
-      console.log(f);
-    }
-  }
   return 0;
 }
 
@@ -7258,47 +7039,6 @@ async function main() {
     },
     async (argv2) => {
       const code = await cmdUpdate(argv2.yes);
-      process.exit(code);
-    }
-  ).command(
-    "sync-back",
-    "Sync changes back to allhands as PR",
-    (yargs) => {
-      return yargs.option("auto", {
-        type: "boolean",
-        describe: "Non-interactive mode (for hooks/CI)",
-        default: false
-      }).option("list", {
-        type: "boolean",
-        describe: "List files that would sync (no PR created)",
-        default: false
-      });
-    },
-    async (argv2) => {
-      if (!argv2.list && !checkGhInstalled()) {
-        console.error("Error: GitHub CLI (gh) is not installed. Please install it first.");
-        console.error("Visit: https://cli.github.com/");
-        process.exit(1);
-      }
-      const code = await cmdSyncBack({
-        auto: argv2.auto,
-        list: argv2.list
-      });
-      process.exit(code);
-    }
-  ).command(
-    "check-ignored [files..]",
-    "Filter files through .allhandsignore",
-    (yargs) => {
-      return yargs.positional("files", {
-        describe: "Files to check",
-        type: "string",
-        array: true,
-        default: []
-      });
-    },
-    (argv2) => {
-      const code = cmdCheckIgnored(argv2.files);
       process.exit(code);
     }
   ).demandCommand(1, "Please specify a command").strict().help().alias("h", "help").parse();

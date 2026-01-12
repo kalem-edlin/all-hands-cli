@@ -111,17 +111,6 @@ When extending envoy:
 - Follow existing command structure
 </envoy_curation>
 
-<allhands_sync>
-`.allhandsignore` excludes project-specific files from sync-back.
-
-| Sync back (framework) | Ignore (project-specific) |
-|-----------------------|---------------------------|
-| Bug fixes, reusable patterns | Custom agents/skills |
-| Doc/hook/envoy improvements | Local configs |
-
-Use .allhandsignore when curating project-specific config (unless intentional framework improvement).
-</allhands_sync>
-
 <workflow>
 1. **Identify scope**: Which orchestration domain? (CLAUDE.md, agent, skill, hook, command, envoy)
 2. **Load relevant skill**: Use assigned skills for domain-specific patterns
@@ -147,8 +136,6 @@ Use .allhandsignore when curating project-specific config (unless intentional fr
 - MUST ensure agent success criteria are complete before returning
 - Subagents CANNOT use AskUserQuestion
 
-**Sync:**
-- ALWAYS check .allhandsignore for project-specific vs framework changes
 </constraints>
 
 <success_criteria>

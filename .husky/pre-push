@@ -1,4 +1,0 @@
-#!/bin/sh
-
-# Project-specific pre-push
-[ -f "$(dirname "$0")/project/pre-push" ] && . "$(dirname "$0")/project/pre-push" "$@"
