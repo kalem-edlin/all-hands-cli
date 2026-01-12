@@ -3,6 +3,7 @@
  */
 
 import { execSync, spawnSync } from "child_process";
+import { basename } from "path";
 
 // Protected branches - no planning required
 const PROTECTED_BRANCHES = new Set([
@@ -124,6 +125,13 @@ export function getProjectRoot(): string {
   } catch {
     return cwd;
   }
+}
+
+/**
+ * Get the repo's root directory name (e.g., "claude-agents").
+ */
+export function getRepoName(): string {
+  return basename(getProjectRoot()) || "";
 }
 
 /**
