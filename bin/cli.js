@@ -6772,34 +6772,6 @@ envoy() {
   "$PWD/.claude/envoy/envoy" "$@"
 }
 `;
-function syncGitignore(allhandsRoot, target) {
-  const sourceGitignore = join5(allhandsRoot, ".gitignore");
-  const targetGitignore = join5(target, ".gitignore");
-  if (!existsSync6(sourceGitignore)) {
-    return { added: [], unchanged: true };
-  }
-  const sourceContent = readFileSync6(sourceGitignore, "utf-8");
-  const sourceLines = sourceContent.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
-  let targetLines = [];
-  let targetContent = "";
-  if (existsSync6(targetGitignore)) {
-    targetContent = readFileSync6(targetGitignore, "utf-8");
-    targetLines = targetContent.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
-  }
-  const targetSet = new Set(targetLines);
-  const linesToAdd = sourceLines.filter((line) => !targetSet.has(line));
-  if (linesToAdd.length === 0) {
-    return { added: [], unchanged: true };
-  }
-  const additions = [
-    "",
-    "# AllHands framework ignores",
-    ...linesToAdd
-  ].join("\n");
-  const newContent = targetContent.trimEnd() + additions + "\n";
-  writeFileSync(targetGitignore, newContent);
-  return { added: linesToAdd, unchanged: false };
-}
 function setupEnvoyShellFunction() {
   const shell = process.env.SHELL || "";
   let shellRc = null;
@@ -6908,16 +6880,6 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     }
     copyFileSync(sourceFile, targetFile);
     copied++;
-  }
-  console.log("\nSyncing .gitignore entries...");
-  const gitignoreResult = syncGitignore(allhandsRoot, resolvedTarget);
-  if (gitignoreResult.unchanged) {
-    console.log("  .gitignore already contains all required entries");
-  } else {
-    console.log(`  Added ${gitignoreResult.added.length} entries to .gitignore:`);
-    for (const entry of gitignoreResult.added) {
-      console.log(`    + ${entry}`);
-    }
   }
   console.log("\nSetting up envoy shell command...");
   const envoyResult = setupEnvoyShellFunction();
@@ -7169,9 +7131,8 @@ function loadSyncConfig(cwd) {
   try {
     const content = readFileSync7(configPath, "utf-8");
     return JSON.parse(content);
-  } catch {
-    console.error(`Error: Failed to parse ${SYNC_CONFIG_FILENAME}`);
-    process.exit(1);
+  } catch (e) {
+    throw new Error(`Failed to parse ${SYNC_CONFIG_FILENAME}: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 function expandGlob(pattern, baseDir) {
@@ -7369,7 +7330,13 @@ async function cmdPush(include, exclude, dryRun, titleArg, bodyArg) {
     return 1;
   }
   const ghUser = prereqs.ghUser;
-  const syncConfig = loadSyncConfig(cwd);
+  let syncConfig = null;
+  try {
+    syncConfig = loadSyncConfig(cwd);
+  } catch (e) {
+    console.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
   const finalIncludes = include.length > 0 ? include : syncConfig?.includes || [];
   const finalExcludes = exclude.length > 0 ? exclude : syncConfig?.excludes || [];
   const filesToPush = collectFilesToPush(cwd, finalIncludes, finalExcludes);

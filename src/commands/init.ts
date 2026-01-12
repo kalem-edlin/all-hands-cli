@@ -14,51 +14,6 @@ envoy() {
 }
 `;
 
-function syncGitignore(allhandsRoot: string, target: string): { added: string[]; unchanged: boolean } {
-  const sourceGitignore = join(allhandsRoot, '.gitignore');
-  const targetGitignore = join(target, '.gitignore');
-
-  if (!existsSync(sourceGitignore)) {
-    return { added: [], unchanged: true };
-  }
-
-  const sourceContent = readFileSync(sourceGitignore, 'utf-8');
-  const sourceLines = sourceContent
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('#'));
-
-  let targetLines: string[] = [];
-  let targetContent = '';
-
-  if (existsSync(targetGitignore)) {
-    targetContent = readFileSync(targetGitignore, 'utf-8');
-    targetLines = targetContent
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#'));
-  }
-
-  const targetSet = new Set(targetLines);
-  const linesToAdd = sourceLines.filter((line) => !targetSet.has(line));
-
-  if (linesToAdd.length === 0) {
-    return { added: [], unchanged: true };
-  }
-
-  // Add missing lines with a header comment
-  const additions = [
-    '',
-    '# AllHands framework ignores',
-    ...linesToAdd,
-  ].join('\n');
-
-  const newContent = targetContent.trimEnd() + additions + '\n';
-  writeFileSync(targetGitignore, newContent);
-
-  return { added: linesToAdd, unchanged: false };
-}
-
 function setupEnvoyShellFunction(): { added: boolean; shellRc: string | null } {
   const shell = process.env.SHELL || '';
   let shellRc: string | null = null;
@@ -206,18 +161,6 @@ export async function cmdInit(target: string, autoYes: boolean = false): Promise
 
     copyFileSync(sourceFile, targetFile);
     copied++;
-  }
-
-  // Sync .gitignore entries
-  console.log('\nSyncing .gitignore entries...');
-  const gitignoreResult = syncGitignore(allhandsRoot, resolvedTarget);
-  if (gitignoreResult.unchanged) {
-    console.log('  .gitignore already contains all required entries');
-  } else {
-    console.log(`  Added ${gitignoreResult.added.length} entries to .gitignore:`);
-    for (const entry of gitignoreResult.added) {
-      console.log(`    + ${entry}`);
-    }
   }
 
   // Setup envoy shell function
