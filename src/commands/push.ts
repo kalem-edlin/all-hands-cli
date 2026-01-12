@@ -8,7 +8,7 @@ import { checkGhAuth, checkGhInstalled, getGhUser, gh } from '../lib/gh.js';
 import { Manifest, filesAreDifferent } from '../lib/manifest.js';
 import { getAllhandsRoot, UPSTREAM_REPO } from '../lib/paths.js';
 import { askQuestion, confirm } from '../lib/ui.js';
-import { SYNC_CONFIG_FILENAME } from '../lib/constants.js';
+import { PUSH_BLOCKLIST, SYNC_CONFIG_FILENAME } from '../lib/constants.js';
 import { walkDir } from '../lib/fs-utils.js';
 
 interface SyncConfig {
@@ -113,6 +113,9 @@ function collectFilesToPush(
   const filesToPush: FileEntry[] = [];
 
   for (const relPath of upstreamFiles) {
+    if (PUSH_BLOCKLIST.includes(relPath)) {
+      continue;
+    }
     if (finalExcludes.some((pattern) => minimatch(relPath, pattern, { dot: true }))) {
       continue;
     }
@@ -128,6 +131,7 @@ function collectFilesToPush(
   for (const pattern of finalIncludes) {
     const matchedFiles = expandGlob(pattern, cwd);
     for (const relPath of matchedFiles) {
+      if (PUSH_BLOCKLIST.includes(relPath)) continue;
       if (filesToPush.some((f) => f.path === relPath)) continue;
       filesToPush.push({ path: relPath, type: 'A' });
     }
