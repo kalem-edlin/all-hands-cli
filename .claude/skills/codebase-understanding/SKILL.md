@@ -48,7 +48,7 @@ When total tokens exceed threshold, an aggregator synthesizes context:
   "insight": "Codebase-grounded answer: what pattern exists, why chosen, how used. References specific files.",
   "lsp_entry_points": [
     { "file": "src/lib/retry.ts", "symbol": "withRetry", "why": "Core retry implementation with backoff" },
-    { "file": "src/lib/errors.ts", "symbol": "isRetryable", "why": "Determines which errors trigger retry" }
+    { "file": "src/lib/errors.ts", "symbol": null, "why": "Error type definitions (no specific symbol)" }
   ],
   "design_notes": ["Least-privilege tooling: agents receive only tools for their function"]
 }
@@ -68,10 +68,13 @@ When tokens below threshold, returns raw search results:
 {
   "aggregated": false,
   "total_tokens": 1200,
+  "threshold": 3500,
+  "result_count": 1,
   "results": [
     {
       "resource_path": "docs/patterns/error-handling.md",
       "similarity": 0.85,
+      "token_count": 450,
       "description": "Error handling patterns for external APIs",
       "relevant_files": ["src/lib/retry.ts"],
       "full_resource_context": "---\ndescription: ...\n---\n\n# Full doc with [ref:path:symbol:hash]..."
