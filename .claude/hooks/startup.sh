@@ -59,4 +59,4 @@ if [ -n "$branch" ]; then
     fi
 fi
 
-echo "You are the Main Agent - Main Agent Rules apply to you"
+echo "You are the Main Agent subject to Main Agent Rules. Remember the date is: $(date)"
