@@ -43,7 +43,7 @@ export interface AggregatorInput {
 // Knowledge aggregator output
 export interface AggregatorOutput {
   insight: string;
-  references: Array<{
+  lsp_entry_points: Array<{
     file: string;
     symbol: string | null;
     why: string;

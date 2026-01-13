@@ -31,7 +31,7 @@ Return ONLY valid JSON:
 ```json
 {
   "insight": "Codebase-grounded answer: what pattern exists, why it was chosen, how it's used. Include best practices if query implies implementation intent. 2-4 sentences max.",
-  "references": [
+  "lsp_entry_points": [
     {
       "file": "path/to/implementation.ts",
       "symbol": "functionOrClassName",
@@ -50,7 +50,7 @@ Return ONLY valid JSON:
 - Mention specific files/patterns by name
 - Include "best practice: X" when docs encode conventions
 
-**references** (max 5, ranked by relevance):
+**lsp_entry_points** (max 5, ranked by relevance):
 - `file`: Path to code file (from doc's `relevant_files` or inline references like `[ref:path:symbol:hash]`)
 - `symbol`: Function/class/variable name if known from doc references, null otherwise
 - `why`: One sentence - why should they look here? What will they find?

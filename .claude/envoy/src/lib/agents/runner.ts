@@ -3,11 +3,11 @@
  * Each run spawns a fresh server instance, executes the agent, and cleans up.
  */
 
+import { createOpencode } from "@opencode-ai/sdk";
 import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
-import { createOpencode } from "@opencode-ai/sdk";
-import type { AgentConfig, AgentResult } from "./index.js";
 import { logCommandComplete, logCommandStart } from "../observability.js";
+import type { AgentConfig, AgentResult } from "./index.js";
 
 const MAX_EXPANSIONS = 3;
 const EXPANSION_PATTERN = /^EXPAND:\s*(.+)$/gm;

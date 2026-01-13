@@ -4,174 +4,161 @@ description: Semantic codebase exploration using knowledge base + LSP. Use for c
 ---
 
 <objective>
-Enable context-efficient codebase exploration by leveraging semantic knowledge search before raw file reads. Knowledge docs capture motivations and design decisions that grep/glob cannot surface. File references in results guide targeted code exploration via LSP or direct reads.
+Enable context-efficient codebase exploration: knowledge search → LSP symbol navigation → targeted reads. Minimize context window consumption while maximizing understanding.
 </objective>
 
-<motivation>
-Traditional search (grep, glob) finds **what** exists but not **why**. Knowledge base docs encode:
-- Design motivations and tradeoffs
-- Pattern explanations with rationale
-- Cross-cutting concerns that span multiple files
-- "How we do X" institutional knowledge
+<north_star>
+**LSP symbols are the primary navigation mechanism.** Knowledge search surfaces relevant docs with file references → LSP explores those symbols → full reads only when necessary.
 
-Searching knowledge first provides semantic context that informs subsequent code exploration. File references embedded in knowledge docs point to implementations, enabling LSP-guided exploration that minimizes context consumption.
-</motivation>
+Flow: User Task → Knowledge Search → LSP on Referenced Symbols → Full Reads if Needed
+</north_star>
 
-<quick_start>
+<input_guidance>
+Queries should be **complete sentences** with full context, not minimal keywords. RAG performs better with rich semantic content.
+
 ```bash
-# Semantic search - use full descriptive phrases, not keywords
-envoy knowledge search "how does retry logic handle rate limits in external API calls"
+# GOOD - complete question with context
+envoy knowledge search "how does the retry mechanism handle rate limits when calling external APIs"
 
-# NOT: envoy knowledge search "retry rate limit"
+# BAD - keyword soup
+envoy knowledge search "retry rate limit api"
 ```
 
-Result interpretation:
-- **High similarity (>0.8)**: Full `full_resource_context` included - read directly
-- **Lower similarity**: Only `description` provided - may need `envoy knowledge read <path>` for full content
-</quick_start>
+For **non trivial discovery needs**, break into multiple parallel searches:
+```bash
+# Run these as background tasks, aggregate results
+envoy knowledge search "what constraints govern external API error handling" &
+envoy knowledge search "how do we implement backoff strategies for retries" &
+envoy knowledge search "what patterns exist for rate limit detection" &
+```
 
-<constraints>
-- Use full phrases for semantic search, not keywords
-- Always check file references in results before doing raw codebase searches
-- LSP required when symbol references present (context-light first)
-- Estimate context cost before large file reads
-</constraints>
+Simple queries don't need splitting—use judgment on complexity.
+</input_guidance>
+
+<result_types>
+Knowledge search returns one of two formats based on result token count (~3500 token threshold):
+
+### Aggregated Results (Most Common)
+
+When total tokens exceed threshold, an aggregator synthesizes context:
+
+```json
+{
+  "aggregated": true,
+  "insight": "Codebase-grounded answer: what pattern exists, why chosen, how used. References specific files.",
+  "lsp_entry_points": [
+    { "file": "src/lib/retry.ts", "symbol": "withRetry", "why": "Core retry implementation with backoff" },
+    { "file": "src/lib/errors.ts", "symbol": "isRetryable", "why": "Determines which errors trigger retry" }
+  ],
+  "design_notes": ["Least-privilege tooling: agents receive only tools for their function"]
+}
+```
+
+**Using aggregated results:**
+1. Read `insight` for semantic understanding (the "why")
+2. Use `lsp_entry_points` for navigation—pre-identified targets with rationale in `why`
+3. `design_notes` capture architectural decisions from docs
+4. Only read full files if LSP exploration reveals need
+
+### Direct Results (Below Token Threshold)
+
+When tokens below threshold, returns raw search results:
+
+```json
+{
+  "aggregated": false,
+  "total_tokens": 1200,
+  "results": [
+    {
+      "resource_path": "docs/patterns/error-handling.md",
+      "similarity": 0.85,
+      "description": "Error handling patterns for external APIs",
+      "relevant_files": ["src/lib/retry.ts"],
+      "full_resource_context": "---\ndescription: ...\n---\n\n# Full doc with [ref:path:symbol:hash]..."
+    }
+  ]
+}
+```
+
+**Using direct results:**
+1. `full_resource_context` included when similarity ≥ 0.82
+2. Lower similarity entries have only `description`—read `resource_path` if relevant
+3. `relevant_files` from frontmatter provide starting points
+4. Extract inline refs: `[ref:path:symbol:hash]` → LSP first; `[ref:path::hash]` → direct read OK
+</result_types>
+
+<lsp_operations>
+Match LSP operation to your information need:
+
+| Need | Operation | When to Use |
+|------|-----------|-------------|
+| Find callers | `incomingCalls` | Understanding usage patterns |
+| Get signature | `hover` | Quick type/doc check before read |
+| Jump to source | `goToDefinition` | Navigate to implementation |
+| Find all uses | `findReferences` | Impact analysis (heavier than incomingCalls) |
+| File structure | `documentSymbol` | Understand file layout before reading |
+
+**Example from aggregated result:**
+```bash
+# Result gave lsp_entry_point: { file: "retry.ts", symbol: "withRetry", why: "Core retry implementation" }
+
+LSP hover retry.ts:78 → signature: withRetry<T>(fn: () => Promise<T>, opts?: RetryOptions): Promise<T>
+LSP incomingCalls retry.ts:78 → 6 callers in gemini.ts, 2 in anthropic.ts
+
+# Only now, if needed:
+Read retry.ts lines 78-120 (just the function, not whole file)
+```
+</lsp_operations>
 
 <workflow>
-### 1. Semantic Search First
+### 1. Search Knowledge
 ```bash
-envoy knowledge search "<descriptive question about the requirement or concept>"
+envoy knowledge search "<complete sentence describing what you need to understand>"
 ```
 
-### 2. Interpret Results
+### 2. Process Results
 
-**High-confidence matches** return full content:
-```json
-{
-  "similarity": 0.85,
-  "full_resource_context": "---\ndescription: ...\n---\n\n# Full doc content..."
-}
-```
+**If aggregated:** Follow `lsp_entry_points` directly—`why` field guides investigation priority.
 
-**Lower-confidence matches** return descriptions only:
-```json
-{
-  "similarity": 0.72,
-  "description": "Brief description of what the doc covers"
-}
-```
+**If direct:** Use `relevant_files` from frontmatter + extract `[ref:...]` blocks from `full_resource_context`.
 
-If description seems relevant, fetch full content:
-```bash
-envoy knowledge read "docs/path/to/file.md"
-```
+### 3. LSP Before Reads
 
-### 3. Follow File References
+For any file reference with a symbol:
+1. `hover` for quick signature check
+2. `incomingCalls` or `findReferences` for usage context
+3. Read only the relevant lines, not entire files
 
-Knowledge docs embed file references in two forms:
+### 4. Full Reads (Last Resort)
 
-**Path + Symbol** (LSP required):
-```
-[ref:.claude/envoy/src/lib/retry.ts:withRetry:fc672da]
-```
-→ Use LSP to explore symbol before reading file
-
-**Path Only** (direct read permitted):
-```
-[ref:.claude/envoy/src/commands/gemini.ts::fc672da]
-```
-→ Full file read acceptable
-
-### 4. LSP Exploration (when symbol present)
-
-Match LSP operation to information need:
-
-| Need | LSP Operation |
-|------|---------------|
-| Find callers/usage | `incomingCalls` |
-| Find dependants | `findReferences` |
-| Get signature/types | `hover` |
-| Jump to definition | `goToDefinition` |
-| All symbols in file | `documentSymbol` |
-
-**Example flow**:
-```bash
-# 1. Find symbol location
-LSP goToDefinition → retry.ts:78
-
-# 2. Understand usage patterns
-LSP incomingCalls → 6 callers in gemini.ts
-
-# 3. Only then read relevant implementation
-Read retry.ts (lines 78-120)
-```
-
-### 5. Context-Aware Reading
-
-After LSP exploration, read only what's needed:
-- Specific function/class implementations
-- Caller contexts that inform usage patterns
-- Avoid reading entire files when LSP provides structure
+Only read full files when:
+- LSP exploration reveals complex implementation needs investigation
+- Path-only references (no symbol to LSP into)
+- Aggregated result doesn't include LSP entry points
 </workflow>
-
-<examples>
-<example name="Investigating retry patterns">
-```bash
-# 1. Semantic search
-envoy knowledge search "how do we handle retries for external API calls in envoy"
-
-# Result includes ref: .claude/envoy/src/lib/retry.ts:withRetry:fc672da
-
-# 2. LSP exploration
-LSP documentSymbol retry.ts → find withRetry at line 78
-LSP incomingCalls line 78 → 6 callers in gemini.ts
-
-# 3. Targeted read
-Read retry.ts lines 36-125 (isRetryableError + withRetry only)
-```
-</example>
-
-<example name="Understanding protocol extension">
-```bash
-# 1. Semantic search
-envoy knowledge search "how are protocols maintained for reusability and extension"
-
-# Result includes full context explaining:
-# - extends keyword for inheritance
-# - Step numbering (6.1, 6.2 for insertions, 6+ for augments)
-# - File refs to protocols/debugging.yaml, protocols/implementation.yaml
-
-# 2. Path-only reference → direct read
-Read .claude/protocols/debugging.yaml (extends field visible)
-```
-</example>
 
 <decision_tree>
 ```
 Need codebase context?
-├─ Know specific file/symbol? → Read/LSP directly
-├─ Conceptual question? → envoy knowledge search
-│   ├─ High similarity result? → Use full_resource_context
-│   └─ Lower similarity? → envoy knowledge read if relevant
-│       └─ File references in result?
-│           ├─ Has symbol (path:symbol:hash)? → LSP first
-│           └─ Path only (path::hash)? → Direct read OK
-└─ No knowledge matches? → Fallback to grep/glob
+├─ Know exact file/symbol? → LSP directly, skip knowledge search
+└─ Conceptual/discovery question? → envoy knowledge search
+    ├─ Aggregated result? → Follow lsp_entry_points (why field = priority)
+    └─ Direct result? → relevant_files + [ref:...] blocks → LSP on symbols
+        └─ Still need more? → envoy knowledge read <resource_path>
 ```
 </decision_tree>
-</examples>
 
 <anti_patterns>
-- Using keywords instead of descriptive phrases in knowledge search
-- Reading entire files when LSP can provide structure first
-- Skipping knowledge search and going straight to grep
-- Ignoring file references and re-searching codebase
-- Using findReferences when incomingCalls would suffice (findReferences includes definition)
+- Keyword queries instead of complete sentences
+- Reading files before LSP exploration of symbols
+- Skipping knowledge search for codebase exploration
+- Ignoring provided `lsp_entry_points` in aggregated results
+- Using `findReferences` when `incomingCalls` suffices
 </anti_patterns>
 
 <success_criteria>
-- Knowledge search invoked before raw codebase exploration
-- File references from knowledge docs used to guide code exploration
-- LSP used for symbol references before large file reads
-- Design motivations ("why") understood alongside implementation ("what")
+- Knowledge search invoked with complete sentence queries
+- LSP used on symbol references before file reads
+- Aggregated result entry points followed directly
+- Context window stays minimal through targeted reads
 </success_criteria>

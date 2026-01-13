@@ -7,19 +7,19 @@
  *   envoy knowledge reindex-from-changes [--files <json_array>]
  */
 
+import { spawnSync } from "child_process";
+import { Command } from "commander";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { Command } from "commander";
-import { spawnSync } from "child_process";
-import { BaseCommand, CommandResult } from "./base.js";
-import { KnowledgeService, type FileChange } from "../lib/knowledge.js";
 import {
   AgentRunner,
   type AggregatorOutput,
   type SearchResult,
 } from "../lib/agents/index.js";
 import { getBaseBranch } from "../lib/git.js";
+import { KnowledgeService, type FileChange } from "../lib/knowledge.js";
+import { BaseCommand, CommandResult } from "./base.js";
 
 const getProjectRoot = (): string => {
   return process.env.PROJECT_ROOT || process.cwd();
@@ -187,7 +187,7 @@ class SearchCommand extends BaseCommand {
         return this.success({
           aggregated: true,
           insight: result.data.insight,
-          references: result.data.references,
+          lsp_entry_points: result.data.lsp_entry_points,
           design_notes: result.data.design_notes,
           metadata: result.metadata,
         });
