@@ -218,7 +218,7 @@ Commit ALL documentation changes from parallel writers:
 Update semantic search index with new documentation:
 
 ```bash
-envoy knowledge reindex-from-changes
+envoy knowledge docs reindex-from-changes
 ```
 
 Command auto-detects doc changes from git merge-base. README.md files excluded automatically.
@@ -256,7 +256,7 @@ Report completion with PR link.
 
 <constraints>
 - MUST NOT perform codebase discovery - delegate ALL discovery to taxonomist
-- MUST NOT run envoy docs tree, envoy docs complexity, or envoy knowledge search
+- MUST NOT run envoy docs tree, envoy docs complexity, or envoy knowledge docs search
 - MUST verify clean git state before documentation (ensure_committed_state step)
 - MUST only create docs branch if already on base branch
 - MUST delegate to taxonomist for init workflow (assignments)

@@ -168,7 +168,7 @@ Documentation may already exist for concepts you're assigned to cover. This is c
 1. Search existing knowledge:
 
    ```bash
-   envoy knowledge search "<concept>" --metadata-only
+   envoy knowledge docs search "<concept>" --metadata-only
    ```
 
 2. If concept already documented:
@@ -261,7 +261,7 @@ coverage_gaps: [] # any source dirs or tech not covered
 1. **Check existing documentation:**
 
    ```bash
-   envoy knowledge search "<domain> <subdomain>" --metadata-only
+   envoy knowledge docs search "<domain> <subdomain>" --metadata-only
    ```
 
    - Understand existing knowledge
@@ -492,7 +492,7 @@ Adjust structure based on topic. The structure serves knowledge transfer, not co
 |---------|---------|
 | `envoy docs format-reference <file> <symbol>` | Get symbol ref: `[ref:file:symbol:hash]` |
 | `envoy docs format-reference <file>` | Get file-only ref: `[ref:file::hash]` |
-| `envoy knowledge search "<query>"` | Find existing knowledge |
+| `envoy knowledge docs search "<query>"` | Find existing knowledge |
 </envoy_commands>
 
 <constraints>

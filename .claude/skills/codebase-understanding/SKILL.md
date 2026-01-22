@@ -18,18 +18,18 @@ Queries should be **complete sentences** with full context, not minimal keywords
 
 ```bash
 # GOOD - complete question with context
-envoy knowledge search "how does the retry mechanism handle rate limits when calling external APIs"
+envoy knowledge docs search "how does the retry mechanism handle rate limits when calling external APIs"
 
 # BAD - keyword soup
-envoy knowledge search "retry rate limit api"
+envoy knowledge docs search "retry rate limit api"
 ```
 
 For **non trivial discovery needs**, break into multiple parallel searches:
 ```bash
 # Run these as background tasks, aggregate results
-envoy knowledge search "what constraints govern external API error handling" &
-envoy knowledge search "how do we implement backoff strategies for retries" &
-envoy knowledge search "what patterns exist for rate limit detection" &
+envoy knowledge docs search "what constraints govern external API error handling" &
+envoy knowledge docs search "how do we implement backoff strategies for retries" &
+envoy knowledge docs search "what patterns exist for rate limit detection" &
 ```
 
 Simple queries don't need splitting—use judgment on complexity.
@@ -116,7 +116,7 @@ Read retry.ts lines 78-120 (just the function, not whole file)
 <workflow>
 ### 1. Search Knowledge
 ```bash
-envoy knowledge search "<complete sentence describing what you need to understand>"
+envoy knowledge docs search "<complete sentence describing what you need to understand>"
 ```
 
 ### 2. Process Results
@@ -144,7 +144,7 @@ Only read full files when:
 ```
 Need codebase context?
 ├─ Know exact file/symbol? → LSP directly, skip knowledge search
-└─ Conceptual/discovery question? → envoy knowledge search
+└─ Conceptual/discovery question? → envoy knowledge docs search
     ├─ Aggregated result? → Follow lsp_entry_points (why field = priority)
     └─ Direct result? → relevant_files + [ref:...] blocks → LSP on symbols
         └─ Still need more? → envoy knowledge read <resource_path>

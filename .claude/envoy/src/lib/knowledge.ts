@@ -58,14 +58,25 @@ interface IndexConfig {
   hasFrontmatter: boolean;
 }
 
-// Docs index configuration (only supported index)
-const DOCS_CONFIG: IndexConfig = {
-  name: "docs",
-  paths: ["docs/"],
-  extensions: [".md"],
-  description: "Project documentation",
-  hasFrontmatter: true,
+// Index configurations
+const INDEX_CONFIGS: Record<string, IndexConfig> = {
+  docs: {
+    name: "docs",
+    paths: ["docs/"],
+    extensions: [".md"],
+    description: "Project documentation",
+    hasFrontmatter: true,
+  },
+  specs: {
+    name: "specs",
+    paths: ["specs/"],
+    extensions: [".md"],
+    description: "Product specifications and requirements",
+    hasFrontmatter: true,
+  },
 };
+
+export type IndexName = keyof typeof INDEX_CONFIGS;
 
 // Environment config with defaults
 const SEARCH_SIMILARITY_THRESHOLD = parseFloat(
@@ -217,13 +228,24 @@ export class KnowledgeService {
   }
 
   /**
-   * Get index file paths
+   * Get index file paths for a specific index
    */
-  private getIndexPaths(): { index: string; meta: string } {
+  private getIndexPaths(indexName: IndexName): { index: string; meta: string } {
     return {
-      index: join(this.knowledgeDir, "docs.usearch"),
-      meta: join(this.knowledgeDir, "docs.meta.json"),
+      index: join(this.knowledgeDir, `${indexName}.usearch`),
+      meta: join(this.knowledgeDir, `${indexName}.meta.json`),
     };
+  }
+
+  /**
+   * Get config for a specific index
+   */
+  private getIndexConfig(indexName: IndexName): IndexConfig {
+    const config = INDEX_CONFIGS[indexName];
+    if (!config) {
+      throw new Error(`Unknown index: ${indexName}. Available: ${Object.keys(INDEX_CONFIGS).join(", ")}`);
+    }
+    return config;
   }
 
   /**
@@ -254,8 +276,8 @@ export class KnowledgeService {
   /**
    * Load index + metadata from disk
    */
-  async loadIndex(): Promise<{ index: Index; meta: IndexMetadata }> {
-    const paths = this.getIndexPaths();
+  async loadIndex(indexName: IndexName): Promise<{ index: Index; meta: IndexMetadata }> {
+    const paths = this.getIndexPaths(indexName);
 
     if (!existsSync(paths.index) || !existsSync(paths.meta)) {
       return {
@@ -274,9 +296,9 @@ export class KnowledgeService {
   /**
    * Save index + metadata to disk
    */
-  async saveIndex(index: Index, meta: IndexMetadata): Promise<void> {
+  async saveIndex(indexName: IndexName, index: Index, meta: IndexMetadata): Promise<void> {
     this.ensureDir();
-    const paths = this.getIndexPaths();
+    const paths = this.getIndexPaths(indexName);
 
     meta.lastUpdated = new Date().toISOString();
     index.save(paths.index);
@@ -381,11 +403,14 @@ export class KnowledgeService {
   }
 
   /**
-   * Search docs index with similarity computation
+   * Search an index with similarity computation
+   * @param indexName - Which index to search (docs, specs)
+   * @param query - Search query
+   * @param k - Max results to return
    * @param metadataOnly - If true, only return file paths and descriptions (no full_resource_context)
    */
-  async search(query: string, k: number = 50, metadataOnly: boolean = false): Promise<SearchResult[]> {
-    const { index, meta } = await this.loadIndex();
+  async search(indexName: IndexName, query: string, k: number = 50, metadataOnly: boolean = false): Promise<SearchResult[]> {
+    const { index, meta } = await this.loadIndex(indexName);
 
     if (Object.keys(meta.documents).length === 0) {
       return [];
@@ -444,19 +469,20 @@ export class KnowledgeService {
   }
 
   /**
-   * Full reindex of docs
+   * Full reindex of a specific index
    */
-  async reindexAll(): Promise<ReindexResult> {
+  async reindexAll(indexName: IndexName): Promise<ReindexResult> {
     this.ensureDir();
+    const config = this.getIndexConfig(indexName);
     const startTime = Date.now();
-    console.error("[knowledge] Reindexing docs...");
+    console.error(`[knowledge] Reindexing ${indexName}...`);
 
     // Create fresh index
     const index = this.createIndex();
     const meta = this.createEmptyMetadata();
 
     // Discover and index files
-    const files = this.discoverFiles(DOCS_CONFIG);
+    const files = this.discoverFiles(config);
     console.error(`[knowledge] Found ${files.length} files`);
     let totalTokens = 0;
 
@@ -482,7 +508,7 @@ export class KnowledgeService {
     }
 
     // Save
-    await this.saveIndex(index, meta);
+    await this.saveIndex(indexName, index, meta);
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[knowledge] Reindex complete: ${files.length} files, ${totalTokens} tokens in ${duration}s`);
 
@@ -493,25 +519,37 @@ export class KnowledgeService {
   }
 
   /**
-   * Incremental reindex from changed files
+   * Reindex all configured indexes
    */
-  async reindexFromChanges(changes: FileChange[]): Promise<{
+  async reindexAllIndexes(): Promise<Record<string, ReindexResult>> {
+    const results: Record<string, ReindexResult> = {};
+    for (const indexName of Object.keys(INDEX_CONFIGS) as IndexName[]) {
+      results[indexName] = await this.reindexAll(indexName);
+    }
+    return results;
+  }
+
+  /**
+   * Incremental reindex from changed files for a specific index
+   */
+  async reindexFromChanges(indexName: IndexName, changes: FileChange[]): Promise<{
     success: boolean;
     message: string;
     files: { path: string; action: string }[];
   }> {
-    console.error(`[knowledge] Incremental reindex: ${changes.length} change(s)`);
+    const config = this.getIndexConfig(indexName);
+    console.error(`[knowledge] Incremental reindex (${indexName}): ${changes.length} change(s)`);
     const startTime = Date.now();
 
-    const { index, meta } = await this.loadIndex();
+    const { index, meta } = await this.loadIndex(indexName);
     const processedFiles: { path: string; action: string }[] = [];
 
     for (const change of changes) {
       const { path, added, deleted, modified } = change;
 
-      // Check if file matches docs config (excluding README.md)
-      const matchesConfig = DOCS_CONFIG.paths.some((p: string) => path.startsWith(p)) &&
-        DOCS_CONFIG.extensions.includes(extname(path)) &&
+      // Check if file matches config (excluding README.md)
+      const matchesConfig = config.paths.some((p: string) => path.startsWith(p)) &&
+        config.extensions.includes(extname(path)) &&
         basename(path) !== "README.md";
 
       if (!matchesConfig) continue;
@@ -554,7 +592,7 @@ export class KnowledgeService {
     }
 
     // Save updated index
-    await this.saveIndex(index, meta);
+    await this.saveIndex(indexName, index, meta);
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[knowledge] Incremental reindex complete: ${processedFiles.length} file(s) in ${duration}s`);
 
@@ -566,13 +604,32 @@ export class KnowledgeService {
   }
 
   /**
-   * Check if docs index exists
+   * Check if a specific index exists
    */
-  async checkIndex(): Promise<{ exists: boolean }> {
-    const paths = this.getIndexPaths();
+  async checkIndex(indexName: IndexName): Promise<{ exists: boolean }> {
+    const paths = this.getIndexPaths(indexName);
     return { exists: existsSync(paths.index) && existsSync(paths.meta) };
+  }
+
+  /**
+   * Check status of all indexes
+   */
+  async checkAllIndexes(): Promise<Record<string, { exists: boolean }>> {
+    const results: Record<string, { exists: boolean }> = {};
+    for (const indexName of Object.keys(INDEX_CONFIGS) as IndexName[]) {
+      results[indexName] = await this.checkIndex(indexName);
+    }
+    return results;
+  }
+
+  /**
+   * Get available index names
+   */
+  static getIndexNames(): string[] {
+    return Object.keys(INDEX_CONFIGS);
   }
 }
 
+export { INDEX_CONFIGS };
 export type { DocumentMeta, FileChange, IndexMetadata, ReindexResult, SearchResult };
 

@@ -4,10 +4,10 @@
   "description": "CLI for syncing Claude agent configurations to all-hands repository",
   "type": "module",
   "bin": {
-    "claude-all-hands": "./bin/cli.js"
+    "claude-all-hands": "./bin/sync-cli.js"
   },
   "scripts": {
-    "build": "esbuild src/cli.ts --bundle --platform=node --target=node18 --outfile=bin/cli.js --format=esm --banner:js=\"#!/usr/bin/env node\"",
+    "build": "esbuild src/sync-cli.ts --bundle --platform=node --target=node18 --outfile=bin/sync-cli.js --format=esm --banner:js=\"#!/usr/bin/env node\"",
     "dev": "npm run build -- --watch",
     "prepublishOnly": "npm run build"
   },

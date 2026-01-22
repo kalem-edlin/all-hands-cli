@@ -250,7 +250,7 @@ uncovered_domains: [] # domains that couldn't fit in 15-agent limit
    e. **Existing knowledge check:**
 
    ```bash
-   envoy knowledge search "<domain_name>" --metadata-only
+   envoy knowledge docs search "<domain_name>" --metadata-only
    ```
 
    Note existing coverage to avoid duplication.
@@ -441,7 +441,7 @@ redelegation_assignments: [] # optional - only if issues require redelegation
    envoy docs tree docs/ --depth 4
 
    # Check if changed concepts are already documented
-   envoy knowledge search "<changed-feature>" --metadata-only
+   envoy knowledge docs search "<changed-feature>" --metadata-only
    ```
 
 3. Identify affected domains from changes + walkthrough context
@@ -485,7 +485,7 @@ redelegation_assignments: [] # optional - only if issues require redelegation
 | `envoy docs tree <path> --depth <n>`               | Get structure with doc coverage         |
 | `envoy docs tree docs/ --depth <n>`                | **See existing doc hierarchy/taxonomy** |
 | `envoy docs complexity <path>`                     | Get complexity metrics                  |
-| `envoy knowledge search "<query>" --metadata-only` | Find if concept is already documented   |
+| `envoy knowledge docs search "<query>" --metadata-only` | Find if concept is already documented   |
 | `envoy git diff-base --name-only`                  | Get list of changed files               |
 
 **Always run docs tree on BOTH:**

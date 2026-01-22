@@ -13,6 +13,9 @@ const MAX_EXPANSIONS = 3;
 const EXPANSION_PATTERN = /^EXPAND:\s*(.+)$/gm;
 const DEFAULT_TIMEOUT_MS = 60000;
 
+// Model from env, empty string means use opencode default
+const ENV_AGENT_MODEL = process.env.AGENT_MODEL?.trim() || undefined;
+
 export class AgentRunner {
   private readonly projectRoot: string;
 
@@ -26,15 +29,34 @@ export class AgentRunner {
    */
   async run<T>(config: AgentConfig, userMessage: string): Promise<AgentResult<T>> {
     const startTime = Date.now();
-    logCommandStart("agent.run", { agent: config.name });
+    // Use config.model if specified, else env AGENT_MODEL, else opencode default
+    const model = config.model ?? ENV_AGENT_MODEL;
+    logCommandStart("agent.run", {
+      agent: config.name,
+      model: model ?? "opencode-default",
+      steps: config.steps,
+      mcp: config.mcp ? Object.keys(config.mcp) : undefined,
+    });
 
     let server: { close: () => void } | null = null;
 
     try {
+      // Build opencode config with optional steps limit and MCP servers
+      const opencodeConfig: Record<string, unknown> = {};
+      if (model) {
+        opencodeConfig.model = model;
+      }
+      if (config.steps) {
+        opencodeConfig.agent = { [config.name]: { steps: config.steps } };
+      }
+      if (config.mcp) {
+        opencodeConfig.mcp = config.mcp;
+      }
+
       const { client, server: srv } = await createOpencode({
         port: 0, // Let OS pick available port to avoid conflicts in parallel runs
         timeout: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-        config: config.model ? { model: config.model } : undefined,
+        config: Object.keys(opencodeConfig).length > 0 ? opencodeConfig : undefined,
       });
       server = srv;
 
@@ -106,13 +128,14 @@ export class AgentRunner {
           agent: config.name,
           expansions: expansionCount,
           retry: true,
+          model: model ?? "opencode-default",
         });
 
         return {
           success: true,
           data: retryParsed,
           metadata: {
-            model: config.model ?? "default",
+            model: model ?? "opencode-default",
             duration_ms: Date.now() - startTime,
           },
         };
@@ -121,13 +144,14 @@ export class AgentRunner {
       logCommandComplete("agent.run", "success", durationMs, {
         agent: config.name,
         expansions: expansionCount,
+        model: model ?? "opencode-default",
       });
 
       return {
         success: true,
         data: parsed,
         metadata: {
-          model: config.model ?? "default",
+          model: model ?? "opencode-default",
           duration_ms: durationMs,
         },
       };
@@ -137,6 +161,7 @@ export class AgentRunner {
 
       logCommandComplete("agent.run", "error", durationMs, {
         agent: config.name,
+        model: model ?? "opencode-default",
         error: errorMessage,
       });
 
@@ -144,7 +169,7 @@ export class AgentRunner {
         success: false,
         error: errorMessage,
         metadata: {
-          model: config.model ?? "default",
+          model: model ?? "opencode-default",
           duration_ms: durationMs,
         },
       };

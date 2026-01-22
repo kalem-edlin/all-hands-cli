@@ -10,7 +10,10 @@
     "BASH_MAX_TIMEOUT_MS": "3600000",
     "BASE_BRANCH": "main",
     "ORACLE_DEFAULT_PROVIDER": "openai",
-    "ENVOY_LOG_MAX_STRING_LENGTH": "150"
+    "ENVOY_LOG_MAX_STRING_LENGTH": "150",
+    "AGENT_MODEL": "opencode/grok-code",
+    "_AGENT_MODEL_ALT": "google/gemini-2.5-flash",
+    "CODESEARCH_TOOL_BUDGET": "12"
   },
   "permissions": {
     "allow": [
@@ -28,7 +31,7 @@
       "Read(~/.claude-code-docs/docs/*)",
       "Bash(envoy:*)"
     ],
-    "deny": ["Task(claude-code-guide)"],
+    "deny": ["Task(claude-code-guide)", "Task(Explore)"],
     "ask": []
   },
   "enableAllProjectMcpServers": false,

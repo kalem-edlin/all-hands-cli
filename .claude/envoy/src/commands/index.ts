@@ -9,8 +9,12 @@ import type { CommandClass } from "./base.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Command value can be a CommandClass or a nested group of CommandClasses
+export type CommandValue = CommandClass | Record<string, CommandClass>;
+export type CommandRegistry = Record<string, CommandValue>;
+
 export interface CommandModule {
-  COMMANDS: Record<string, CommandClass>;
+  COMMANDS: CommandRegistry;
 }
 
 /**
@@ -20,11 +24,12 @@ export interface CommandModule {
  * Supports:
  * - Single-file modules: foo.ts -> import ./foo.js
  * - Directory modules: foo/index.ts -> import ./foo/index.js
+ * - Nested command groups (3-level commands like `envoy knowledge docs search`)
  */
 export async function discoverCommands(): Promise<
-  Map<string, Record<string, CommandClass>>
+  Map<string, CommandRegistry>
 > {
-  const commands = new Map<string, Record<string, CommandClass>>();
+  const commands = new Map<string, CommandRegistry>();
 
   const entries = readdirSync(__dirname);
 

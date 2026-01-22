@@ -3,12 +3,22 @@
  * Uses OpenCode SDK to spawn agents for specialized tasks.
  */
 
+// MCP server configuration (matches opencode SDK McpLocalConfig)
+export interface McpServerConfig {
+  type: "local";
+  command: string[]; // Command and args as array: ["uvx", "--from", "pkg", "server"]
+  environment?: Record<string, string>;
+  enabled?: boolean;
+}
+
 // Agent configuration
 export interface AgentConfig {
   name: string;
   systemPrompt: string;
   model?: string;
   timeoutMs?: number;
+  steps?: number; // Hard limit on agent iterations
+  mcp?: Record<string, McpServerConfig>; // MCP servers to enable
 }
 
 // Agent execution result
