@@ -4,12 +4,17 @@
  * PostToolUse hooks that run diagnostics on edited files:
  * - Python: pyright + ruff (if available)
  * - TypeScript: tsc --noEmit
+ * - Schema validation for schema-managed markdown files
  */
 
 import { execSync } from 'child_process';
-import { extname } from 'path';
+import { extname, join, dirname } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
 import type { Command } from 'commander';
-import { HookInput, outputContext, allowTool, readHookInput } from './shared.js';
+import { parse as parseYaml } from 'yaml';
+import { HookInput, outputContext, allowTool, readHookInput, getProjectDir } from './shared.js';
+import { minimatch } from 'minimatch';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -184,6 +189,222 @@ function formatDiagnosticsContext(results: DiagnosticResult[]): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Schema Validation
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+interface SchemaPattern {
+  pattern: string;
+  schemaType: 'prompt' | 'alignment' | 'spec' | 'documentation';
+}
+
+const SCHEMA_PATTERNS: SchemaPattern[] = [
+  { pattern: '.planning/**/prompts/*.md', schemaType: 'prompt' },
+  { pattern: '.planning/**/alignment.md', schemaType: 'alignment' },
+  { pattern: 'specs/**/*.spec.md', schemaType: 'spec' },
+  { pattern: 'specs/roadmap/**/*.spec.md', schemaType: 'spec' },
+  { pattern: 'docs/**/*.md', schemaType: 'documentation' },
+];
+
+interface SchemaDefinition {
+  frontmatter: Record<string, {
+    type: string;
+    required?: boolean;
+    default?: unknown;
+    values?: string[];
+    items?: string;
+    description?: string;
+  }>;
+  body?: {
+    description?: string;
+    sections?: Array<{
+      name: string;
+      required?: boolean;
+      description?: string;
+    }>;
+  };
+}
+
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
+/**
+ * Detect which schema applies to a file path
+ */
+function detectSchemaType(filePath: string): 'prompt' | 'alignment' | 'spec' | 'documentation' | null {
+  const projectDir = getProjectDir();
+  // Make path relative to project
+  const relativePath = filePath.startsWith(projectDir)
+    ? filePath.slice(projectDir.length + 1)
+    : filePath;
+
+  for (const { pattern, schemaType } of SCHEMA_PATTERNS) {
+    if (minimatch(relativePath, pattern)) {
+      return schemaType;
+    }
+  }
+  return null;
+}
+
+/**
+ * Load schema definition from YAML file
+ */
+function loadSchema(schemaType: string): SchemaDefinition | null {
+  const schemaPath = join(__dirname, '..', '..', 'schema', `${schemaType}.yaml`);
+  if (!existsSync(schemaPath)) {
+    return null;
+  }
+
+  try {
+    const content = readFileSync(schemaPath, 'utf-8');
+    return parseYaml(content) as SchemaDefinition;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse frontmatter from a markdown file
+ */
+function parseFrontmatter(content: string): Record<string, unknown> | null {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return null;
+
+  try {
+    return parseYaml(match[1]) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validate frontmatter against schema
+ */
+function validateFrontmatter(
+  frontmatter: Record<string, unknown>,
+  schema: SchemaDefinition
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (!schema.frontmatter) return errors;
+
+  // Check required fields
+  for (const [fieldName, fieldDef] of Object.entries(schema.frontmatter)) {
+    const value = frontmatter[fieldName];
+
+    // Check required
+    if (fieldDef.required && (value === undefined || value === null)) {
+      errors.push({
+        field: fieldName,
+        message: `Required field '${fieldName}' is missing`,
+      });
+      continue;
+    }
+
+    // Skip validation if not present and not required
+    if (value === undefined || value === null) continue;
+
+    // Type validation
+    switch (fieldDef.type) {
+      case 'string':
+        if (typeof value !== 'string') {
+          errors.push({
+            field: fieldName,
+            message: `Field '${fieldName}' must be a string`,
+          });
+        }
+        break;
+
+      case 'integer':
+        if (typeof value !== 'number' || !Number.isInteger(value)) {
+          errors.push({
+            field: fieldName,
+            message: `Field '${fieldName}' must be an integer`,
+          });
+        }
+        break;
+
+      case 'enum':
+        if (fieldDef.values && !fieldDef.values.includes(value as string)) {
+          errors.push({
+            field: fieldName,
+            message: `Field '${fieldName}' must be one of: ${fieldDef.values.join(', ')}`,
+          });
+        }
+        break;
+
+      case 'array':
+        if (!Array.isArray(value)) {
+          errors.push({
+            field: fieldName,
+            message: `Field '${fieldName}' must be an array`,
+          });
+        }
+        break;
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Run schema validation on a file.
+ * Returns validation errors or null if valid.
+ */
+function runSchemaValidation(filePath: string): ValidationError[] | null {
+  // Detect schema type
+  const schemaType = detectSchemaType(filePath);
+  if (!schemaType) {
+    // Not a schema-managed file
+    return null;
+  }
+
+  // Load schema
+  const schema = loadSchema(schemaType);
+  if (!schema) {
+    return null;
+  }
+
+  // Read file content
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  const content = readFileSync(filePath, 'utf-8');
+
+  // Parse frontmatter
+  const frontmatter = parseFrontmatter(content);
+  if (!frontmatter) {
+    return [{
+      field: 'frontmatter',
+      message: 'File is missing valid YAML frontmatter (---...---)',
+    }];
+  }
+
+  // Validate
+  return validateFrontmatter(frontmatter, schema);
+}
+
+/**
+ * Format validation errors as context string
+ */
+function formatSchemaErrors(errors: ValidationError[], schemaType: string): string {
+  const parts: string[] = [`## Schema Validation Errors (${schemaType})`];
+
+  for (const error of errors) {
+    parts.push(`- ${error.message}`);
+  }
+
+  parts.push('\nPlease fix the frontmatter to match the schema. Run `ah schema ' + schemaType + '` to see the expected format.');
+
+  return parts.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Command Registration
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -202,6 +423,32 @@ export function register(parent: Command): void {
       try {
         const input = await readHookInput();
         runDiagnostics(input);
+      } catch {
+        allowTool();
+      }
+    });
+
+  validation
+    .command('schema')
+    .description('Validate schema-managed markdown files')
+    .action(async () => {
+      try {
+        const input = await readHookInput();
+        const filePath = input.tool_input?.file_path as string | undefined;
+
+        if (!filePath) {
+          allowTool();
+        }
+
+        const errors = runSchemaValidation(filePath!);
+
+        if (errors && errors.length > 0) {
+          const schemaType = detectSchemaType(filePath!) || 'unknown';
+          const context = formatSchemaErrors(errors, schemaType);
+          outputContext(context);
+        }
+
+        allowTool();
       } catch {
         allowTool();
       }

@@ -1,5 +1,73 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "(WebFetch|Bash)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement github-url"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement research-fetch"
+          }
+        ]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement research-search"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Write|Edit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks validation schema"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks validation diagnostics"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks lifecycle agent-stop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks lifecycle agent-compact"
+          }
+        ]
+      }
+    ]
+  },
   "env": {
     "PARALLEL_MAX_WORKERS": "3",
     "SEARCH_SIMILARITY_THRESHOLD": "0.65",

@@ -18,7 +18,7 @@ const __dirname = dirname(__filename);
 export function register(program: Command): void {
   program
     .command('schema <type>')
-    .description('Output schema for a file type (prompt, alignment, status, spec)')
+    .description('Output schema for a file type (prompt, alignment, spec, documentation)')
     .option('--json', 'Output as JSON instead of YAML')
     .action(async (type: string, options: { json?: boolean }) => {
       const schemaDir = join(__dirname, '..', '..', 'schema');

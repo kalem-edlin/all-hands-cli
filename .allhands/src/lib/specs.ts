@@ -3,10 +3,19 @@
  *
  * Handles discovery and loading of spec files for milestone selection.
  * Scans specs/roadmap/ for planned milestones and specs/ for others.
+ * Parses YAML frontmatter for domain_name and status fields.
  */
 
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
+import { parse as parseYaml } from 'yaml';
+
+export interface SpecFrontmatter {
+  name?: string;
+  domain_name?: string;
+  status?: 'roadmap' | 'in_progress' | 'completed';
+  dependencies?: string[];
+}
 
 export interface SpecFile {
   id: string;
@@ -14,12 +23,34 @@ export interface SpecFile {
   path: string;
   title: string;
   category: 'roadmap' | 'active' | 'completed';
+  domain_name: string;
+  status: 'roadmap' | 'in_progress' | 'completed';
+  dependencies: string[];
 }
 
 export interface SpecGroup {
   category: 'roadmap' | 'active' | 'completed';
   label: string;
   specs: SpecFile[];
+}
+
+export interface DomainGroup {
+  domain_name: string;
+  specs: SpecFile[];
+}
+
+/**
+ * Parse frontmatter from spec file content
+ */
+function parseFrontmatter(content: string): SpecFrontmatter | null {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return null;
+
+  try {
+    return parseYaml(match[1]) as SpecFrontmatter;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -55,6 +86,7 @@ function scanSpecDir(
     const content = readFileSync(path, 'utf-8');
     const title = extractTitle(content, filename);
     const id = filename.replace(/\.spec\.md$/i, '').replace(/\.md$/i, '');
+    const frontmatter = parseFrontmatter(content);
 
     return {
       id,
@@ -62,6 +94,9 @@ function scanSpecDir(
       path,
       title,
       category,
+      domain_name: frontmatter?.domain_name || 'uncategorized',
+      status: frontmatter?.status || (category === 'completed' ? 'completed' : category === 'roadmap' ? 'roadmap' : 'in_progress'),
+      dependencies: frontmatter?.dependencies || [],
     };
   });
 }
@@ -164,4 +199,41 @@ export function specsToModalItems(
   }
 
   return items;
+}
+
+/**
+ * Load all specs grouped by domain_name
+ */
+export function loadSpecsByDomain(cwd?: string): DomainGroup[] {
+  const groups = loadAllSpecs(cwd);
+  const allSpecs = groups.flatMap((g) => g.specs);
+
+  // Group by domain_name
+  const byDomain: Record<string, SpecFile[]> = {};
+  for (const spec of allSpecs) {
+    const domain = spec.domain_name;
+    if (!byDomain[domain]) {
+      byDomain[domain] = [];
+    }
+    byDomain[domain].push(spec);
+  }
+
+  // Convert to array sorted by domain name
+  return Object.entries(byDomain)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([domain_name, specs]) => ({
+      domain_name,
+      specs: specs.sort((a, b) => a.id.localeCompare(b.id)),
+    }));
+}
+
+/**
+ * Get all specs with a specific status
+ */
+export function getSpecsByStatus(
+  status: 'roadmap' | 'in_progress' | 'completed',
+  cwd?: string
+): SpecFile[] {
+  const groups = loadAllSpecs(cwd);
+  return groups.flatMap((g) => g.specs).filter((s) => s.status === status);
 }

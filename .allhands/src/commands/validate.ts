@@ -24,7 +24,7 @@ export function register(program: Command): void {
   program
     .command('validate <file>')
     .description('Validate a file against its schema')
-    .option('-t, --type <type>', 'Schema type (prompt, alignment, status, spec)')
+    .option('-t, --type <type>', 'Schema type (prompt, alignment, spec, documentation)')
     .option('--json', 'Output as JSON')
     .action(async (file: string, options: { type?: string; json?: boolean }) => {
       if (!existsSync(file)) {
@@ -86,11 +86,11 @@ function inferSchemaType(file: string): string | null {
   if (file.includes('alignment') || file.match(/alignment\.md$/i)) {
     return 'alignment';
   }
-  if (file.includes('status') || file.match(/status\.yaml$/i)) {
-    return 'status';
-  }
   if (file.includes('/specs/') || file.endsWith('.spec.md')) {
     return 'spec';
+  }
+  if (file.includes('/docs/') && file.endsWith('.md')) {
+    return 'documentation';
   }
   return null;
 }
