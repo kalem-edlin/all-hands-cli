@@ -20,23 +20,6 @@ async function main(): Promise<void> {
   // Auto-discover and register all commands
   await discoverAndRegister(program);
 
-  // Built-in utility commands
-  program
-    .command('notify <message>')
-    .description('Send a desktop notification')
-    .action(async (message: string) => {
-      const { exec } = await import('child_process');
-      const platform = process.platform;
-
-      if (platform === 'darwin') {
-        exec(`osascript -e 'display notification "${message}" with title "All Hands"'`);
-      } else if (platform === 'linux') {
-        exec(`notify-send "All Hands" "${message}"`);
-      } else {
-        console.log(`[NOTIFY] ${message}`);
-      }
-    });
-
   // Handle no command
   if (process.argv.length <= 2) {
     program.help();

@@ -39,6 +39,13 @@ export function logCommandComplete(
 }
 
 /**
+ * Log info message.
+ */
+export function logInfo(message: string, context?: Record<string, unknown>): void {
+  logger.info(context, message);
+}
+
+/**
  * Log warning message.
  */
 export function logWarn(message: string, context?: Record<string, unknown>): void {
