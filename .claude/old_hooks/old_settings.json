@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "PARALLEL_MAX_WORKERS": "3",
+    "SEARCH_SIMILARITY_THRESHOLD": "0.65",
+    "SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD": "0.82",
+    "SEARCH_CONTEXT_TOKEN_LIMIT": "5000",
+    "KNOWLEDGE_AGGREGATOR_TOKEN_THRESHOLD": "3500",
+    "MAX_LOGS_TOKENS": "10000",
+    "BASH_MAX_TIMEOUT_MS": "3600000",
+    "BASE_BRANCH": "main",
+    "ORACLE_DEFAULT_PROVIDER": "openai",
+    "ENVOY_LOG_MAX_STRING_LENGTH": "150",
+    "AGENT_MODEL": "opencode/grok-code",
+    "_AGENT_MODEL_ALT": "google/gemini-2.5-flash",
+    "CODESEARCH_TOOL_BUDGET": "12"
+  },
+  "permissions": {
+    "deny": ["Task(claude-code-guide)", "Task(Explore)"],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": false,
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notify_stop.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/startup.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notify_idle.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notify_elicitation.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(WebFetch|Bash)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/github_url_to_gh.py"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/enforce_research_fetch.py"
+          }
+        ]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/enforce_research_search.py"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/envoy/envoy util log-event SubagentStop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/envoy/envoy util log-event PreCompact"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Write|Edit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/validate_frontmatter.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/statusline.sh",
+    "padding": 0
+  },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true,
+    "vtsls@claude-code-lsps": true,
+    "basedpyright@claude-code-lsps": true,
+    "vscode-langservers@claude-code-lsps": true
+  }
+}

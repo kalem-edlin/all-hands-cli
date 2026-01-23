@@ -1,6 +1,6 @@
 name: documentor
 flow: DOCUMENTATION_TAXONOMY.md
-singleton: true
+prompt_scoped: false
 message_template: |
   Documenting milestone: ${MILESTONE_NAME}
 template_vars:

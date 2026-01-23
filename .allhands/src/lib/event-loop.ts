@@ -10,18 +10,24 @@
  * Uses setInterval with cleanup to prevent memory leaks.
  */
 
-import { execSync } from 'child_process';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { getCurrentBranch } from './planning.js';
+import { getCurrentBranch, updateGreptileStatus, readStatus } from './planning.js';
 import { listWindows, SESSION_NAME, sessionExists, getCurrentSession } from './tmux.js';
 import { pickNextPrompt, markPromptInProgress, type PromptFile } from './prompts.js';
 import { shutdownDaemon } from './mcp-client.js';
+import {
+  checkGreptileStatus,
+  hasNewReview,
+  parsePRUrl,
+  type GreptileReviewState,
+} from './greptile.js';
 
 export interface EventLoopState {
   currentBranch: string;
   prUrl: string | null;
   greptileFeedbackAvailable: boolean;
+  greptileReviewState: GreptileReviewState;
   activeAgents: string[];
   lastCheckTime: number;
   loopEnabled: boolean;
@@ -69,6 +75,12 @@ export class EventLoop {
       currentBranch: getCurrentBranch(),
       prUrl: null,
       greptileFeedbackAvailable: false,
+      greptileReviewState: {
+        status: 'none',
+        lastCommentId: null,
+        lastCommentTime: null,
+        reviewCycle: 0,
+      },
       activeAgents: [],
       lastCheckTime: Date.now(),
       loopEnabled: false,
@@ -149,38 +161,56 @@ export class EventLoop {
 
   /**
    * Check for Greptile PR feedback
+   *
+   * Uses the greptile library to:
+   * - Track review cycles (not just presence)
+   * - Compare comment timestamps with last check
+   * - Update status.yaml with current state
    */
   private async checkGreptileFeedback(): Promise<void> {
     if (!this.state.prUrl) {
       return;
     }
 
+    // Validate PR URL
+    const prInfo = parsePRUrl(this.state.prUrl);
+    if (!prInfo) {
+      return;
+    }
+
     try {
-      // Extract PR info from URL
-      // Format: https://github.com/owner/repo/pull/123
-      const match = this.state.prUrl.match(
-        /github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/
-      );
-      if (!match) {
-        return;
-      }
+      // Get current Greptile review state
+      const currentState = await checkGreptileStatus(this.state.prUrl, this.cwd);
 
-      const [, owner, repo, prNumber] = match;
+      // Check if there's a new review
+      const isNewReview = hasNewReview(this.state.greptileReviewState, currentState);
 
-      // Check PR comments for Greptile review
-      const output = execSync(
-        `gh api repos/${owner}/${repo}/pulls/${prNumber}/comments --jq '.[].user.login'`,
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], cwd: this.cwd }
-      );
+      // Update feedback available flag
+      const hasGreptileComment = currentState.status === 'completed';
 
-      // Check if greptile-bot or similar has commented
-      const hasGreptileComment =
-        output.toLowerCase().includes('greptile') ||
-        output.toLowerCase().includes('coderabbit');
-
-      if (hasGreptileComment !== this.state.greptileFeedbackAvailable) {
+      if (hasGreptileComment !== this.state.greptileFeedbackAvailable || isNewReview) {
         this.state.greptileFeedbackAvailable = hasGreptileComment;
-        this.callbacks.onGreptileFeedback?.(hasGreptileComment);
+        this.state.greptileReviewState = currentState;
+
+        // Update status.yaml with Greptile state
+        try {
+          updateGreptileStatus(
+            {
+              reviewCycle: currentState.reviewCycle,
+              lastReviewTime: currentState.lastCommentTime,
+              status: currentState.status,
+            },
+            this.state.currentBranch,
+            this.cwd
+          );
+        } catch {
+          // Status file might not exist - ignore
+        }
+
+        // Notify if there's a new review
+        if (isNewReview) {
+          this.callbacks.onGreptileFeedback?.(hasGreptileComment);
+        }
       }
     } catch {
       // Silently fail - might not have gh installed or no PR

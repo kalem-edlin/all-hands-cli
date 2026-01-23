@@ -54,10 +54,12 @@ export interface SpawnConfig {
   /** If true, switch focus to the new window after spawning (default: true for TUI actions) */
   focusWindow?: boolean;
   /**
-   * If true, only one instance of this agent can run at a time.
-   * Attempting to spawn when one already exists will throw an error.
+   * If true, this agent is scoped to a specific prompt and can have multiple
+   * instances running concurrently (one per prompt).
+   * Prompt-scoped agents include the prompt number in their ID (e.g., "executor-01").
+   * Non-prompt-scoped agents use their name as AGENT_ID and only one can run at a time.
    */
-  singleton?: boolean;
+  promptScoped?: boolean;
 }
 
 export interface SessionContext {
@@ -387,15 +389,15 @@ export function renameCurrentWindow(newName: string): void {
 /**
  * Build the window name for an agent.
  *
- * Singleton agents use their name directly (e.g., "planner").
- * Non-singleton agents include the prompt number (e.g., "executor-01").
+ * Non-prompt-scoped agents use their name directly (e.g., "planner").
+ * Prompt-scoped agents include the prompt number (e.g., "executor-01").
  */
 export function buildWindowName(config: SpawnConfig): string {
-  if (config.singleton) {
+  if (!config.promptScoped) {
     return config.name;
   }
 
-  // Non-singleton agents include prompt number
+  // Prompt-scoped agents include prompt number
   if (config.promptNumber !== undefined) {
     return `${config.name}-${String(config.promptNumber).padStart(2, '0')}`;
   }
@@ -435,11 +437,11 @@ export function buildAgentEnv(config: SpawnConfig, branch: string, windowName: s
  * @param branch - Git branch (defaults to current)
  * @param cwd - Working directory
  * @returns Session and window names
- * @throws Error if singleton agent already exists
+ * @throws Error if non-prompt-scoped agent already exists
  *
  * Window naming:
- * - Singleton agents use name directly (e.g., "planner")
- * - Non-singleton agents include prompt number (e.g., "executor-01")
+ * - Non-prompt-scoped agents use name directly (e.g., "planner")
+ * - Prompt-scoped agents include prompt number (e.g., "executor-01")
  *
  * The window name becomes the AGENT_ID for MCP daemon isolation.
  *
@@ -457,14 +459,14 @@ export function spawnAgent(
   const windowName = buildWindowName(config);
   const shouldFocus = config.focusWindow !== false; // Default to true
 
-  // Singleton enforcement: fail if already running
-  if (config.singleton && windowExists(sessionName, windowName)) {
+  // Non-prompt-scoped agent enforcement: fail if already running
+  if (!config.promptScoped && windowExists(sessionName, windowName)) {
     throw new Error(
-      `Agent "${windowName}" is already running. Only one instance of singleton agents is allowed.`
+      `Agent "${windowName}" is already running. Only one instance of non-prompt-scoped agents is allowed.`
     );
   }
 
-  // Kill existing window if present (for non-singleton agents being restarted)
+  // Kill existing window if present (for prompt-scoped agents being restarted)
   if (windowExists(sessionName, windowName)) {
     killWindow(sessionName, windowName);
   }
@@ -563,8 +565,8 @@ export function getAgentTypes(): string[] {
  * Infer agent type from window name using agent profiles.
  *
  * Window names follow patterns:
- * - Singleton: exact profile name (e.g., "planner")
- * - Non-singleton: "{name}-{NN}" (e.g., "executor-01")
+ * - Non-prompt-scoped: exact profile name (e.g., "planner")
+ * - Prompt-scoped: "{name}-{NN}" (e.g., "executor-01")
  */
 function inferAgentType(windowName: string): AgentType | undefined {
   const lowerName = windowName.toLowerCase();
@@ -578,13 +580,13 @@ function inferAgentType(windowName: string): AgentType | undefined {
 
     const name = profile.name.toLowerCase();
 
-    if (profile.singleton) {
-      // Singleton: exact match
+    if (!profile.promptScoped) {
+      // Non-prompt-scoped: exact match
       if (lowerName === name) {
         return name;
       }
     } else {
-      // Non-singleton: match "{name}" or "{name}-{NN}"
+      // Prompt-scoped: match "{name}" or "{name}-{NN}"
       if (lowerName === name || lowerName.match(new RegExp(`^${name}-\\d+$`))) {
         return name;
       }

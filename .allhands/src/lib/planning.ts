@@ -18,6 +18,18 @@ export interface LoopConfig {
   iteration: number;
 }
 
+export interface PRStatus {
+  url: string;
+  number: number;
+  created: string;
+}
+
+export interface GreptileStatus {
+  reviewCycle: number;
+  lastReviewTime: string | null;
+  status: 'pending' | 'reviewing' | 'completed' | 'none';
+}
+
 export interface StatusFile {
   milestone: string;
   spec: string;
@@ -27,6 +39,8 @@ export interface StatusFile {
   compound_run: boolean;
   created: string;
   updated: string;
+  pr?: PRStatus;
+  greptile?: GreptileStatus;
 }
 
 export interface AlignmentFrontmatter {
@@ -343,4 +357,57 @@ export function getAlignmentTokenCount(branch?: string, cwd?: string): number {
 
   // Rough estimate: ~4 chars per token
   return Math.ceil(content.length / 4);
+}
+
+/**
+ * Update PR status in status file
+ */
+export function updatePRStatus(
+  url: string,
+  number: number,
+  branch?: string,
+  cwd?: string
+): StatusFile {
+  return updateStatus(
+    {
+      pr: {
+        url,
+        number,
+        created: new Date().toISOString(),
+      },
+    },
+    branch,
+    cwd
+  );
+}
+
+/**
+ * Update Greptile review status in status file
+ */
+export function updateGreptileStatus(
+  state: Partial<GreptileStatus>,
+  branch?: string,
+  cwd?: string
+): StatusFile {
+  const current = readStatus(branch, cwd);
+  if (!current) {
+    throw new Error('No status file exists. Initialize a milestone first.');
+  }
+
+  const currentGreptile = current.greptile || {
+    reviewCycle: 0,
+    lastReviewTime: null,
+    status: 'none' as const,
+  };
+
+  return updateStatus(
+    {
+      greptile: {
+        ...currentGreptile,
+        ...state,
+      },
+    },
+    branch,
+    cwd
+  );
 }

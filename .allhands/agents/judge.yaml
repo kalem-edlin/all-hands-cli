@@ -1,6 +1,6 @@
 name: judge
 flow: JUDGE_REVIEWING.md
-singleton: true
+prompt_scoped: false
 message_template: |
   Reviewing milestone: ${MILESTONE_NAME}
   Alignment doc: ${ALIGNMENT_PATH}

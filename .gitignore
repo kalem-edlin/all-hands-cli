@@ -4,8 +4,10 @@
 node_modules/
 .DS_Store
 .trees/**
+.swp
 
 # Envoy observability files
 .planning/
+.env.ai
 
 

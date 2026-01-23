@@ -1,6 +1,6 @@
 name: executor
 flow: PROMPT_EXECUTION.md
-singleton: false
+prompt_scoped: true
 message_template: |
   Your prompt file: ${PROMPT_PATH}
   Alignment doc: ${ALIGNMENT_PATH}

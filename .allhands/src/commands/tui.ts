@@ -30,7 +30,7 @@ import {
   renameCurrentWindow,
 } from '../lib/tmux.js';
 import { loadAgentProfile, buildAgentInvocation } from '../lib/agents.js';
-import { suggestBranchName, generatePRDescription } from '../lib/oracle.js';
+import { suggestBranchName, buildPR } from '../lib/oracle.js';
 import type { PromptFile } from '../lib/prompts.js';
 import { findSpecById } from '../lib/specs.js';
 
@@ -135,7 +135,7 @@ async function handleAction(
           flowPath: join(flowsDir, 'IDEATION_SESSION.md'),
           preamble: 'Starting ideation session. Explore ideas and draft specs.',
           milestoneName: status?.milestone,
-          singleton: true,
+          promptScoped: false,
         }, branch);
         tui.log(`Spawned ideation in ${result.sessionName}:${result.windowName}`);
         updateRunningAgents(tui, branch);
@@ -155,7 +155,7 @@ async function handleAction(
           preamble: 'Starting coordinator session. You can inspect agents and manage the loop.',
           milestoneName: status?.milestone,
           nonCoding: true,
-          singleton: true,
+          promptScoped: false,
         }, branch);
         tui.log(`Spawned coordinator in ${result.sessionName}:${result.windowName}`);
         updateRunningAgents(tui, branch);
@@ -178,7 +178,7 @@ async function handleAction(
           flowPath: join(flowsDir, 'MILESTONE_PLANNING.md'),
           preamble: 'Plan the milestone. Create prompts and set up the alignment doc.',
           milestoneName: status.milestone,
-          singleton: true,
+          promptScoped: false,
         }, branch);
         tui.log(`Spawned planner in ${result.sessionName}:${result.windowName}`);
         updateRunningAgents(tui, branch);
@@ -198,7 +198,7 @@ async function handleAction(
           preamble: 'Review the current milestone work. Spawn jury sub-agents as needed.',
           milestoneName: status?.milestone,
           nonCoding: true,
-          singleton: true,
+          promptScoped: false,
         }, branch);
         tui.log(`Spawned judge in ${result.sessionName}:${result.windowName}`);
         updateRunningAgents(tui, branch);
@@ -214,43 +214,16 @@ async function handleAction(
         return;
       }
 
-      tui.log('Building PR description via oracle...');
+      tui.log('Creating PR via oracle...');
 
       try {
-        // Load prompts and alignment doc
-        const prompts = loadAllPrompts(branch);
-        const promptData = prompts.map((p) => ({
-          number: p.frontmatter.number,
-          title: p.frontmatter.title,
-          status: p.frontmatter.status,
-        }));
+        const result = await buildPR(branch);
 
-        // Read alignment doc if it exists
-        const paths = getPlanningPaths(branch);
-        let alignmentContent = '';
-        if (existsSync(paths.alignment)) {
-          alignmentContent = readFileSync(paths.alignment, 'utf-8');
-        }
-
-        // Generate PR description via oracle
-        const prContent = await generatePRDescription(promptData, alignmentContent, status.milestone);
-
-        tui.log(`PR Title: ${prContent.title}`);
-        tui.log('Creating PR via gh CLI...');
-
-        // Create PR using gh CLI
-        const prBody = `${prContent.body}\n\n---\n🤖 Generated with [All Hands Agentic Harness](https://github.com/kalem-edlin/all-hands)`;
-
-        try {
-          const prUrl = execSync(
-            `gh pr create --title "${prContent.title.replace(/"/g, '\\"')}" --body "${prBody.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`,
-            { encoding: 'utf-8', cwd: process.cwd() }
-          ).trim();
-
-          tui.log(`PR created: ${prUrl}`);
-          tui.setPRUrl(prUrl);
-        } catch (ghError) {
-          tui.log(`Error creating PR: ${ghError instanceof Error ? ghError.message : String(ghError)}`);
+        if (result.success && result.prUrl) {
+          tui.log(`PR created: ${result.prUrl}`);
+          tui.setPRUrl(result.prUrl);
+        } else {
+          tui.log(`Error: ${result.body}`);
           tui.log('You may need to push your branch first or check gh auth status.');
         }
       } catch (e) {
@@ -268,7 +241,7 @@ async function handleAction(
           flowPath: join(flowsDir, 'PR_REVIEWING.md'),
           preamble: 'Review and address PR feedback.',
           milestoneName: status?.milestone,
-          singleton: true,
+          promptScoped: false,
         }, branch);
         tui.log(`Spawned pr-reviewer in ${result.sessionName}:${result.windowName}`);
         updateRunningAgents(tui, branch);
@@ -287,7 +260,7 @@ async function handleAction(
           flowPath: join(flowsDir, 'DOCUMENTATION_TAXONOMY.md'),
           preamble: 'Run compound phase: documentation and post-mortem.',
           milestoneName: status?.milestone,
-          singleton: true,
+          promptScoped: false,
         }, branch);
         tui.log(`Spawned documentor in ${result.sessionName}:${result.windowName}`);
         updateRunningAgents(tui, branch);
@@ -444,7 +417,7 @@ function spawnExecutorForPrompt(tui: TUI, prompt: PromptFile, branch: string): v
       promptNumber,
       milestoneName: prompt.frontmatter.title,
       focusWindow: false, // Don't steal focus from TUI
-      singleton: false, // Multiple executors can run (one per prompt)
+      promptScoped: true, // Multiple executors can run (one per prompt)
     },
     branch
   );

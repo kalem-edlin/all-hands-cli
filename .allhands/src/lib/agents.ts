@@ -20,11 +20,12 @@ export interface AgentProfile {
   messageTemplate?: string;
   templateVars?: string[];
   /**
-   * If true, only one instance of this agent can run at a time.
-   * Singleton agents use their name as AGENT_ID (e.g., "planner").
-   * Non-singleton agents include the prompt number (e.g., "executor-01").
+   * If true, this agent is scoped to a specific prompt and can have multiple
+   * instances running concurrently (one per prompt).
+   * Prompt-scoped agents include the prompt number in their ID (e.g., "executor-01").
+   * Non-prompt-scoped agents use their name as AGENT_ID (e.g., "coordinator").
    */
-  singleton?: boolean;
+  promptScoped?: boolean;
 }
 
 export interface AgentInvocation {
@@ -50,7 +51,7 @@ interface RawAgentProfile {
   env?: Record<string, string>;
   message_template?: string;
   template_vars?: string[];
-  singleton?: boolean;
+  prompt_scoped?: boolean;
 }
 
 /**
@@ -88,7 +89,7 @@ export function loadAgentProfile(name: string): AgentProfile | null {
       env: raw.env || {},
       messageTemplate: raw.message_template,
       templateVars: raw.template_vars,
-      singleton: raw.singleton ?? false,
+      promptScoped: raw.prompt_scoped ?? false,
     };
   } catch {
     return null;

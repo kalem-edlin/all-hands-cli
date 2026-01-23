@@ -1,6 +1,6 @@
 name: coordinator
 flow: COORDINATION.md
-singleton: true
+prompt_scoped: false
 message_template: |
   Coordinating milestone: ${MILESTONE_NAME}
 template_vars:

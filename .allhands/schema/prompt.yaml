@@ -35,6 +35,12 @@ frontmatter:
     default: 0
     description: "Number of execution attempts"
 
+  commits:
+    type: array
+    items: string
+    default: []
+    description: "Git commit hashes for work done on this prompt (chronological order, includes failed attempts)"
+
   created:
     type: date
     required: true

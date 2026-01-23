@@ -1,6 +1,6 @@
 name: pr-reviewer
 flow: PR_REVIEWING.md
-singleton: true
+prompt_scoped: false
 message_template: |
   Reviewing PR feedback for: ${MILESTONE_NAME}
 template_vars:

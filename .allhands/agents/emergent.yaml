@@ -1,6 +1,6 @@
 name: emergent
 flow: EMERGENT_REFINEMENT.md
-singleton: false
+prompt_scoped: true
 message_template: |
   Alignment doc: ${ALIGNMENT_PATH}
   Status: ${STATUS_PATH}

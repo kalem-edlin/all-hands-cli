@@ -1,6 +1,6 @@
 name: planner
 flow: MILESTONE_PLANNING.md
-singleton: true
+prompt_scoped: false
 message_template: |
   Milestone: ${MILESTONE_NAME}
   Spec: ${SPEC_PATH}
