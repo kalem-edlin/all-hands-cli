@@ -192,8 +192,10 @@ export function register(program: Command): void {
 }
 
 async function withTimeout<T>(fn: () => Promise<T>): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('Request timed out')), DEFAULT_TIMEOUT)
-  );
+  let timeoutId: NodeJS.Timeout;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Request timed out')), DEFAULT_TIMEOUT);
+    timeoutId.unref(); // Don't keep process alive after main work completes
+  });
   return Promise.race([fn(), timeout]);
 }

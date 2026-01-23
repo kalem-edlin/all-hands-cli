@@ -9,189 +9,255 @@ cd .allhands
 npm install
 ```
 
+The `ah` command is automatically installed to `~/.local/bin/ah` when you run `npx all-hands init`. This shim finds and executes the project-local `.allhands/ah` from any subdirectory.
+
+For local development, run:
+```bash
+./scripts/install-shim.sh
+```
+
 ## Usage
 
 ```bash
-npx tsx src/cli.ts <command>
+ah <command>
 ```
 
-Or create an alias:
+The `ah` command works from any directory within an all-hands project.
+
+## Commands Reference
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `ah context7` | Library documentation search and context retrieval |
+| `ah docs` | Documentation management and validation |
+| `ah git` | Git utilities with automatic base branch detection |
+| `ah grok` | X/Twitter search for technology research |
+| `ah hooks` | Hook commands (internal use) |
+| `ah knowledge` | Semantic search and indexing for docs and specs |
+| `ah milestone` | Milestone management |
+| `ah notify` | Desktop notifications |
+| `ah oracle` | Multi-provider LLM inference |
+| `ah perplexity` | Deep research with citations |
+| `ah schema` | Output schema for a file type |
+| `ah spawn` | Spawn sub-agents for specialized tasks |
+| `ah tavily` | Web search and content extraction |
+| `ah tools` | MCP tool integrations with session management |
+| `ah tui` | Launch the terminal user interface |
+| `ah validate` | Validate a file against its schema |
+
+### context7 - Library Documentation
+
 ```bash
-alias ah="npx tsx $(pwd)/src/cli.ts"
+ah context7 search <library> [query]     # Search for libraries by name
+ah context7 context <libraryId> <query>  # Get documentation context
 ```
+
+Options: `--limit <n>`, `--json`, `--text`
+
+### docs - Documentation Management
+
+```bash
+ah docs format-reference <file> [symbol]  # Format a symbol/file reference with git hash
+ah docs validate                          # Validate all documentation references
+ah docs complexity <path>                 # Get complexity metrics
+ah docs tree <path>                       # Get tree structure with doc coverage
+```
+
+Options: `--path`, `--depth`, `--json`
+
+### git - Git Utilities
+
+```bash
+ah git base             # Show detected base branch (main, master, etc.)
+ah git diff-base        # Show diff from base branch to HEAD
+ah git diff-base-files  # List file names changed from base to HEAD
+```
+
+Options: `--json`
+
+### grok - X/Twitter Search
+
+```bash
+ah grok search <query>     # Search X for tech opinions and insights
+ah grok challenge <query>  # Challenge research findings with X search
+```
+
+Options: `--json`
+
+### knowledge - Semantic Search
+
+```bash
+ah knowledge docs      # Project documentation operations
+ah knowledge specs     # Product specifications operations
+ah knowledge reindex   # Rebuild all indexes
+ah knowledge status    # Check status of all indexes
+```
+
+### milestone - Milestone Management
+
+```bash
+ah milestone list                # List all milestones grouped by domain
+ah milestone complete <name>     # Mark milestone completed
+ah milestone resurrect <name>    # Mark milestone incomplete
+```
+
+Options: `--json`
+
+### notify - Desktop Notifications
+
+```bash
+ah notify send <title> <message>  # Send a system notification
+```
+
+Options: `--json`
+
+### oracle - LLM Inference
+
+```bash
+ah oracle ask <query>                              # Raw LLM inference
+ah oracle compaction <logs> <prompt>               # Post-agent analysis
+ah oracle pr-build                                 # Create PR with generated description
+```
+
+Options: `--provider`, `--model`, `--file`, `--json`
+
+### perplexity - Deep Research
+
+```bash
+ah perplexity research <query>  # Deep research with citations
+```
+
+Options: `--json`
+
+### spawn - Sub-agents
+
+```bash
+ah spawn codesearch <query>  # AI code search with structural/text/semantic tools
+```
+
+Options: `--json`
+
+### tavily - Web Search
+
+```bash
+ah tavily search <query>      # Web search with optional LLM answer
+ah tavily extract <urls...>   # Extract full content from URLs (max 20)
+```
+
+Options: `--answer`, `--depth`, `--json`
+
+### tools - MCP Integrations
+
+```bash
+ah tools [target]       # Run MCP tool
+ah tools --list         # List all available MCP servers
+ah tools --sessions     # List all active sessions
+ah tools --restart      # Restart server session
+ah tools --shutdown-daemon  # Shutdown the daemon
+```
+
+Options: `--json`, `--help-tool`
+
+## Hooks Reference
+
+Hooks are internal commands used by Claude Code's hook system. They're configured in `.claude/settings.json`.
+
+### Context Hooks (PreToolUse)
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| `ah hooks context tldr-inject` | PreToolUse:Task | Inject TLDR context for Task |
+| `ah hooks context edit-inject` | PreToolUse:Edit | Inject file structure before edits |
+| `ah hooks context arch-inject` | PreToolUse:Task | Inject architecture layers for planning |
+| `ah hooks context signature` | PreToolUse:Edit | Inject function signatures for Edit |
+| `ah hooks context read-enforcer` | PreToolUse:Read | Enforce TLDR for large code files |
+| `ah hooks context search-router` | PreToolUse:Grep | Route searches to optimal tool |
+
+### Context Hooks (PostToolUse)
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| `ah hooks context diagnostics` | PostToolUse:Edit\|Write | Run TLDR diagnostics after edits |
+| `ah hooks context import-validate` | PostToolUse:Edit\|Write | Validate imports after edits |
+| `ah hooks context edit-notify` | PostToolUse:Edit\|Write | Notify TLDR daemon of file changes |
+
+### Enforcement Hooks (PreToolUse)
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| `ah hooks enforcement github-url` | PreToolUse:Bash | Block GitHub URLs in fetch commands |
+| `ah hooks enforcement research-fetch` | PreToolUse:WebFetch | Block WebFetch, suggest research tools |
+| `ah hooks enforcement research-search` | PreToolUse:WebSearch | Block WebSearch, suggest delegation |
+
+### Lifecycle Hooks
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| `ah hooks lifecycle agent-stop` | Stop:* | Handle agent stop event |
+| `ah hooks lifecycle agent-compact` | PreCompact:* | Handle pre-compaction event |
+
+### Notification Hooks
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| `ah hooks notification elicitation` | PreToolUse:AskUserQuestion | Desktop alert for questions |
+| `ah hooks notification stop` | Stop:* | Desktop alert when agent stops |
+| `ah hooks notification compact` | PreCompact:* | Desktop alert before compaction |
+
+### Session Hooks
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| `ah hooks session tldr-warm` | SessionStart | Warm TLDR cache on session start |
+
+### Validation Hooks (PostToolUse)
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| `ah hooks validation diagnostics` | PostToolUse:Edit\|Write | Run diagnostics on edited files |
+| `ah hooks validation schema` | PostToolUse:Edit\|Write | Validate schema-managed markdown |
 
 ## Optional Dependencies
 
 ### Universal Ctags (for `ah docs` command)
 
-The `ah docs` command uses [Universal Ctags](https://ctags.io/) for symbol lookup and documentation reference validation.
-
-**Install (macOS):**
 ```bash
+# macOS
 brew install universal-ctags
-```
 
-**Install (Ubuntu/Debian):**
-```bash
+# Ubuntu/Debian
 sudo apt install universal-ctags
 ```
 
-**Install (other platforms):**
-See [Universal Ctags installation guide](https://github.com/universal-ctags/ctags#how-to-build-and-install).
+### AST-grep (for advanced code search)
 
-**Verify installation:**
 ```bash
-ctags --version
-# Should show "Universal Ctags" in output
-```
-
-**What happens if ctags isn't installed?**
-
-The `ah docs` commands will exit with an error message asking you to install universal-ctags. Other `ah` commands work normally without it.
-
-### AST-grep (optional, for advanced code search)
-
-[AST-grep](https://ast-grep.github.io/) is an optional tool for pattern-based code search and exploration. It's not required for docs validation but provides richer code exploration capabilities.
-
-**Install (macOS):**
-```bash
+# macOS
 brew install ast-grep
-```
 
-**Install (cargo):**
-```bash
+# cargo
 cargo install ast-grep --locked
-```
-
-**Install (npm - slower startup):**
-```bash
-npm install -g @ast-grep/cli
-```
-
-**Verify installation:**
-```bash
-sg --version
 ```
 
 ### MCP Tools (for `ah tools` command)
 
-The `ah tools` command uses [mcptools](https://github.com/f/mcptools) to interact with MCP (Model Context Protocol) servers for lazy-loaded tool integrations.
-
-**Install (macOS):**
 ```bash
-brew tap f/mcptools
-brew install mcp
-```
+# macOS
+brew tap f/mcptools && brew install mcp
 
-**Install (other platforms):**
-```bash
+# Go
 go install github.com/f/mcptools/cmd/mcptools@latest
 ```
 
-**Verify installation:**
-```bash
-mcp --version
-```
-
-**What happens if mcptools isn't installed?**
-
-The `ah tools` command will exit with an error message asking you to install mcptools. Other `ah` commands work normally without it.
-
 ### Desktop Notifications (macOS)
 
-The `ah notify` command uses [jamf/Notifier](https://github.com/jamf/Notifier) for native macOS notifications.
-
-**Install:**
 ```bash
 brew install --cask notifier
 ```
 
-**What happens if Notifier isn't installed?**
-
-The notification commands fail gracefully:
-- Returns `{ success: false, sent: false, reason: "notifier not available" }` in JSON mode
-- Prints "Failed to send notification (notifier not installed?)" in normal mode
-- Exits with code 1
-- No crash or exception
-
-This allows hooks to safely call `ah notify` without breaking if Notifier isn't installed.
-
-**Usage:**
-```bash
-# Send a notification
-ah notify send "Title" "Message"
-
-# Gate notification (persistent alert - requires dismissal)
-ah notify gate "Review" "Plan ready for review"
-
-# Hook notification (auto-dismissing banner)
-ah notify hook "Stop" "Agent execution stopped"
-
-# JSON output (for hooks)
-ah notify send "Title" "Message" --json
-```
-
-**Claude Code Hooks Example:**
-
-In `.claude/settings.json`:
-```json
-{
-  "hooks": {
-    "Stop": [
-      "ah notify hook Stop \"Agent stopped\""
-    ]
-  }
-}
-```
-
-## Commands
-
-Run `ah --help` to see all available commands.
-
-| Command | Description |
-|---------|-------------|
-| `ah status` | Show milestone status |
-| `ah prompt` | Manage prompt files |
-| `ah alignment` | Manage alignment doc |
-| `ah schema` | Output schemas |
-| `ah validate` | Validate files against schemas |
-| `ah docs` | Documentation validation and reference management |
-| `ah notify` | Desktop notifications |
-| `ah oracle` | LLM inference |
-| `ah tavily` | Web search |
-| `ah perplexity` | Deep research |
-| `ah grok` | X/Twitter search |
-| `ah context7` | Library documentation |
-| `ah tools` | Lazy-loaded MCP tool integrations |
-| `ah tui` | Launch TUI |
-
-## Documentation Commands
-
-The `ah docs` command provides tools for documentation reference validation:
-
-```bash
-# Validate all documentation references
-ah docs validate
-
-# Validate specific docs path
-ah docs validate --path docs/api/
-
-# Create a symbol reference
-ah docs format-reference src/lib/foo.ts MyClass
-# Output: [ref:src/lib/foo.ts:MyClass:abc1234]
-
-# Create a file-only reference
-ah docs format-reference src/lib/foo.ts
-# Output: [ref:src/lib/foo.ts::abc1234]
-
-# Get complexity metrics
-ah docs complexity src/lib/
-
-# Get tree with doc coverage
-ah docs tree src/ --depth 2
-```
-
-### Reference Format
+## Documentation Reference Format
 
 Documentation uses validated references to link to source code:
 
@@ -209,3 +275,17 @@ Where `hash` is the git commit hash (7 chars) of the file when the reference was
 | VALID | File exists, symbol exists, hash matches | None |
 | STALE | File exists, symbol exists, hash differs | Review and update |
 | INVALID | File missing OR symbol missing | Fix documentation |
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `CONTEXT7_API_KEY` | API key for Context7 library docs |
+| `TAVILY_API_KEY` | API key for Tavily web search |
+| `PERPLEXITY_API_KEY` | API key for Perplexity research |
+| `XAI_API_KEY` | API key for Grok/X search |
+| `OPENAI_API_KEY` | API key for OpenAI (oracle) |
+| `ANTHROPIC_API_KEY` | API key for Anthropic (oracle) |
+| `GEMINI_API_KEY` | API key for Gemini (oracle) |
+| `BASE_BRANCH` | Override auto-detected base branch |
+| `AGENT_ID` | Agent identifier for session management |

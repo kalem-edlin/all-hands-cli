@@ -1,4 +1,4 @@
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { basename, dirname, join, resolve } from 'path';
 import { isGitRepo } from '../lib/git.js';
@@ -8,41 +8,48 @@ import { ConflictResolution, askConflictResolution, confirm, getNextBackupPath }
 import { SYNC_CONFIG_FILENAME, SYNC_CONFIG_TEMPLATE } from '../lib/constants.js';
 import { restoreDotfiles } from '../lib/dotfiles.js';
 
-const AH_SHELL_FUNCTION = `
-# AllHands CLI - resolves to .allhands/allhands from current directory
-ah() {
-  "$PWD/.allhands/allhands" "$@"
-}
-allhands() {
-  "$PWD/.allhands/allhands" "$@"
-}
+const AH_SHIM_SCRIPT = `#!/bin/bash
+# AllHands CLI shim - finds and executes project-local .allhands/ah
+# Installed by: npx all-hands init
+
+dir="$PWD"
+while [ "$dir" != "/" ]; do
+  if [ -x "$dir/.allhands/ah" ]; then
+    exec "$dir/.allhands/ah" "$@"
+  fi
+  dir="$(dirname "$dir")"
+done
+
+echo "error: not in an all-hands project (no .allhands/ah found)" >&2
+echo "hint: run 'npx all-hands init .' to initialize this project" >&2
+exit 1
 `;
 
-function setupAhShellFunction(): { added: boolean; shellRc: string | null } {
-  const shell = process.env.SHELL || '';
-  let shellRc: string | null = null;
+function setupAhShim(): { installed: boolean; path: string | null; inPath: boolean } {
+  const localBin = join(homedir(), '.local', 'bin');
+  const shimPath = join(localBin, 'ah');
 
-  if (shell.includes('zsh')) {
-    shellRc = join(homedir(), '.zshrc');
-  } else if (shell.includes('bash')) {
-    const bashProfile = join(homedir(), '.bash_profile');
-    const bashRc = join(homedir(), '.bashrc');
-    shellRc = existsSync(bashProfile) ? bashProfile : bashRc;
-  }
+  // Check if ~/.local/bin is in PATH
+  const pathEnv = process.env.PATH || '';
+  const inPath = pathEnv.split(':').some(p =>
+    p === localBin || p === join(homedir(), '.local/bin')
+  );
 
-  if (!shellRc) {
-    return { added: false, shellRc: null };
-  }
-
-  if (existsSync(shellRc)) {
-    const content = readFileSync(shellRc, 'utf-8');
-    if (content.includes('ah()') || content.includes('allhands()') || content.includes('.allhands/allhands')) {
-      return { added: false, shellRc };
+  // Check if shim already exists and is current
+  if (existsSync(shimPath)) {
+    const existing = readFileSync(shimPath, 'utf-8');
+    if (existing.includes('.allhands/ah')) {
+      return { installed: false, path: shimPath, inPath };
     }
   }
 
-  appendFileSync(shellRc, AH_SHELL_FUNCTION);
-  return { added: true, shellRc };
+  // Create ~/.local/bin if needed
+  mkdirSync(localBin, { recursive: true });
+
+  // Write the shim
+  writeFileSync(shimPath, AH_SHIM_SCRIPT, { mode: 0o755 });
+
+  return { installed: true, path: shimPath, inPath };
 }
 
 export async function cmdInit(target: string, autoYes: boolean = false): Promise<number> {
@@ -171,18 +178,18 @@ export async function cmdInit(target: string, autoYes: boolean = false): Promise
   // npm excludes these files, so we ship them without dots and rename here
   restoreDotfiles(resolvedTarget);
 
-  // Setup ah/allhands shell functions
-  console.log('\nSetting up shell commands (ah, allhands)...');
-  const ahResult = setupAhShellFunction();
-  if (ahResult.added && ahResult.shellRc) {
-    console.log(`  Added ah and allhands functions to ${ahResult.shellRc}`);
-    console.log('  Run `source ' + ahResult.shellRc + '` or restart terminal to use');
-  } else if (ahResult.shellRc) {
-    console.log('  Shell functions already configured');
+  // Setup ah CLI shim in ~/.local/bin
+  console.log('\nSetting up `ah` command...');
+  const shimResult = setupAhShim();
+  if (shimResult.installed) {
+    console.log(`  Installed shim to ${shimResult.path}`);
   } else {
-    console.log('  Could not detect shell config (add manually to your shell rc):');
-    console.log('    ah() { "$PWD/.allhands/allhands" "$@"; }');
-    console.log('    allhands() { "$PWD/.allhands/allhands" "$@"; }');
+    console.log(`  Shim already installed at ${shimResult.path}`);
+  }
+  if (!shimResult.inPath) {
+    console.log('  ⚠️  ~/.local/bin is not in your PATH');
+    console.log('  Add this to your shell config (.zshrc/.bashrc):');
+    console.log('    export PATH="$HOME/.local/bin:$PATH"');
   }
 
   // Offer to create sync config for push command

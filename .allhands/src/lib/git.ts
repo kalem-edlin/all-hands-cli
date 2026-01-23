@@ -214,3 +214,27 @@ export function getHeadCommit(cwd?: string): string {
 export function getShortCommit(commitHash: string): string {
   return commitHash.substring(0, 7);
 }
+
+/**
+ * Get list of changed file names from base branch to HEAD.
+ * Returns just the file paths, one per line.
+ */
+export function getChangedFilesFromBase(cwd?: string): string[] {
+  const workingDir = cwd || process.cwd();
+  const baseBranch = getBaseBranch();
+
+  try {
+    const result = spawnSync("git", ["diff", `${baseBranch}...HEAD`, "--name-only"], {
+      encoding: "utf-8",
+      cwd: workingDir,
+    });
+
+    if (result.status !== 0 || !result.stdout.trim()) {
+      return [];
+    }
+
+    return result.stdout.trim().split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}

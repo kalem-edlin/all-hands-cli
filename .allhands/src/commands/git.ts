@@ -6,12 +6,13 @@
  * which branch that is (main, master, develop, etc.).
  *
  * Commands:
- * - ah git base       - Show detected base branch
- * - ah git diff-base  - Show diff from base branch to HEAD
+ * - ah git base            - Show detected base branch
+ * - ah git diff-base       - Show diff from base branch to HEAD
+ * - ah git diff-base-files - List changed file names from base to HEAD
  */
 
 import { Command } from 'commander';
-import { getBaseBranch, getDiffFromBase } from '../lib/git.js';
+import { getBaseBranch, getChangedFilesFromBase, getDiffFromBase } from '../lib/git.js';
 
 export function register(program: Command): void {
   const git = program
@@ -46,6 +47,26 @@ export function register(program: Command): void {
         console.log(JSON.stringify({ base_branch: baseBranch, diff }, null, 2));
       } else {
         console.log(diff);
+      }
+    });
+
+  // ah git diff-base-files
+  git
+    .command('diff-base-files')
+    .description('List file names changed from base branch to HEAD')
+    .option('--json', 'Output as JSON')
+    .action((options: { json?: boolean }) => {
+      const baseBranch = getBaseBranch();
+      const files = getChangedFilesFromBase();
+
+      if (options.json) {
+        console.log(JSON.stringify({ base_branch: baseBranch, files, count: files.length }, null, 2));
+      } else {
+        if (files.length === 0) {
+          console.log('(No changed files from base)');
+        } else {
+          files.forEach(f => console.log(f));
+        }
       }
     });
 }

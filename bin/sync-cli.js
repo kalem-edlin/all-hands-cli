@@ -6,10 +6,10 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
 
-// ../../node_modules/yargs/lib/platform-shims/esm.mjs
+// node_modules/yargs/lib/platform-shims/esm.mjs
 import { notStrictEqual, strictEqual } from "assert";
 
-// ../../node_modules/cliui/build/lib/index.js
+// node_modules/cliui/build/lib/index.js
 var align = {
   right: alignRight,
   center: alignCenter
@@ -265,7 +265,7 @@ function cliui(opts, _mixin) {
   });
 }
 
-// ../../node_modules/cliui/build/lib/string-utils.js
+// node_modules/cliui/build/lib/string-utils.js
 var ansi = new RegExp("\x1B(?:\\[(?:\\d+[ABCDEFGJKSTm]|\\d+;\\d+[Hfm]|\\d+;\\d+;\\d+m|6n|s|u|\\?25[lh])|\\w)", "g");
 function stripAnsi(str) {
   return str.replace(ansi, "");
@@ -286,7 +286,7 @@ function wrap(str, width) {
   return wrapped;
 }
 
-// ../../node_modules/cliui/index.mjs
+// node_modules/cliui/index.mjs
 function ui(opts) {
   return cliui(opts, {
     stringWidth: (str) => {
@@ -297,7 +297,7 @@ function ui(opts) {
   });
 }
 
-// ../../node_modules/escalade/sync/index.mjs
+// node_modules/escalade/sync/index.mjs
 import { dirname, resolve } from "path";
 import { readdirSync, statSync } from "fs";
 function sync_default(start, callback) {
@@ -314,16 +314,16 @@ function sync_default(start, callback) {
   }
 }
 
-// ../../node_modules/yargs/lib/platform-shims/esm.mjs
+// node_modules/yargs/lib/platform-shims/esm.mjs
 import { inspect } from "util";
 import { readFileSync as readFileSync3 } from "fs";
 import { fileURLToPath } from "url";
 
-// ../../node_modules/yargs-parser/build/lib/index.js
+// node_modules/yargs-parser/build/lib/index.js
 import { format } from "util";
 import { normalize, resolve as resolve2 } from "path";
 
-// ../../node_modules/yargs-parser/build/lib/string-utils.js
+// node_modules/yargs-parser/build/lib/string-utils.js
 function camelCase(str) {
   const isCamelCase = str !== str.toLowerCase() && str !== str.toUpperCase();
   if (!isCamelCase) {
@@ -377,7 +377,7 @@ function looksLikeNumber(x) {
   return /^[-]?(?:\d+(?:\.\d*)?|\.\d+)(e[-+]?\d+)?$/.test(x);
 }
 
-// ../../node_modules/yargs-parser/build/lib/tokenize-arg-string.js
+// node_modules/yargs-parser/build/lib/tokenize-arg-string.js
 function tokenizeArgString(argString) {
   if (Array.isArray(argString)) {
     return argString.map((e) => typeof e !== "string" ? e + "" : e);
@@ -409,7 +409,7 @@ function tokenizeArgString(argString) {
   return args;
 }
 
-// ../../node_modules/yargs-parser/build/lib/yargs-parser-types.js
+// node_modules/yargs-parser/build/lib/yargs-parser-types.js
 var DefaultValuesForTypeKey;
 (function(DefaultValuesForTypeKey2) {
   DefaultValuesForTypeKey2["BOOLEAN"] = "boolean";
@@ -418,7 +418,7 @@ var DefaultValuesForTypeKey;
   DefaultValuesForTypeKey2["ARRAY"] = "array";
 })(DefaultValuesForTypeKey || (DefaultValuesForTypeKey = {}));
 
-// ../../node_modules/yargs-parser/build/lib/yargs-parser.js
+// node_modules/yargs-parser/build/lib/yargs-parser.js
 var mixin2;
 var YargsParser = class {
   constructor(_mixin) {
@@ -1258,7 +1258,7 @@ function stripQuotes(val) {
   return typeof val === "string" && (val[0] === "'" || val[0] === '"') && val[val.length - 1] === val[0] ? val.substring(1, val.length - 1) : val;
 }
 
-// ../../node_modules/yargs-parser/build/lib/index.js
+// node_modules/yargs-parser/build/lib/index.js
 import { readFileSync } from "fs";
 var _a;
 var _b;
@@ -1304,10 +1304,10 @@ yargsParser.decamelize = decamelize;
 yargsParser.looksLikeNumber = looksLikeNumber;
 var lib_default = yargsParser;
 
-// ../../node_modules/yargs/lib/platform-shims/esm.mjs
+// node_modules/yargs/lib/platform-shims/esm.mjs
 import { basename, dirname as dirname2, extname, relative, resolve as resolve4 } from "path";
 
-// ../../node_modules/yargs/build/lib/utils/process-argv.js
+// node_modules/yargs/build/lib/utils/process-argv.js
 function getProcessArgvBinIndex() {
   if (isBundledElectronApp())
     return 0;
@@ -1326,7 +1326,7 @@ function getProcessArgvBin() {
   return process.argv[getProcessArgvBinIndex()];
 }
 
-// ../../node_modules/yargs/build/lib/yerror.js
+// node_modules/yargs/build/lib/yerror.js
 var YError = class _YError extends Error {
   constructor(msg) {
     super(msg || "yargs error");
@@ -1337,7 +1337,7 @@ var YError = class _YError extends Error {
   }
 };
 
-// ../../node_modules/y18n/build/lib/platform-shims/node.js
+// node_modules/y18n/build/lib/platform-shims/node.js
 import { readFileSync as readFileSync2, statSync as statSync2, writeFile } from "fs";
 import { format as format2 } from "util";
 import { resolve as resolve3 } from "path";
@@ -1357,7 +1357,7 @@ var node_default = {
   }
 };
 
-// ../../node_modules/y18n/build/lib/index.js
+// node_modules/y18n/build/lib/index.js
 var shim;
 var Y18N = class {
   constructor(opts) {
@@ -1518,13 +1518,13 @@ function y18n(opts, _shim) {
   };
 }
 
-// ../../node_modules/y18n/index.mjs
+// node_modules/y18n/index.mjs
 var y18n2 = (opts) => {
   return y18n(opts, node_default);
 };
 var y18n_default = y18n2;
 
-// ../../node_modules/yargs/lib/platform-shims/esm.mjs
+// node_modules/yargs/lib/platform-shims/esm.mjs
 var REQUIRE_ERROR = "require is not supported by ESM";
 var REQUIRE_DIRECTORY_ERROR = "loading a directory of commands is not supported yet for ESM";
 var __dirname;
@@ -1583,7 +1583,7 @@ var esm_default = {
   })
 };
 
-// ../../node_modules/yargs/build/lib/typings/common-types.js
+// node_modules/yargs/build/lib/typings/common-types.js
 function assertNotStrictEqual(actual, expected, shim3, message) {
   shim3.assert.notStrictEqual(actual, expected, message);
 }
@@ -1594,12 +1594,12 @@ function objectKeys(object) {
   return Object.keys(object);
 }
 
-// ../../node_modules/yargs/build/lib/utils/is-promise.js
+// node_modules/yargs/build/lib/utils/is-promise.js
 function isPromise(maybePromise) {
   return !!maybePromise && !!maybePromise.then && typeof maybePromise.then === "function";
 }
 
-// ../../node_modules/yargs/build/lib/parse-command.js
+// node_modules/yargs/build/lib/parse-command.js
 function parseCommand(cmd) {
   const extraSpacesStrippedCommand = cmd.replace(/\s{2,}/g, " ");
   const splitCommand = extraSpacesStrippedCommand.split(/\s+(?![^[]*]|[^<]*>)/);
@@ -1632,7 +1632,7 @@ function parseCommand(cmd) {
   return parsedCommand;
 }
 
-// ../../node_modules/yargs/build/lib/argsert.js
+// node_modules/yargs/build/lib/argsert.js
 var positionName = ["first", "second", "third", "fourth", "fifth", "sixth"];
 function argsert(arg1, arg2, arg3) {
   function parseArgs() {
@@ -1690,7 +1690,7 @@ function argumentTypeError(observedType, allowedTypes, position) {
   throw new YError(`Invalid ${positionName[position] || "manyith"} argument. Expected ${allowedTypes.join(" or ")} but received ${observedType}.`);
 }
 
-// ../../node_modules/yargs/build/lib/middleware.js
+// node_modules/yargs/build/lib/middleware.js
 var GlobalMiddleware = class {
   constructor(yargs) {
     this.globalMiddleware = [];
@@ -1772,7 +1772,7 @@ function applyMiddleware(argv, yargs, middlewares, beforeValidation) {
   }, argv);
 }
 
-// ../../node_modules/yargs/build/lib/utils/maybe-async-result.js
+// node_modules/yargs/build/lib/utils/maybe-async-result.js
 function maybeAsyncResult(getResult, resultHandler, errorHandler = (err) => {
   throw err;
 }) {
@@ -1787,7 +1787,7 @@ function isFunction(arg) {
   return typeof arg === "function";
 }
 
-// ../../node_modules/yargs/build/lib/utils/which-module.js
+// node_modules/yargs/build/lib/utils/which-module.js
 function whichModule(exported) {
   if (typeof __require === "undefined")
     return null;
@@ -1799,7 +1799,7 @@ function whichModule(exported) {
   return null;
 }
 
-// ../../node_modules/yargs/build/lib/command.js
+// node_modules/yargs/build/lib/command.js
 var DEFAULT_MARKER = /(^\*)|(^\$0)/;
 var CommandInstance = class {
   constructor(usage2, validation2, globalMiddleware, shim3) {
@@ -2191,7 +2191,7 @@ function isCommandHandlerDefinition(cmd) {
   return typeof cmd === "object" && !Array.isArray(cmd);
 }
 
-// ../../node_modules/yargs/build/lib/utils/obj-filter.js
+// node_modules/yargs/build/lib/utils/obj-filter.js
 function objFilter(original = {}, filter2 = () => true) {
   const obj = {};
   objectKeys(original).forEach((key) => {
@@ -2202,7 +2202,7 @@ function objFilter(original = {}, filter2 = () => true) {
   return obj;
 }
 
-// ../../node_modules/yargs/build/lib/utils/set-blocking.js
+// node_modules/yargs/build/lib/utils/set-blocking.js
 function setBlocking(blocking) {
   if (typeof process === "undefined")
     return;
@@ -2214,7 +2214,7 @@ function setBlocking(blocking) {
   });
 }
 
-// ../../node_modules/yargs/build/lib/usage.js
+// node_modules/yargs/build/lib/usage.js
 function isBoolean(fail) {
   return typeof fail === "boolean";
 }
@@ -2740,7 +2740,7 @@ function getText(text) {
   return isIndentedText(text) ? text.text : text;
 }
 
-// ../../node_modules/yargs/build/lib/completion-templates.js
+// node_modules/yargs/build/lib/completion-templates.js
 var completionShTemplate = `###-begin-{{app_name}}-completions-###
 #
 # yargs command completion script
@@ -2791,7 +2791,7 @@ compdef _{{app_name}}_yargs_completions {{app_name}}
 ###-end-{{app_name}}-completions-###
 `;
 
-// ../../node_modules/yargs/build/lib/completion.js
+// node_modules/yargs/build/lib/completion.js
 var Completion = class {
   constructor(yargs, usage2, command2, shim3) {
     var _a2, _b2, _c2;
@@ -3004,7 +3004,7 @@ function isFallbackCompletionFunction(completionFunction) {
   return completionFunction.length > 3;
 }
 
-// ../../node_modules/yargs/build/lib/utils/levenshtein.js
+// node_modules/yargs/build/lib/utils/levenshtein.js
 function levenshtein(a, b) {
   if (a.length === 0)
     return b.length;
@@ -3035,7 +3035,7 @@ function levenshtein(a, b) {
   return matrix[b.length][a.length];
 }
 
-// ../../node_modules/yargs/build/lib/validation.js
+// node_modules/yargs/build/lib/validation.js
 var specialKeys = ["$0", "--", "_"];
 function validation(yargs, usage2, shim3) {
   const __ = shim3.y18n.__;
@@ -3304,7 +3304,7 @@ ${customMsgs.join("\n")}` : "";
   return self;
 }
 
-// ../../node_modules/yargs/build/lib/utils/apply-extends.js
+// node_modules/yargs/build/lib/utils/apply-extends.js
 var previouslyVisitedConfigs = [];
 var shim2;
 function applyExtends(config, cwd, mergeExtends, _shim) {
@@ -3357,7 +3357,7 @@ function mergeDeep(config1, config2) {
   return target;
 }
 
-// ../../node_modules/yargs/build/lib/yargs-factory.js
+// node_modules/yargs/build/lib/yargs-factory.js
 var __classPrivateFieldSet = function(receiver, state, value, kind, f) {
   if (kind === "m") throw new TypeError("Private method is not writable");
   if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
@@ -4851,12 +4851,12 @@ function isYargsInstance(y) {
   return !!y && typeof y.getInternalMethods === "function";
 }
 
-// ../../node_modules/yargs/index.mjs
+// node_modules/yargs/index.mjs
 var Yargs = YargsFactory(esm_default);
 var yargs_default = Yargs;
 
 // src/commands/init.ts
-import { appendFileSync, copyFileSync, existsSync as existsSync7, mkdirSync, readFileSync as readFileSync6, renameSync as renameSync2, writeFileSync } from "fs";
+import { copyFileSync, existsSync as existsSync7, mkdirSync, readFileSync as readFileSync6, renameSync as renameSync2, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename as basename4, dirname as dirname7, join as join6, resolve as resolve6 } from "path";
 
@@ -4910,7 +4910,7 @@ function getGitFiles(repoPath) {
 import { readFileSync as readFileSync5, existsSync as existsSync3, statSync as statSync3 } from "fs";
 import { join as join3 } from "path";
 
-// ../../node_modules/@isaacs/balanced-match/dist/esm/index.js
+// node_modules/@isaacs/balanced-match/dist/esm/index.js
 var balanced = (a, b, str) => {
   const ma = a instanceof RegExp ? maybeMatch(a, str) : a;
   const mb = b instanceof RegExp ? maybeMatch(b, str) : b;
@@ -4963,7 +4963,7 @@ var range = (a, b, str) => {
   return result;
 };
 
-// ../../node_modules/@isaacs/brace-expansion/dist/esm/index.js
+// node_modules/@isaacs/brace-expansion/dist/esm/index.js
 var escSlash = "\0SLASH" + Math.random() + "\0";
 var escOpen = "\0OPEN" + Math.random() + "\0";
 var escClose = "\0CLOSE" + Math.random() + "\0";
@@ -5121,7 +5121,7 @@ function expand_(str, isTop) {
   return expansions;
 }
 
-// ../../node_modules/minimatch/dist/esm/assert-valid-pattern.js
+// node_modules/minimatch/dist/esm/assert-valid-pattern.js
 var MAX_PATTERN_LENGTH = 1024 * 64;
 var assertValidPattern = (pattern) => {
   if (typeof pattern !== "string") {
@@ -5132,7 +5132,7 @@ var assertValidPattern = (pattern) => {
   }
 };
 
-// ../../node_modules/minimatch/dist/esm/brace-expressions.js
+// node_modules/minimatch/dist/esm/brace-expressions.js
 var posixClasses = {
   "[:alnum:]": ["\\p{L}\\p{Nl}\\p{Nd}", true],
   "[:alpha:]": ["\\p{L}\\p{Nl}", true],
@@ -5241,7 +5241,7 @@ var parseClass = (glob, position) => {
   return [comb, uflag, endPos - pos, true];
 };
 
-// ../../node_modules/minimatch/dist/esm/unescape.js
+// node_modules/minimatch/dist/esm/unescape.js
 var unescape = (s, { windowsPathsNoEscape = false, magicalBraces = true } = {}) => {
   if (magicalBraces) {
     return windowsPathsNoEscape ? s.replace(/\[([^\/\\])\]/g, "$1") : s.replace(/((?!\\).|^)\[([^\/\\])\]/g, "$1$2").replace(/\\([^\/])/g, "$1");
@@ -5249,7 +5249,7 @@ var unescape = (s, { windowsPathsNoEscape = false, magicalBraces = true } = {}) 
   return windowsPathsNoEscape ? s.replace(/\[([^\/\\{}])\]/g, "$1") : s.replace(/((?!\\).|^)\[([^\/\\{}])\]/g, "$1$2").replace(/\\([^\/{}])/g, "$1");
 };
 
-// ../../node_modules/minimatch/dist/esm/ast.js
+// node_modules/minimatch/dist/esm/ast.js
 var types = /* @__PURE__ */ new Set(["!", "?", "+", "*", "@"]);
 var isExtglobType = (c) => types.has(c);
 var startNoTraversal = "(?!(?:^|/)\\.\\.?(?:$|/))";
@@ -5725,7 +5725,7 @@ var AST = class _AST {
   }
 };
 
-// ../../node_modules/minimatch/dist/esm/escape.js
+// node_modules/minimatch/dist/esm/escape.js
 var escape = (s, { windowsPathsNoEscape = false, magicalBraces = false } = {}) => {
   if (magicalBraces) {
     return windowsPathsNoEscape ? s.replace(/[?*()[\]{}]/g, "[$&]") : s.replace(/[?*()[\]\\{}]/g, "\\$&");
@@ -5733,7 +5733,7 @@ var escape = (s, { windowsPathsNoEscape = false, magicalBraces = false } = {}) =
   return windowsPathsNoEscape ? s.replace(/[?*()[\]]/g, "[$&]") : s.replace(/[?*()[\]\\]/g, "\\$&");
 };
 
-// ../../node_modules/minimatch/dist/esm/index.js
+// node_modules/minimatch/dist/esm/index.js
 var minimatch = (p, pattern, options = {}) => {
   assertValidPattern(pattern);
   if (!options.nocomment && pattern.charAt(0) === "#") {
@@ -6790,36 +6790,38 @@ function restoreDotfiles(targetDir) {
 }
 
 // src/commands/init.ts
-var AH_SHELL_FUNCTION = `
-# AllHands CLI - resolves to .allhands/allhands from current directory
-ah() {
-  "$PWD/.allhands/allhands" "$@"
-}
-allhands() {
-  "$PWD/.allhands/allhands" "$@"
-}
+var AH_SHIM_SCRIPT = `#!/bin/bash
+# AllHands CLI shim - finds and executes project-local .allhands/ah
+# Installed by: npx all-hands init
+
+dir="$PWD"
+while [ "$dir" != "/" ]; do
+  if [ -x "$dir/.allhands/ah" ]; then
+    exec "$dir/.allhands/ah" "$@"
+  fi
+  dir="$(dirname "$dir")"
+done
+
+echo "error: not in an all-hands project (no .allhands/ah found)" >&2
+echo "hint: run 'npx all-hands init .' to initialize this project" >&2
+exit 1
 `;
-function setupAhShellFunction() {
-  const shell = process.env.SHELL || "";
-  let shellRc = null;
-  if (shell.includes("zsh")) {
-    shellRc = join6(homedir(), ".zshrc");
-  } else if (shell.includes("bash")) {
-    const bashProfile = join6(homedir(), ".bash_profile");
-    const bashRc = join6(homedir(), ".bashrc");
-    shellRc = existsSync7(bashProfile) ? bashProfile : bashRc;
-  }
-  if (!shellRc) {
-    return { added: false, shellRc: null };
-  }
-  if (existsSync7(shellRc)) {
-    const content = readFileSync6(shellRc, "utf-8");
-    if (content.includes("ah()") || content.includes("allhands()") || content.includes(".allhands/allhands")) {
-      return { added: false, shellRc };
+function setupAhShim() {
+  const localBin = join6(homedir(), ".local", "bin");
+  const shimPath = join6(localBin, "ah");
+  const pathEnv = process.env.PATH || "";
+  const inPath = pathEnv.split(":").some(
+    (p) => p === localBin || p === join6(homedir(), ".local/bin")
+  );
+  if (existsSync7(shimPath)) {
+    const existing = readFileSync6(shimPath, "utf-8");
+    if (existing.includes(".allhands/ah")) {
+      return { installed: false, path: shimPath, inPath };
     }
   }
-  appendFileSync(shellRc, AH_SHELL_FUNCTION);
-  return { added: true, shellRc };
+  mkdirSync(localBin, { recursive: true });
+  writeFileSync(shimPath, AH_SHIM_SCRIPT, { mode: 493 });
+  return { installed: true, path: shimPath, inPath };
 }
 async function cmdInit(target, autoYes = false) {
   const resolvedTarget = resolve6(process.cwd(), target);
@@ -6909,17 +6911,17 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     copied++;
   }
   restoreDotfiles(resolvedTarget);
-  console.log("\nSetting up shell commands (ah, allhands)...");
-  const ahResult = setupAhShellFunction();
-  if (ahResult.added && ahResult.shellRc) {
-    console.log(`  Added ah and allhands functions to ${ahResult.shellRc}`);
-    console.log("  Run `source " + ahResult.shellRc + "` or restart terminal to use");
-  } else if (ahResult.shellRc) {
-    console.log("  Shell functions already configured");
+  console.log("\nSetting up `ah` command...");
+  const shimResult = setupAhShim();
+  if (shimResult.installed) {
+    console.log(`  Installed shim to ${shimResult.path}`);
   } else {
-    console.log("  Could not detect shell config (add manually to your shell rc):");
-    console.log('    ah() { "$PWD/.allhands/allhands" "$@"; }');
-    console.log('    allhands() { "$PWD/.allhands/allhands" "$@"; }');
+    console.log(`  Shim already installed at ${shimResult.path}`);
+  }
+  if (!shimResult.inPath) {
+    console.log("  \u26A0\uFE0F  ~/.local/bin is not in your PATH");
+    console.log("  Add this to your shell config (.zshrc/.bashrc):");
+    console.log('    export PATH="$HOME/.local/bin:$PATH"');
   }
   const syncConfigPath = join6(resolvedTarget, SYNC_CONFIG_FILENAME);
   let syncConfigCreated = false;
