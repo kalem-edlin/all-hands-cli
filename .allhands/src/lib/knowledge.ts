@@ -51,23 +51,27 @@ interface IndexConfig {
   description: string;
   /** Whether this index expects front-matter with description/relevant_files */
   hasFrontmatter: boolean;
+  /** Whether to strip frontmatter from content before embedding */
+  stripFrontmatter?: boolean;
 }
 
 // Index configurations
 const INDEX_CONFIGS: Record<string, IndexConfig> = {
   docs: {
     name: "docs",
-    paths: ["docs/"],
+    paths: ["docs/", "specs/"],
     extensions: [".md"],
-    description: "Project documentation",
+    description: "Project documentation and specifications",
     hasFrontmatter: true,
+    stripFrontmatter: true,
   },
-  specs: {
-    name: "specs",
-    paths: ["specs/"],
+  roadmap: {
+    name: "roadmap",
+    paths: ["specs/roadmap/"],
     extensions: [".md"],
-    description: "Product specifications and requirements",
+    description: "Roadmap specifications (planned work)",
     hasFrontmatter: true,
+    stripFrontmatter: true,
   },
 };
 
@@ -405,21 +409,27 @@ export class KnowledgeService {
     for (let i = 0; i < files.length; i++) {
       const filePath = files[i];
       const fullPath = join(this.projectRoot, filePath);
-      const content = readFileSync(fullPath, "utf-8");
+      const rawContent = readFileSync(fullPath, "utf-8");
 
       // Parse front-matter
       let frontMatter: Record<string, unknown> = {};
+      let contentForEmbedding = rawContent;
+
       if (filePath.endsWith(".md")) {
         try {
-          const parsed = matter(content);
+          const parsed = matter(rawContent);
           frontMatter = parsed.data;
+          // Strip frontmatter from content for embedding if configured
+          if (config.stripFrontmatter) {
+            contentForEmbedding = parsed.content;
+          }
         } catch {
           // Skip files with invalid front-matter
         }
       }
 
       console.error(`[knowledge] Embedding ${i + 1}/${files.length}: ${filePath}`);
-      await this.indexDocument(index, meta, filePath, content, frontMatter);
+      await this.indexDocument(index, meta, filePath, contentForEmbedding, frontMatter);
       totalTokens += meta.documents[filePath].token_count;
     }
 
@@ -486,14 +496,19 @@ export class KnowledgeService {
         const fullPath = join(this.projectRoot, path);
         if (!existsSync(fullPath)) continue;
 
-        const content = readFileSync(fullPath, "utf-8");
+        const rawContent = readFileSync(fullPath, "utf-8");
         let frontMatter: Record<string, unknown> = {};
+        let contentForEmbedding = rawContent;
 
         // Process front-matter
         if (path.endsWith(".md")) {
           try {
-            const parsed = matter(content);
+            const parsed = matter(rawContent);
             frontMatter = parsed.data;
+            // Strip frontmatter from content for embedding if configured
+            if (config.stripFrontmatter) {
+              contentForEmbedding = parsed.content;
+            }
           } catch {
             // Skip files with invalid front-matter
           }
@@ -502,7 +517,7 @@ export class KnowledgeService {
         // Index document
         const action = added ? "added" : "modified";
         console.error(`[knowledge] Embedding (${action}): ${path}`);
-        await this.indexDocument(index, meta, path, content, frontMatter);
+        await this.indexDocument(index, meta, path, contentForEmbedding, frontMatter);
         processedFiles.push({ path, action });
       }
     }

@@ -1,11 +1,11 @@
 /**
- * Knowledge commands - semantic search and indexing for docs and specs.
+ * Knowledge commands - semantic search and indexing for docs and roadmap.
  *
  * Commands:
  *   ah knowledge docs search <query> [--metadata-only]
- *   ah knowledge specs search <query> [--metadata-only]
+ *   ah knowledge roadmap search <query> [--metadata-only]
  *   ah knowledge docs reindex
- *   ah knowledge specs reindex
+ *   ah knowledge roadmap reindex
  *   ah knowledge reindex (all indexes)
  *   ah knowledge status (all indexes)
  */

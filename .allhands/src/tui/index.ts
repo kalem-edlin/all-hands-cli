@@ -17,11 +17,15 @@
 import blessed from 'blessed';
 import { createActionsPane, ActionItem, ToggleState } from './actions.js';
 import { createPromptsPane, PromptItem } from './prompts-pane.js';
-import { createStatusPane, AgentInfo } from './status-pane.js';
+import { createStatusPane, AgentInfo, FileStates, StatusPaneOptions } from './status-pane.js';
 import { createModal, Modal } from './modal.js';
+import { createFileViewer, FileViewer, getPlanningFilePath, getSpecFilePath } from './file-viewer-modal.js';
 import { EventLoop } from '../lib/event-loop.js';
+import { KnowledgeService } from '../lib/knowledge.js';
+import { validateDocs } from '../lib/docs-validation.js';
 import type { PromptFile } from '../lib/prompts.js';
 import { loadAllSpecs, specsToModalItems } from '../lib/specs.js';
+import { join } from 'path';
 
 export type PaneId = 'actions' | 'prompts' | 'status';
 
@@ -65,6 +69,7 @@ export class TUI {
 
   // Modals
   private activeModal: Modal | null = null;
+  private activeFileViewer: FileViewer | null = null;
   private logEntries: string[] = [];
 
   // Action items (for selection tracking)
@@ -101,7 +106,9 @@ export class TUI {
       undefined,
       this.state.milestone,
       this.state.branch,
-      this.logEntries
+      this.logEntries,
+      undefined, // fileStates - will be set on render
+      undefined  // options - will be set on render
     );
 
     // Build action items list for navigation
@@ -146,10 +153,61 @@ export class TUI {
         },
       });
       this.eventLoop.start();
+
+      // Start background indexing (non-blocking)
+      this.startBackgroundIndexing();
     }
 
     // Initial render
     this.render();
+  }
+
+  /**
+   * Start background indexing of knowledge bases and validation.
+   * Non-blocking - progress is logged to status pane.
+   */
+  private async startBackgroundIndexing(): Promise<void> {
+    if (!this.options.cwd) return;
+
+    this.log('Starting background index...');
+    this.render();
+
+    try {
+      const service = new KnowledgeService(this.options.cwd);
+
+      // Reindex roadmap
+      this.log('Indexing roadmap specs...');
+      this.render();
+      await service.reindexAll('roadmap');
+
+      // Reindex docs (includes specs)
+      this.log('Indexing documentation...');
+      this.render();
+      await service.reindexAll('docs');
+
+      // Run validation
+      this.log('Validating documentation...');
+      this.render();
+      const docsPath = join(this.options.cwd, 'docs');
+      const validation = validateDocs(docsPath, this.options.cwd);
+
+      if (validation.frontmatter_error_count > 0) {
+        this.log(`⚠ ${validation.frontmatter_error_count} frontmatter errors`);
+      }
+      if (validation.stale_count > 0) {
+        this.log(`⚠ ${validation.stale_count} stale references`);
+      }
+      if (validation.invalid_count > 0) {
+        this.log(`⚠ ${validation.invalid_count} invalid references`);
+      }
+
+      this.log('Index ready ✓');
+      this.render();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`Index error: ${message}`);
+      this.render();
+    }
   }
 
   private createHeader(): blessed.Widgets.BoxElement {
@@ -187,11 +245,12 @@ export class TUI {
       { id: 'coordinator', label: 'Coordinator', key: '1', type: 'action' },
       { id: 'ideation', label: 'Ideation', key: '2', type: 'action' },
       { id: 'planner', label: 'Planner', key: '3', type: 'action' },
-      { id: 'review-jury', label: 'Review Jury', key: '4', type: 'action' },
-      { id: 'pr-action', label: this.getPRActionLabel(), key: '5', type: 'action',
+      { id: 'e2e-test-planner', label: 'Build E2E Test', key: '4', type: 'action' },
+      { id: 'review-jury', label: 'Review Jury', key: '5', type: 'action' },
+      { id: 'pr-action', label: this.getPRActionLabel(), key: '6', type: 'action',
         disabled: this.state.prActionState === 'greptile-reviewing' },
-      { id: 'compound', label: 'Compound', key: '6', type: 'action' },
-      { id: 'switch-milestone', label: 'Switch Milestone', key: '7', type: 'action' },
+      { id: 'compound', label: 'Compound', key: '7', type: 'action' },
+      { id: 'switch-milestone', label: 'Switch Milestone', key: '8', type: 'action' },
       { id: 'separator-toggles', label: '─ Toggles ─', type: 'separator' },
       { id: 'toggle-loop', label: 'Loop', key: 'L', type: 'toggle', checked: this.state.loopEnabled },
       { id: 'toggle-emergent', label: 'Emergent', key: 'E', type: 'toggle', checked: this.state.emergentEnabled },
@@ -267,16 +326,18 @@ export class TUI {
 
     // Escape to close modals
     this.screen.key(['escape'], () => {
-      if (this.activeModal) {
+      if (this.activeFileViewer) {
+        this.closeFileViewer();
+      } else if (this.activeModal) {
         this.closeModal();
       }
     });
 
     // Number hotkeys for actions (work globally, not just in actions pane)
-    const hotkeys = ['1', '2', '3', '4', '5', '6', '7'];
+    const hotkeys = ['1', '2', '3', '4', '5', '6', '7', '8'];
     hotkeys.forEach((key, index) => {
       this.screen.key([key], () => {
-        if (!this.activeModal) {
+        if (!this.activeModal && !this.activeFileViewer) {
           const selectableItems = this.getSelectableActionItems();
           const actionItems = selectableItems.filter(i => i.type === 'action');
           if (index < actionItems.length) {
@@ -451,6 +512,50 @@ export class TUI {
     }
   }
 
+  public openFileViewer(title: string, filePath: string): void {
+    if (this.activeFileViewer) {
+      this.closeFileViewer();
+    }
+    if (this.activeModal) {
+      this.closeModal();
+    }
+
+    this.activeFileViewer = createFileViewer(this.screen, {
+      title,
+      filePath,
+      onClose: () => {
+        this.closeFileViewer();
+      },
+    });
+
+    if (!this.activeFileViewer) {
+      this.log(`File not found: ${filePath}`);
+    }
+  }
+
+  private closeFileViewer(): void {
+    if (this.activeFileViewer) {
+      this.activeFileViewer.destroy();
+      this.activeFileViewer = null;
+      this.render();
+    }
+  }
+
+  /**
+   * Get planning file paths for current milestone
+   */
+  public getFileStates(): { spec: boolean; alignment: boolean; e2eTestPlan: boolean } {
+    if (!this.state.branch || !this.options.cwd) {
+      return { spec: false, alignment: false, e2eTestPlan: false };
+    }
+
+    return {
+      spec: this.state.milestone ? getSpecFilePath(this.options.cwd, this.state.milestone) !== null : false,
+      alignment: getPlanningFilePath(this.options.cwd, this.state.branch, 'alignment') !== null,
+      e2eTestPlan: getPlanningFilePath(this.options.cwd, this.state.branch, 'e2e_test_plan') !== null,
+    };
+  }
+
   public updateState(updates: Partial<TUIState>): void {
     this.state = { ...this.state, ...updates };
     this.buildActionItems();
@@ -499,13 +604,41 @@ export class TUI {
 
     // Update status pane
     this.statusPane.destroy();
+    const fileStates = this.getFileStates();
     this.statusPane = createStatusPane(
       this.screen,
       this.state.activeAgents,
       this.focusedPane === 'status' ? this.selectedIndex.status : undefined,
       this.state.milestone,
       this.state.branch,
-      this.logEntries
+      this.logEntries,
+      fileStates,
+      {
+        onViewSpec: () => {
+          if (this.state.milestone && this.options.cwd) {
+            const specPath = getSpecFilePath(this.options.cwd, this.state.milestone);
+            if (specPath) {
+              this.openFileViewer(`Spec: ${this.state.milestone}`, specPath);
+            }
+          }
+        },
+        onViewAlignment: () => {
+          if (this.state.branch && this.options.cwd) {
+            const alignPath = getPlanningFilePath(this.options.cwd, this.state.branch, 'alignment');
+            if (alignPath) {
+              this.openFileViewer('Alignment Document', alignPath);
+            }
+          }
+        },
+        onViewE2ETestPlan: () => {
+          if (this.state.branch && this.options.cwd) {
+            const e2ePath = getPlanningFilePath(this.options.cwd, this.state.branch, 'e2e_test_plan');
+            if (e2ePath) {
+              this.openFileViewer('E2E Test Plan', e2ePath);
+            }
+          }
+        },
+      }
     );
 
     // Apply focus styling
