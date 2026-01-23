@@ -16,6 +16,7 @@ import { join } from 'path';
 import { getCurrentBranch } from './planning.js';
 import { listWindows, SESSION_NAME, sessionExists, getCurrentSession } from './tmux.js';
 import { pickNextPrompt, markPromptInProgress, type PromptFile } from './prompts.js';
+import { shutdownDaemon } from './mcp-client.js';
 
 export interface EventLoopState {
   currentBranch: string;
@@ -219,7 +220,9 @@ export class EventLoop {
       const sessionName = currentSession || SESSION_NAME;
 
       if (!sessionExists(sessionName)) {
+        // Session gone - cleanup all agent daemons
         if (this.state.activeAgents.length > 0) {
+          await this.cleanupAgentDaemons(this.state.activeAgents);
           this.state.activeAgents = [];
           this.callbacks.onAgentsChange?.([]);
         }
@@ -237,11 +240,35 @@ export class EventLoop {
       const sortedPrevious = [...this.state.activeAgents].sort();
 
       if (JSON.stringify(sortedCurrent) !== JSON.stringify(sortedPrevious)) {
+        // Find agents that disappeared and cleanup their daemons
+        const disappeared = this.state.activeAgents.filter(
+          (name) => !agentWindows.includes(name)
+        );
+
+        if (disappeared.length > 0) {
+          await this.cleanupAgentDaemons(disappeared);
+        }
+
         this.state.activeAgents = agentWindows;
         this.callbacks.onAgentsChange?.(agentWindows);
       }
     } catch {
       // Silently fail
+    }
+  }
+
+  /**
+   * Cleanup MCP daemons for agents that have exited.
+   * The window name IS the AGENT_ID, so we can directly shutdown their daemons.
+   */
+  private async cleanupAgentDaemons(agentNames: string[]): Promise<void> {
+    for (const agentName of agentNames) {
+      try {
+        // Window name = AGENT_ID for daemon isolation
+        await shutdownDaemon(agentName);
+      } catch {
+        // Ignore errors - daemon may already be gone
+      }
     }
   }
 

@@ -1,0 +1,7 @@
+name: documentor
+flow: DOCUMENTATION_TAXONOMY.md
+singleton: true
+message_template: |
+  Documenting milestone: ${MILESTONE_NAME}
+template_vars:
+  - MILESTONE_NAME

@@ -16,6 +16,7 @@
  * 5. Rename active session to "ah-hub"
  *
  * Environment Variables passed to agents:
+ * - AGENT_ID: Unique agent identifier (= window name, used for MCP daemon isolation)
  * - AGENT_TYPE: executor, coordinator, planner, judge, ideation, documentor, pr-reviewer
  * - PROMPT_NUMBER: Current prompt number (when applicable)
  * - MILESTONE_NAME: Current milestone name
@@ -26,18 +27,16 @@ import { execSync, spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { getCurrentBranch } from './planning.js';
+import { listAgentProfiles, loadAgentProfile } from './agents.js';
 
-export type AgentType =
-  | 'executor'
-  | 'coordinator'
-  | 'planner'
-  | 'judge'
-  | 'ideation'
-  | 'documentor'
-  | 'pr-reviewer'
-  | 'emergent';
+/**
+ * Agent type = agent profile name.
+ * Derived from .allhands/agents/*.yaml profile files.
+ */
+export type AgentType = string;
 
 export interface AgentEnv {
+  AGENT_ID: string;
   AGENT_TYPE: AgentType;
   PROMPT_NUMBER?: string;
   MILESTONE_NAME?: string;
@@ -54,6 +53,11 @@ export interface SpawnConfig {
   nonCoding?: boolean;
   /** If true, switch focus to the new window after spawning (default: true for TUI actions) */
   focusWindow?: boolean;
+  /**
+   * If true, only one instance of this agent can run at a time.
+   * Attempting to spawn when one already exists will throw an error.
+   */
+  singleton?: boolean;
 }
 
 export interface SessionContext {
@@ -381,10 +385,31 @@ export function renameCurrentWindow(newName: string): void {
 }
 
 /**
+ * Build the window name for an agent.
+ *
+ * Singleton agents use their name directly (e.g., "planner").
+ * Non-singleton agents include the prompt number (e.g., "executor-01").
+ */
+export function buildWindowName(config: SpawnConfig): string {
+  if (config.singleton) {
+    return config.name;
+  }
+
+  // Non-singleton agents include prompt number
+  if (config.promptNumber !== undefined) {
+    return `${config.name}-${String(config.promptNumber).padStart(2, '0')}`;
+  }
+
+  // Fallback: use name as-is
+  return config.name;
+}
+
+/**
  * Build environment variables for agent
  */
-export function buildAgentEnv(config: SpawnConfig, branch: string): Record<string, string> {
+export function buildAgentEnv(config: SpawnConfig, branch: string, windowName: string): Record<string, string> {
   const env: Record<string, string> = {
+    AGENT_ID: windowName, // Window name = AGENT_ID (used for MCP daemon isolation)
     AGENT_TYPE: config.agentType,
     BRANCH: branch,
   };
@@ -410,6 +435,13 @@ export function buildAgentEnv(config: SpawnConfig, branch: string): Record<strin
  * @param branch - Git branch (defaults to current)
  * @param cwd - Working directory
  * @returns Session and window names
+ * @throws Error if singleton agent already exists
+ *
+ * Window naming:
+ * - Singleton agents use name directly (e.g., "planner")
+ * - Non-singleton agents include prompt number (e.g., "executor-01")
+ *
+ * The window name becomes the AGENT_ID for MCP daemon isolation.
  *
  * Window focus behavior:
  * - config.focusWindow = true (default): Switch to the new window after spawning
@@ -422,10 +454,17 @@ export function spawnAgent(
 ): { sessionName: string; windowName: string } {
   const currentBranch = branch || getCurrentBranch();
   const sessionName = ensureSession(currentBranch, cwd);
-  const windowName = config.name;
+  const windowName = buildWindowName(config);
   const shouldFocus = config.focusWindow !== false; // Default to true
 
-  // Kill existing window if present
+  // Singleton enforcement: fail if already running
+  if (config.singleton && windowExists(sessionName, windowName)) {
+    throw new Error(
+      `Agent "${windowName}" is already running. Only one instance of singleton agents is allowed.`
+    );
+  }
+
+  // Kill existing window if present (for non-singleton agents being restarted)
   if (windowExists(sessionName, windowName)) {
     killWindow(sessionName, windowName);
   }
@@ -434,7 +473,8 @@ export function spawnAgent(
   createWindow(sessionName, windowName, cwd, true);
 
   // Build environment as inline vars (VAR=value VAR2=value command)
-  const env = buildAgentEnv(config, currentBranch);
+  // Pass windowName so AGENT_ID is set correctly
+  const env = buildAgentEnv(config, currentBranch, windowName);
   const envPrefix = Object.entries(env)
     .map(([k, v]) => `${k}='${v}'`)
     .join(' ');
@@ -510,21 +550,46 @@ export function getRunningAgents(branch?: string): Array<{
 }
 
 /**
- * Infer agent type from window name
+ * Get all valid agent types from profiles.
+ */
+export function getAgentTypes(): string[] {
+  return listAgentProfiles().map((name) => {
+    const profile = loadAgentProfile(name);
+    return profile?.name ?? name;
+  });
+}
+
+/**
+ * Infer agent type from window name using agent profiles.
+ *
+ * Window names follow patterns:
+ * - Singleton: exact profile name (e.g., "planner")
+ * - Non-singleton: "{name}-{NN}" (e.g., "executor-01")
  */
 function inferAgentType(windowName: string): AgentType | undefined {
   const lowerName = windowName.toLowerCase();
 
-  if (lowerName.includes('executor') || lowerName.match(/^prompt-\d+$/)) {
-    return 'executor';
+  // Load all profiles and match against window name
+  const profileNames = listAgentProfiles();
+
+  for (const profileName of profileNames) {
+    const profile = loadAgentProfile(profileName);
+    if (!profile) continue;
+
+    const name = profile.name.toLowerCase();
+
+    if (profile.singleton) {
+      // Singleton: exact match
+      if (lowerName === name) {
+        return name;
+      }
+    } else {
+      // Non-singleton: match "{name}" or "{name}-{NN}"
+      if (lowerName === name || lowerName.match(new RegExp(`^${name}-\\d+$`))) {
+        return name;
+      }
+    }
   }
-  if (lowerName.includes('coordinator')) return 'coordinator';
-  if (lowerName.includes('planner')) return 'planner';
-  if (lowerName.includes('judge')) return 'judge';
-  if (lowerName.includes('ideation')) return 'ideation';
-  if (lowerName.includes('documentor')) return 'documentor';
-  if (lowerName.includes('pr-review')) return 'pr-reviewer';
-  if (lowerName.includes('emergent')) return 'emergent';
 
   return undefined;
 }

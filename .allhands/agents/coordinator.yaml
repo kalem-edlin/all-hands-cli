@@ -1,0 +1,7 @@
+name: coordinator
+flow: COORDINATION.md
+singleton: true
+message_template: |
+  Coordinating milestone: ${MILESTONE_NAME}
+template_vars:
+  - MILESTONE_NAME

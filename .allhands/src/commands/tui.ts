@@ -128,30 +128,40 @@ async function handleAction(
   switch (action) {
     case 'ideation': {
       tui.log('Spawning ideation session...');
-      const result = spawnAgent({
-        name: 'ideation',
-        agentType: 'ideation',
-        flowPath: join(flowsDir, 'IDEATION_SESSION.md'),
-        preamble: 'Starting ideation session. Explore ideas and draft specs.',
-        milestoneName: status?.milestone,
-      }, branch);
-      tui.log(`Spawned ideation in ${result.sessionName}:${result.windowName}`);
-      updateRunningAgents(tui, branch);
+      try {
+        const result = spawnAgent({
+          name: 'ideation',
+          agentType: 'ideation',
+          flowPath: join(flowsDir, 'IDEATION_SESSION.md'),
+          preamble: 'Starting ideation session. Explore ideas and draft specs.',
+          milestoneName: status?.milestone,
+          singleton: true,
+        }, branch);
+        tui.log(`Spawned ideation in ${result.sessionName}:${result.windowName}`);
+        updateRunningAgents(tui, branch);
+      } catch (e) {
+        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      }
       break;
     }
 
     case 'coordinator': {
       tui.log('Spawning coordinator chat...');
-      const result = spawnAgent({
-        name: 'coordinator',
-        agentType: 'coordinator',
-        flowPath: join(flowsDir, 'COORDINATION.md'),
-        preamble: 'Starting coordinator session. You can inspect agents and manage the loop.',
-        milestoneName: status?.milestone,
-        nonCoding: true,
-      }, branch);
-      tui.log(`Spawned coordinator in ${result.sessionName}:${result.windowName}`);
-      updateRunningAgents(tui, branch);
+      try {
+        const result = spawnAgent({
+          name: 'coordinator',
+          agentType: 'coordinator',
+          flowPath: join(flowsDir, 'COORDINATION.md'),
+          preamble: 'Starting coordinator session. You can inspect agents and manage the loop.',
+          milestoneName: status?.milestone,
+          nonCoding: true,
+          singleton: true,
+        }, branch);
+        tui.log(`Spawned coordinator in ${result.sessionName}:${result.windowName}`);
+        updateRunningAgents(tui, branch);
+      } catch (e) {
+        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      }
       break;
     }
 
@@ -161,30 +171,40 @@ async function handleAction(
         return;
       }
       tui.log('Spawning planner...');
-      const result = spawnAgent({
-        name: 'planner',
-        agentType: 'planner',
-        flowPath: join(flowsDir, 'MILESTONE_PLANNING.md'),
-        preamble: 'Plan the milestone. Create prompts and set up the alignment doc.',
-        milestoneName: status.milestone,
-      }, branch);
-      tui.log(`Spawned planner in ${result.sessionName}:${result.windowName}`);
-      updateRunningAgents(tui, branch);
+      try {
+        const result = spawnAgent({
+          name: 'planner',
+          agentType: 'planner',
+          flowPath: join(flowsDir, 'MILESTONE_PLANNING.md'),
+          preamble: 'Plan the milestone. Create prompts and set up the alignment doc.',
+          milestoneName: status.milestone,
+          singleton: true,
+        }, branch);
+        tui.log(`Spawned planner in ${result.sessionName}:${result.windowName}`);
+        updateRunningAgents(tui, branch);
+      } catch (e) {
+        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      }
       break;
     }
 
     case 'review-jury': {
       tui.log('Spawning judge for milestone review...');
-      const result = spawnAgent({
-        name: 'judge',
-        agentType: 'judge',
-        flowPath: join(flowsDir, 'JUDGE_REVIEWING.md'),
-        preamble: 'Review the current milestone work. Spawn jury sub-agents as needed.',
-        milestoneName: status?.milestone,
-        nonCoding: true,
-      }, branch);
-      tui.log(`Spawned judge in ${result.sessionName}:${result.windowName}`);
-      updateRunningAgents(tui, branch);
+      try {
+        const result = spawnAgent({
+          name: 'judge',
+          agentType: 'judge',
+          flowPath: join(flowsDir, 'JUDGE_REVIEWING.md'),
+          preamble: 'Review the current milestone work. Spawn jury sub-agents as needed.',
+          milestoneName: status?.milestone,
+          nonCoding: true,
+          singleton: true,
+        }, branch);
+        tui.log(`Spawned judge in ${result.sessionName}:${result.windowName}`);
+        updateRunningAgents(tui, branch);
+      } catch (e) {
+        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      }
       break;
     }
 
@@ -241,29 +261,39 @@ async function handleAction(
 
     case 'address-pr': {
       tui.log('Spawning PR reviewer...');
-      const result = spawnAgent({
-        name: 'pr-reviewer',
-        agentType: 'pr-reviewer',
-        flowPath: join(flowsDir, 'PR_REVIEWING.md'),
-        preamble: 'Review and address PR feedback.',
-        milestoneName: status?.milestone,
-      }, branch);
-      tui.log(`Spawned pr-reviewer in ${result.sessionName}:${result.windowName}`);
-      updateRunningAgents(tui, branch);
+      try {
+        const result = spawnAgent({
+          name: 'pr-reviewer',
+          agentType: 'pr-reviewer',
+          flowPath: join(flowsDir, 'PR_REVIEWING.md'),
+          preamble: 'Review and address PR feedback.',
+          milestoneName: status?.milestone,
+          singleton: true,
+        }, branch);
+        tui.log(`Spawned pr-reviewer in ${result.sessionName}:${result.windowName}`);
+        updateRunningAgents(tui, branch);
+      } catch (e) {
+        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      }
       break;
     }
 
     case 'compound': {
       tui.log('Spawning documentor for compound phase...');
-      const result = spawnAgent({
-        name: 'documentor',
-        agentType: 'documentor',
-        flowPath: join(flowsDir, 'DOCUMENTATION_TAXONOMY.md'),
-        preamble: 'Run compound phase: documentation and post-mortem.',
-        milestoneName: status?.milestone,
-      }, branch);
-      tui.log(`Spawned documentor in ${result.sessionName}:${result.windowName}`);
-      updateRunningAgents(tui, branch);
+      try {
+        const result = spawnAgent({
+          name: 'documentor',
+          agentType: 'documentor',
+          flowPath: join(flowsDir, 'DOCUMENTATION_TAXONOMY.md'),
+          preamble: 'Run compound phase: documentation and post-mortem.',
+          milestoneName: status?.milestone,
+          singleton: true,
+        }, branch);
+        tui.log(`Spawned documentor in ${result.sessionName}:${result.windowName}`);
+        updateRunningAgents(tui, branch);
+      } catch (e) {
+        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      }
       break;
     }
 
@@ -402,19 +432,19 @@ function updateRunningAgents(tui: TUI, branch: string): void {
 function spawnExecutorForPrompt(tui: TUI, prompt: PromptFile, branch: string): void {
   const flowsDir = getFlowsDir();
   const promptNumber = prompt.frontmatter.number;
-  const windowName = `prompt-${String(promptNumber).padStart(2, '0')}`;
 
   tui.log(`Spawning executor for: ${prompt.frontmatter.title}`);
 
   const result = spawnAgent(
     {
-      name: windowName,
+      name: 'executor', // buildWindowName will create "executor-NN"
       agentType: 'executor',
       flowPath: join(flowsDir, 'EXECUTOR.md'),
       preamble: `Execute prompt ${promptNumber}: ${prompt.frontmatter.title}\n\nPrompt file: ${prompt.path}`,
       promptNumber,
       milestoneName: prompt.frontmatter.title,
       focusWindow: false, // Don't steal focus from TUI
+      singleton: false, // Multiple executors can run (one per prompt)
     },
     branch
   );

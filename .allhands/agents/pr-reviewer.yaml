@@ -1,0 +1,7 @@
+name: pr-reviewer
+flow: PR_REVIEWING.md
+singleton: true
+message_template: |
+  Reviewing PR feedback for: ${MILESTONE_NAME}
+template_vars:
+  - MILESTONE_NAME

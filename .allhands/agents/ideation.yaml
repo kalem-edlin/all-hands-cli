@@ -1,0 +1,7 @@
+name: ideation
+flow: IDEATION_SESSION.md
+singleton: true
+message_template: |
+  Exploring ideas for: ${MILESTONE_NAME}
+template_vars:
+  - MILESTONE_NAME
