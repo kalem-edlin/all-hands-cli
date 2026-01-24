@@ -126,51 +126,6 @@ export function getPlanDir(cwd?: string): string {
 }
 
 /**
- * Get diff from base branch to HEAD.
- * Combines getBaseBranch() and getDiff() for convenience.
- */
-export function getDiffFromBase(cwd?: string): string {
-  const workingDir = cwd || process.cwd();
-  const baseBranch = getBaseBranch();
-
-  try {
-    // Use three-dot diff to show changes since divergence
-    const result = spawnSync("git", ["diff", `${baseBranch}...HEAD`], {
-      encoding: "utf-8",
-      maxBuffer: 10 * 1024 * 1024, // 10MB
-      cwd: workingDir,
-    });
-
-    if (result.status !== 0) {
-      return getDiff(baseBranch);
-    }
-
-    return result.stdout || "(No changes from base)";
-  } catch {
-    return getDiff(baseBranch);
-  }
-}
-
-/**
- * Get diff stat summary from base branch.
- */
-export function getDiffStatFromBase(cwd?: string): string {
-  const workingDir = cwd || process.cwd();
-  const baseBranch = getBaseBranch();
-
-  try {
-    const result = spawnSync("git", ["diff", `${baseBranch}...HEAD`, "--stat"], {
-      encoding: "utf-8",
-      cwd: workingDir,
-    });
-
-    return result.status === 0 ? result.stdout.trim() : "(Unable to get diff stat)";
-  } catch {
-    return "(Unable to get diff stat)";
-  }
-}
-
-/**
  * Get the current HEAD commit hash.
  */
 export function getHeadCommit(cwd?: string): string {
@@ -193,28 +148,4 @@ export function getHeadCommit(cwd?: string): string {
  */
 export function getShortCommit(commitHash: string): string {
   return commitHash.substring(0, 7);
-}
-
-/**
- * Get list of changed file names from base branch to HEAD.
- * Returns just the file paths, one per line.
- */
-export function getChangedFilesFromBase(cwd?: string): string[] {
-  const workingDir = cwd || process.cwd();
-  const baseBranch = getBaseBranch();
-
-  try {
-    const result = spawnSync("git", ["diff", `${baseBranch}...HEAD`, "--name-only"], {
-      encoding: "utf-8",
-      cwd: workingDir,
-    });
-
-    if (result.status !== 0 || !result.stdout.trim()) {
-      return [];
-    }
-
-    return result.stdout.trim().split("\n").filter(Boolean);
-  } catch {
-    return [];
-  }
 }

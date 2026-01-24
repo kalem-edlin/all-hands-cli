@@ -10,6 +10,7 @@ node_modules/
 .planning/
 .env.ai
 .tldr/
+.reposearch/
 
 # External repo research
 .reposearch/

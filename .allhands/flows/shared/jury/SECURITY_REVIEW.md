@@ -20,7 +20,7 @@ Review implementation for security vulnerabilities and risks. Per **Agentic Vali
 
 ## Context Gathering
 
-- Run `ah git diff-base` to review all implementation changes
+- Review all implementation changes from base branch
 - Read alignment doc for security decisions made during planning
 - Identify security-sensitive areas touched
 

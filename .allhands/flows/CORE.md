@@ -3,14 +3,12 @@ Core harness integration for all agents. Per **Context is Precious**, this flow 
 </goal>
 
 <constraints>
-- MUST use `ah knowledge search <query>` as the first tool when searching the codebase
+- MUST use `ah knowledge search <query>` for code search tied to crucial project knowledge
+- MUST use `tldr semantic search <query>` for quick and intelligent code search
 - MUST read `.allhands/principles.md` when making architectural decisions
 - NEVER repeat instructions found in sub-flows; reference them instead
 </constraints>
 
-## Semantic Search
-
-Per **Context is Precious**, use the semantic index before file exploration:
-- Run `ah knowledge search "<query>"` to find relevant code
-- Add `--path <path>` to scope searches to specific directories
-- Add `--k <n>` to control result count (default: 5)
+## Git Base Branch
+ 
+For git commands, you can reference the base branch with `$BASE_BRANCH`

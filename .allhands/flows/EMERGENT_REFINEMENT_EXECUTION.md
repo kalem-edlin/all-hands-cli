@@ -13,9 +13,10 @@ Create a hypothesis of implementation that iteratively solves, improves, or conv
 - Read the alignment doc for top-level goal, objectives, acceptance criteria, and prior prompt summaries
 - Formulate a non-overlapping hypothesis of implementation → intended outcome
 - Verify hypothesis doesn't conflict with prior work:
-  - Read relevant prompt files
+  - Read relevant prompt files and check their code references if relevant
   - Run `ah knowledge search <query>` for documented features
-  - Run `ah git diff-base-files` for recently changed files on this branch
+  - Check recently changed files on this branch
+- If more context is needed, run `ah solutions search "<keywords>"` for relevant past solutions
 
 ## Implementation
 

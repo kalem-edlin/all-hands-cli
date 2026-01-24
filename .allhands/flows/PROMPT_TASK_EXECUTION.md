@@ -15,7 +15,9 @@ Execute prompt tasks with full context, validate thoroughly, and document your w
   - If FAILURE SUMMARY sections exist, adapt to their redirections / learnings
 - Read the alignment doc for milestone context, prior prompt summaries, and key decisions
   - Read any relevant dependency prompt files
-- Run `ah knowledge search <query>` for codebase information as needed
+- Only if additional context is needed (likely not needed):
+  - Run `ah knowledge search <query>` for codebase information as needed
+  - Run `ah solutions search "<keywords>"` for relevant past solutions
 
 ## Implementation
 

@@ -455,6 +455,7 @@ export function buildAgentEnv(config: SpawnConfig, branch: string, windowName: s
     AGENT_ID: windowName, // Window name = AGENT_ID (used for MCP daemon isolation)
     AGENT_TYPE: config.agentType,
     BRANCH: branch,
+    BASE_BRANCH: process.env.BASE_BRANCH || 'main',
   };
 
   if (config.promptNumber !== undefined) {
@@ -695,6 +696,7 @@ export function spawnCustomFlow(
     AGENT_ID: windowName,
     AGENT_TYPE: 'custom-flow',
     BRANCH: currentBranch,
+    BASE_BRANCH: process.env.BASE_BRANCH || 'main',
   };
 
   if (config.milestoneName) {

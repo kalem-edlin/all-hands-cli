@@ -20,7 +20,7 @@ Build an E2E test plan that convinces the engineer of milestone implementation e
 ## Context Gathering
 
 - Read the alignment doc for top-level goal, objectives, acceptance criteria, and prompt execution summaries
-- Run `ah git diff-base-files` to see changed files (use `ah git diff-base` for full diff if needed - careful with information overload)
+- Review changed files from base branch (careful with information overload on full diffs)
 - Run `ah validation-tools list` to see available validation suites
 - Investigate validation tooling methods used in prompts and their consequences on E2E product flows
 

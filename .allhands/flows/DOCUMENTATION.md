@@ -123,7 +123,7 @@ After validation passes:
 Incremental documentation for changes only.
 
 ### Scope Changes
-- Run `ah git diff-base-files` to identify affected files
+- Identify files changed from base branch
 - Run `ah docs tree <affected-path> --depth 4`
 - Run `ah docs complexity <affected-path>`
 

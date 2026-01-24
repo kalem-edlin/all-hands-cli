@@ -23,7 +23,7 @@ Review implementation for domain best practices compliance. Per **Knowledge Comp
 ## Context Gathering
 
 - Read the alignment doc for prompt summaries
-- Run `ah git diff-base-files` to identify domain-relevant implementation files
+- Identify domain-relevant implementation files changed from base branch
 - Identify and read prompts that touched this domain
 
 ## Best Practices Extraction

@@ -22,7 +22,7 @@ Review implementation for YAGNI (You Ain't Gonna Need It) violations. Per **Qual
 
 ## Context Gathering
 
-- Run `ah git diff-base` to review all implementation changes
+- Review all implementation changes from base branch
 - Read prompt summaries for task scope
 - Read alignment doc for engineer decisions
 - Identify patch prompts and emergent prompts (post-planning decisions)

@@ -23,7 +23,7 @@ Review implementation for engineer expectations fit. Per **Ideation First**, ver
 
 - Read the spec doc for original engineer expectations, desires, and success criteria
 - Read the alignment doc for planning decisions and engineer interjections
-- Run `ah git diff-base-files` to identify implementation files
+- Identify implementation files changed from base branch
 - Read select prompts for detailed implementation context where necessary
 
 ## Expectations Extraction
