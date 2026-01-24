@@ -44,6 +44,25 @@ If external documentation is needed, use `.allhands/flows/shared/EXTERNAL_TECH_G
 - `ah context7 search "<tool_name>"` for official docs
 - `ah tavily extract "<doc_url>"` for specific pages
 
+### MCP Gap Assessment
+
+Check if discovered tools are available as MCP integrations:
+```bash
+ah tools --list
+```
+
+If research identifies a valuable MCP that isn't currently integrated:
+
+1. **Document the gap**: Note the MCP package name and purpose
+2. **Spin up sub-agent** to add the MCP (runs in parallel, non-blocking):
+   ```
+   Invoke sub-agent with:
+   - Flow: .allhands/flows/shared/HARNESS_MCP.md
+   - Inputs: MCP package name, purpose for validation
+   ```
+3. **Continue to Phase 3** - Don't block on MCP setup; the sub-agent handles it
+4. **In Phase 3**, inform user that MCP integration is in progress and may require credentials
+
 ## Phase 3: User Interview
 
 Present findings to the user:
@@ -52,6 +71,10 @@ Present findings to the user:
 2. **Recommend a primary approach** with reasoning
 3. **Identify CICD integration opportunities** - can this run in pipelines?
 4. **Confirm scope** - what validation scenarios should this suite cover?
+5. **MCP status** (if sub-agent was spawned):
+   - Which MCP is being integrated
+   - Any credentials/env vars that will be needed
+   - Expected tools that will become available
 
 Get user confirmation before proceeding to creation.
 
