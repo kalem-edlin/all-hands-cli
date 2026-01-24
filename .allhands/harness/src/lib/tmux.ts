@@ -643,6 +643,126 @@ export function spawnAgentFromProfile(
 }
 
 /**
+ * Configuration for custom flow spawning
+ */
+export interface CustomFlowConfig {
+  /** Absolute path to the flow file */
+  flowPath: string;
+  /** Custom message to use as system prompt/preamble */
+  customMessage: string;
+  /** Unique window name (e.g., "custom-flow-1") */
+  windowName: string;
+  /** If true, switch focus to the new window (default: true) */
+  focusWindow?: boolean;
+  /** Current milestone name (optional, for context) */
+  milestoneName?: string;
+}
+
+/**
+ * Spawn a custom flow agent
+ *
+ * This allows running any flow file with a custom message as the preamble.
+ * The agent is tracked like profiled agents but without profile restrictions.
+ *
+ * @param config - Custom flow configuration
+ * @param branch - Git branch (defaults to current)
+ * @param cwd - Working directory
+ * @returns Session and window names
+ */
+export function spawnCustomFlow(
+  config: CustomFlowConfig,
+  branch?: string,
+  cwd?: string
+): { sessionName: string; windowName: string } {
+  const currentBranch = branch || getCurrentBranch();
+  const sessionName = ensureSession(currentBranch, cwd);
+  const windowName = config.windowName;
+  const shouldFocus = config.focusWindow !== false;
+
+  // Kill existing window if present (allow respawning)
+  if (windowExists(sessionName, windowName)) {
+    killWindow(sessionName, windowName);
+  }
+
+  // Create new window (detached - don't switch focus yet)
+  createWindow(sessionName, windowName, cwd, true);
+
+  // Register this agent as spawned by ALL HANDS
+  registerSpawnedAgent(windowName);
+
+  // Build environment variables for the custom flow agent
+  const env: Record<string, string> = {
+    AGENT_ID: windowName,
+    AGENT_TYPE: 'custom-flow',
+    BRANCH: currentBranch,
+  };
+
+  if (config.milestoneName) {
+    env.MILESTONE_NAME = config.milestoneName;
+  }
+
+  // Read the flow file content
+  let flowContent = '';
+  if (existsSync(config.flowPath)) {
+    flowContent = readFileSync(config.flowPath, 'utf-8');
+  }
+
+  // Write a launcher script to avoid all shell escaping issues
+  const tempDir = join(cwd || process.cwd(), '.allhands', 'harness', '.cache', 'launchers');
+  mkdirSync(tempDir, { recursive: true });
+
+  const launcherScript = join(tempDir, `${windowName}-launcher.sh`);
+  const promptFile = join(tempDir, `${windowName}-prompt.txt`);
+  const systemPromptFile = join(tempDir, `${windowName}-system.txt`);
+
+  // Write flow content as the main prompt
+  if (flowContent) {
+    writeFileSync(promptFile, flowContent, 'utf-8');
+  }
+
+  // Write custom message as system prompt if provided
+  if (config.customMessage && config.customMessage.trim()) {
+    writeFileSync(systemPromptFile, config.customMessage, 'utf-8');
+  }
+
+  // Build the launcher script
+  const scriptLines: string[] = ['#!/bin/bash', ''];
+
+  // Export environment variables
+  for (const [key, value] of Object.entries(env)) {
+    scriptLines.push(`export ${key}="${value}"`);
+  }
+  scriptLines.push('');
+
+  // Build claude command
+  const cmdParts: string[] = ['claude'];
+  cmdParts.push('--settings .allhands/harness/src/platforms/claude/settings.json');
+  cmdParts.push('--dangerously-skip-permissions');
+
+  if (config.customMessage && config.customMessage.trim()) {
+    cmdParts.push(`--system-prompt "$(cat '${systemPromptFile}')"`);
+  }
+
+  if (flowContent) {
+    cmdParts.push(`"$(cat '${promptFile}')"`);
+  }
+
+  scriptLines.push(cmdParts.join(' \\\n  '));
+
+  writeFileSync(launcherScript, scriptLines.join('\n'), { mode: 0o755 });
+
+  // Execute the launcher script with exec so it replaces the shell
+  sendKeys(sessionName, windowName, `exec bash '${launcherScript}'`);
+
+  // Switch focus to the new window if requested
+  if (shouldFocus) {
+    selectWindow(sessionName, windowName);
+  }
+
+  return { sessionName, windowName };
+}
+
+/**
  * Build standard template context from planning state
  *
  * This constructs the context object needed for agent spawning

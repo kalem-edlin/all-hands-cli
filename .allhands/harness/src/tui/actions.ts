@@ -155,6 +155,8 @@ function buildActionItems(toggleState: ToggleState): ActionItem[] {
     { id: 'mark-completed', label: 'Mark Completed', key: '8', type: 'action', hidden: !compoundRun },
     // Switch/Choose milestone - always visible, label changes
     { id: 'switch-milestone', label: milestoneLabel, key: '9', type: 'action' },
+    // Custom Flow - always visible, allows running any flow with custom message
+    { id: 'custom-flow', label: 'Custom Flow', key: '0', type: 'action' },
     // Spacing before toggles
     { id: 'spacer-1', label: '', type: 'separator' },
     { id: 'separator-toggles', label: '─── Toggles ───', type: 'separator' },

@@ -78,6 +78,7 @@ export async function launchTUI(options: { branch?: string } = {}): Promise<void
     branch,
     prActionState: 'create-pr' as PRActionState,
     compoundRun: status?.compound_run ?? false,
+    customFlowCounter: 0,
   };
 
   // Rename current tmux window to 'hub'

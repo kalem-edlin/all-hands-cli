@@ -21,12 +21,13 @@ import { createStatusPane, AgentInfo, FileStates, StatusPaneOptions } from './st
 import { createModal, Modal } from './modal.js';
 import { createFileViewer, FileViewer, getPlanningFilePath, getSpecFilePath } from './file-viewer-modal.js';
 import { EventLoop } from '../lib/event-loop.js';
-import { killWindow, listWindows, getCurrentSession } from '../lib/tmux.js';
+import { killWindow, listWindows, getCurrentSession, spawnCustomFlow } from '../lib/tmux.js';
 import { KnowledgeService } from '../lib/knowledge.js';
 import { validateDocs } from '../lib/docs-validation.js';
 import { loadAllProfiles } from '../lib/opencode/index.js';
 import type { PromptFile } from '../lib/prompts.js';
 import { loadAllSpecs, specsToModalItems } from '../lib/specs.js';
+import { loadAllFlows, flowsToModalItems } from '../lib/flows.js';
 import { join } from 'path';
 
 export type PaneId = 'actions' | 'prompts' | 'status';
@@ -49,6 +50,7 @@ export interface TUIState {
   branch?: string;
   prActionState: PRActionState;
   compoundRun: boolean;
+  customFlowCounter: number;
 }
 
 export class TUI {
@@ -96,6 +98,7 @@ export class TUI {
       activeAgents: [],
       prActionState: 'create-pr',
       compoundRun: false,
+      customFlowCounter: 0,
     };
 
     // Suppress terminal capability errors (e.g., xterm-ghostty.Setulc) during screen creation
@@ -355,6 +358,8 @@ export class TUI {
       { id: 'mark-completed', label: 'Mark Completed', key: '8', type: 'action', hidden: !this.state.compoundRun },
       // Switch/Choose milestone - always visible, label changes
       { id: 'switch-milestone', label: milestoneLabel, key: '9', type: 'action' },
+      // Custom Flow - always visible, allows running any flow with custom message
+      { id: 'custom-flow', label: 'Custom Flow', key: '0', type: 'action' },
       { id: 'separator-toggles', label: '─ Toggles ─', type: 'separator' },
       { id: 'toggle-loop', label: 'Loop', key: 'O', type: 'toggle', checked: this.state.loopEnabled },
       { id: 'toggle-emergent', label: 'Emergent', key: 'E', type: 'toggle', checked: this.state.emergentEnabled },
@@ -438,7 +443,7 @@ export class TUI {
     });
 
     // Number hotkeys for actions (work globally, not just in actions pane)
-    const hotkeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const hotkeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
     hotkeys.forEach((key, index) => {
       this.screen.key([key], () => {
         if (!this.activeModal && !this.activeFileViewer) {
@@ -560,6 +565,9 @@ export class TUI {
       case 'switch-milestone':
         this.openMilestoneModal();
         break;
+      case 'custom-flow':
+        this.openCustomFlowModal();
+        break;
       case 'pr-action':
         if (this.state.prActionState === 'create-pr') {
           this.options.onAction('create-pr');
@@ -606,6 +614,167 @@ export class TUI {
       scrollable: true,
     });
     this.screen.render();
+  }
+
+  private openCustomFlowModal(): void {
+    // Load flows from filesystem
+    const flowGroups = loadAllFlows();
+    const items = flowsToModalItems(flowGroups);
+
+    this.activeModal = createModal(this.screen, {
+      title: 'Select Flow',
+      items,
+      onSelect: (flowPath: string) => {
+        this.closeModal();
+        // flowPath is the absolute path to the selected flow file
+        if (!flowPath.startsWith('header-')) {
+          this.openCustomMessageInput(flowPath);
+        }
+      },
+      onCancel: () => {
+        this.closeModal();
+      },
+      scrollable: true,
+    });
+    this.screen.render();
+  }
+
+  private openCustomMessageInput(flowPath: string): void {
+    // Create an input modal for the custom message
+    const width = 60;
+    const height = 12;
+
+    const box = blessed.box({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width,
+      height,
+      border: {
+        type: 'line',
+      },
+      label: ' Custom Message (optional) ',
+      tags: true,
+      style: {
+        border: {
+          fg: 'yellow',
+        },
+        bg: 'black',
+      },
+    });
+
+    // Add description text
+    blessed.text({
+      parent: box,
+      top: 1,
+      left: 1,
+      content: 'Enter a custom message (system prompt).\nLeave empty to skip. Press Enter to confirm.',
+      tags: true,
+    });
+
+    // Create textarea for input
+    const textarea = blessed.textarea({
+      parent: box,
+      top: 4,
+      left: 1,
+      width: width - 4,
+      height: 4,
+      border: {
+        type: 'line',
+      },
+      style: {
+        border: {
+          fg: 'cyan',
+        },
+        focus: {
+          border: {
+            fg: 'yellow',
+          },
+        },
+      },
+      inputOnFocus: true,
+    });
+
+    // Help text
+    blessed.text({
+      parent: box,
+      bottom: 0,
+      left: 1,
+      content: '{gray-fg}[Enter] Confirm  [Esc] Cancel{/gray-fg}',
+      tags: true,
+    });
+
+    // Store modal reference for cleanup (conform to Modal interface)
+    const modalRef: Modal = {
+      box,
+      selectedIndex: 0,
+      destroy: () => {
+        box.destroy();
+      },
+      navigate: () => {}, // Not used for input modal
+      select: () => {}, // Not used for input modal
+    };
+    this.activeModal = modalRef;
+
+    // Focus textarea
+    textarea.focus();
+
+    // Handle Enter key - submit
+    textarea.key(['enter'], () => {
+      const customMessage = textarea.getValue().trim();
+      modalRef.destroy();
+      this.activeModal = null;
+      this.spawnCustomFlowAgent(flowPath, customMessage);
+      this.render();
+    });
+
+    // Handle Escape key - cancel
+    textarea.key(['escape'], () => {
+      modalRef.destroy();
+      this.activeModal = null;
+      this.render();
+    });
+
+    this.screen.render();
+  }
+
+  private spawnCustomFlowAgent(flowPath: string, customMessage: string): void {
+    // Increment counter and generate window name
+    this.state.customFlowCounter++;
+    const windowName = `custom-flow-${this.state.customFlowCounter}`;
+    const branch = this.state.branch || 'main';
+
+    this.log(`Spawning custom flow: ${windowName}`);
+    this.log(`Flow: ${flowPath.split('/').slice(-2).join('/')}`);
+
+    try {
+      const result = spawnCustomFlow(
+        {
+          flowPath,
+          customMessage,
+          windowName,
+          focusWindow: true,
+          milestoneName: this.state.milestone,
+        },
+        branch,
+        this.options.cwd
+      );
+
+      this.log(`Spawned ${windowName} in ${result.sessionName}:${result.windowName}`);
+
+      // Update running agents display
+      this.state.activeAgents = [
+        ...this.state.activeAgents,
+        {
+          name: windowName,
+          agentType: 'custom-flow',
+          isRunning: true,
+        },
+      ];
+      this.render();
+    } catch (e) {
+      this.log(`Error spawning custom flow: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   private closeModal(): void {
