@@ -76,6 +76,22 @@ Per **Ideation First**:
 
 Use "Assuming X exists..." or "Assuming any of X, Y, Z exist..." to express dependencies on milestones that will be implemented by the time this one is.
 
+## Spec Flow Analysis (Optional)
+
+After writing the spec, offer flow analysis:
+
+Ask engineer: "Would you like me to analyze this spec for user flow coverage and gaps?"
+
+If yes:
+- Read `.allhands/flows/shared/SPEC_FLOW_ANALYSIS.md` and follow instructions
+- Returns: identified flows, gaps, clarifying questions
+- Engineer chooses which gaps to address before enabling milestone
+
+This is recommended for:
+- User-facing features with multiple paths
+- Complex integrations with external systems
+- Features with unclear scope boundaries
+
 ## Closing
 
 After writing the spec, ask the engineer:

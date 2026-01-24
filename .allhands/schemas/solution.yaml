@@ -1,0 +1,131 @@
+# Solution Schema
+# Files in docs/solutions/<category>/<name>.md
+# Single source of truth for documented learnings and solved problems
+# Per **Knowledge Compounding**, solutions capture institutional knowledge for future reference
+
+frontmatter:
+  title:
+    type: string
+    required: true
+    description: "Descriptive title of the problem/solution (searchable)"
+
+  date:
+    type: string
+    required: true
+    format: "YYYY-MM-DD"
+    description: "Date the solution was documented"
+
+  milestone:
+    type: string
+    required: false
+    description: "Milestone branch name where this was discovered (if applicable)"
+
+  problem_type:
+    type: enum
+    required: true
+    values:
+      - build_error
+      - test_failure
+      - runtime_error
+      - performance_issue
+      - database_issue
+      - security_issue
+      - ui_bug
+      - integration_issue
+      - logic_error
+      - agentic_issue
+      - workflow_issue
+      - best_practice
+      - documentation_gap
+    description: "Category of problem - determines storage directory"
+
+  component:
+    type: string
+    required: true
+    description: "Technical component affected (e.g., 'api-client', 'auth-service', 'database', 'ui-component')"
+
+  symptoms:
+    type: array
+    items: string
+    required: true
+    min_items: 1
+    max_items: 5
+    description: "Observable symptoms that indicate this problem (searchable)"
+
+  root_cause:
+    type: enum
+    required: true
+    values:
+      - missing_dependency
+      - wrong_api_usage
+      - configuration_error
+      - logic_error
+      - timing_issue
+      - resource_leak
+      - missing_validation
+      - permission_issue
+      - agentic_hallucination
+      - agentic_duplication
+      - agentic_miscommunication
+      - incomplete_implementation
+      - environment_mismatch
+      - documentation_missing
+    description: "Root cause category for pattern detection"
+
+  severity:
+    type: enum
+    required: true
+    values: [critical, high, medium, low]
+    description: "Impact severity for prioritization"
+
+  tags:
+    type: array
+    items: string
+    required: true
+    description: "Searchable keywords (lowercase, hyphen-separated)"
+
+  source:
+    type: enum
+    required: false
+    values: [user-steering, agent-inferred, review-fix]
+    default: agent-inferred
+    description: "How this learning was discovered"
+
+body:
+  description: "Structured documentation of the problem and solution"
+  sections:
+    - name: "Problem"
+      required: true
+      description: "What happened - exact error messages, observable behavior"
+
+    - name: "Investigation"
+      required: false
+      description: "What was tried that didn't work (helps avoid wrong paths)"
+
+    - name: "Solution"
+      required: true
+      description: "What fixed it - code changes, configuration, etc."
+
+    - name: "Prevention"
+      required: true
+      description: "How to avoid this in future - patterns, checks, guidance"
+
+    - name: "Related"
+      required: false
+      description: "Cross-references to similar solutions"
+
+# Category mapping based on problem_type
+category_mapping:
+  build_error: "build-errors"
+  test_failure: "test-failures"
+  runtime_error: "runtime-errors"
+  performance_issue: "performance-issues"
+  database_issue: "database-issues"
+  security_issue: "security-issues"
+  ui_bug: "ui-bugs"
+  integration_issue: "integration-issues"
+  logic_error: "logic-errors"
+  agentic_issue: "agentic-issues"
+  workflow_issue: "workflow-issues"
+  best_practice: "best-practices"
+  documentation_gap: "documentation-gaps"

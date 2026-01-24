@@ -6,6 +6,7 @@ Extract learnings from completed milestones to improve the harness, skills, and 
 - MUST ask the engineer before modifying harness files
 - MUST update `.allhands/flows/shared/HARNESS_FUNCTIONALITY.md` when making structural harness changes
 - MUST write compounding summary to `.planning/<milestone>/compounding_summary.md`
+- MUST write non-trivial solutions to `docs/solutions/<category>/`
 - NEVER modify harness without first principle justification
 </constraints>
 
@@ -71,6 +72,38 @@ Per **Knowledge Compounding**, capture learnings as memories:
   - Sources: `user-steering`, `agent-inferred`
   - Description: 1-3 sentences of self-contained learning
 
+## Solution Documentation
+
+Per **Knowledge Compounding**, document non-trivial solved problems for institutional knowledge.
+
+### Identify Documentable Solutions
+
+From the signal analysis, identify problems that:
+- Required multiple investigation attempts
+- Had non-obvious solutions
+- Would benefit future sessions (similar issues likely to recur)
+- Involve agentic anti-patterns (hallucinations, duplications, miscommunications)
+
+Skip documentation for:
+- Simple typos or obvious syntax errors
+- Trivial fixes immediately resolved
+- One-off environment issues
+
+### Write Solution Files
+
+For each documentable solution:
+- Run `ah schema solution` for frontmatter and body section format
+- Determine `problem_type` and corresponding category directory
+- Generate filename: `<sanitized-symptom>-<component>-<YYYYMMDD>.md`
+- Create directory if needed: `mkdir -p docs/solutions/<category>`
+- Write solution file following schema
+
+### Cross-Reference
+
+If similar solutions exist in `docs/solutions/`:
+- Add "Related" section with links to similar solutions
+- Update existing similar solutions with cross-reference back
+
 ## Spec Finalization
 
 Update the milestone spec as a historical record:
@@ -96,6 +129,9 @@ Write `.planning/<milestone>/compounding_summary.md`:
 
 ## Memories Added
 - [References to .allhands/memories.md entries]
+
+## Solutions Documented
+- [docs/solutions/<category>/<filename>.md - brief description]
 
 ## Engineer Feedback Addressed
 - [Specific concerns resolved]

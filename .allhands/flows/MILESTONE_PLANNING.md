@@ -76,6 +76,20 @@ When engineer selects multiple approaches:
 - Create alignment doc with top-level goal + objectives
 - Document engineer decisions from interview
 
+## Plan Verification
+
+Before spawning jury, self-verify plans can achieve goals:
+
+| Dimension | Check |
+|-----------|-------|
+| Requirement Coverage | Every spec requirement has task(s)? |
+| Task Completeness | Every prompt has clear acceptance criteria? |
+| Key Links Planned | Components wire together (API → UI)? |
+| Scope Sanity | 2-3 tasks per prompt? <7 files per prompt? |
+| Validation Coverage | Each prompt has validation tooling reference? |
+
+If issues found, fix before jury review.
+
 ## Plan Review Jury
 
 Spawn parallel review subtasks (provide alignment doc, spec doc, prompts folder paths):
@@ -91,6 +105,25 @@ After jury returns:
 - Present actionable options to engineer
 - Amend alignment doc / prompts based on engineer choices
 - Document engineer decisions (critical for compounding)
+
+## Plan Deepening (Optional)
+
+Per **Knowledge Compounding**, offer to deepen the plan:
+
+Ask engineer: "Would you like to deepen this plan with comprehensive research?"
+
+If yes:
+- Read `.allhands/flows/shared/PLAN_DEEPENING.md` and follow instructions
+- Applies available skills to each plan section
+- Searches solutions for relevant past learnings
+- Enhances prompts with research insights
+- Preserves original content, only adds research findings
+
+This is recommended for:
+- Complex architectural decisions
+- High-risk domains (security, payments, data migrations)
+- Novel technologies not yet in codebase
+- Large milestones with many unknowns
 
 ## Completion
 

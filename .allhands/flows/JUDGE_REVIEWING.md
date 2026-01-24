@@ -43,6 +43,14 @@ For each domain touched by implementation:
 - Spawn subtask to read `.allhands/flows/shared/jury/YAGNI_REVIEW.md`
 - Ensures implementation avoids over-engineering and unnecessary complexity
 
+### Maintainability
+- Spawn subtask to read `.allhands/flows/shared/jury/MAINTAINABILITY_REVIEW.md`
+- Identifies agentic anti-patterns, simplification opportunities, LOC reduction
+
+### Architecture
+- Spawn subtask to read `.allhands/flows/shared/jury/ARCHITECTURE_REVIEW.md`
+- Verifies SOLID principles, component boundaries, pattern compliance
+
 ## Feedback Synthesis
 
 After all jury subtasks complete:

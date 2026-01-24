@@ -10,5 +10,6 @@ node_modules/
 .planning/
 .env.ai
 .tldr/
+.reposearch/
 
 
