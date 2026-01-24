@@ -197,7 +197,7 @@ const __dirname = dirname(__filename);
 
 interface SchemaPattern {
   pattern: string;
-  schemaType: 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite';
+  schemaType: 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite' | 'skill';
 }
 
 const SCHEMA_PATTERNS: SchemaPattern[] = [
@@ -207,6 +207,7 @@ const SCHEMA_PATTERNS: SchemaPattern[] = [
   { pattern: 'specs/roadmap/**/*.spec.md', schemaType: 'spec' },
   { pattern: 'docs/**/*.md', schemaType: 'documentation' },
   { pattern: '.allhands/validation-tooling/*.md', schemaType: 'validation-suite' },
+  { pattern: '.allhands/skills/*/SKILL.md', schemaType: 'skill' },
 ];
 
 interface SchemaDefinition {
@@ -236,7 +237,7 @@ interface ValidationError {
 /**
  * Detect which schema applies to a file path
  */
-function detectSchemaType(filePath: string): 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite' | null {
+function detectSchemaType(filePath: string): 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite' | 'skill' | null {
   const projectDir = getProjectDir();
   // Make path relative to project
   const relativePath = filePath.startsWith(projectDir)
@@ -280,6 +281,35 @@ function parseFrontmatter(content: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Extract folder name from skill file path
+ * e.g., ".allhands/skills/my-skill/SKILL.md" -> "my-skill"
+ */
+function extractSkillFolderName(filePath: string): string | null {
+  const match = filePath.match(/\.allhands\/skills\/([^/]+)\/SKILL\.md$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Validate skill-specific rules (name must match folder)
+ */
+function validateSkillSpecificRules(
+  filePath: string,
+  frontmatter: Record<string, unknown>
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const folderName = extractSkillFolderName(filePath);
+
+  if (folderName && frontmatter.name && frontmatter.name !== folderName) {
+    errors.push({
+      field: 'name',
+      message: `Skill name '${frontmatter.name}' must match containing folder '${folderName}'`,
+    });
+  }
+
+  return errors;
 }
 
 /**
@@ -386,8 +416,15 @@ function runSchemaValidation(filePath: string): ValidationError[] | null {
     }];
   }
 
-  // Validate
-  return validateFrontmatter(frontmatter, schema);
+  // Validate against schema
+  const errors = validateFrontmatter(frontmatter, schema);
+
+  // Add skill-specific validation
+  if (schemaType === 'skill') {
+    errors.push(...validateSkillSpecificRules(filePath, frontmatter));
+  }
+
+  return errors;
 }
 
 /**
@@ -417,8 +454,15 @@ function runSchemaValidationOnContent(filePath: string, content: string): Valida
     }];
   }
 
-  // Validate
-  return validateFrontmatter(frontmatter, schema);
+  // Validate against schema
+  const errors = validateFrontmatter(frontmatter, schema);
+
+  // Add skill-specific validation
+  if (schemaType === 'skill') {
+    errors.push(...validateSkillSpecificRules(filePath, frontmatter));
+  }
+
+  return errors;
 }
 
 /**

@@ -1,0 +1,34 @@
+# Skill Schema
+# Files in .allhands/skills/*/SKILL.md
+# Single source of truth for skill documentation
+
+frontmatter:
+  name:
+    type: string
+    required: true
+    description: "Unique skill identifier (must match containing folder name)"
+
+  description:
+    type: string
+    required: true
+    description: "Use case description - when/why to use this skill for domain expertise"
+
+  globs:
+    type: array
+    items: string
+    required: true
+    description: "File patterns this skill applies to (used for discovery during prompt curation)"
+
+  version:
+    type: string
+    required: false
+    description: "Semantic version of the skill"
+
+  license:
+    type: string
+    required: false
+    description: "License for the skill content"
+
+body:
+  description: "Domain expertise guide - how to apply this skill's knowledge"
+  sections: []  # No required sections - body is flexible

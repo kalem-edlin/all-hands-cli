@@ -11,6 +11,12 @@ NOTES:
   * Patch prompts and why they were invoked by the user - was it conflicting with their expecations (bad ideation -> plan), or bug fixing / errors (bad prompt creation / execution)
   * Emergent refinement prompts and why they were included / excluded give great signals into user intent / goals knowledge that can persist along side changes from this milestone.
   * Review prompts and how many were needed (bad prompt creation / prompt creation review)
+* **Skills/Validation Tooling Feedback Analysis**:
+  * For each user-patch prompt, check its `patches_prompts` field
+  * Cross-reference those original prompts' `skills` and `validation_suites` frontmatter
+  * Identify which tooling files may be problematic (skills that led to bad guidance, validation suites that missed issues)
+  * Fix problematic tooling files directly when patterns are clear
+  * Document findings in compounding_summary.md
 * Harness Maintainance application of learnings (compounding!!):
   * Some kind of Decision Tree:
     * Were initial user ideas perpetuated, or were they forgotten? -> MILESTONE_PLANNING
@@ -23,6 +29,26 @@ NOTES:
     * A single line per memory:
     * [Memory Name] | [Harness Domain: "planning", "validation", "implementation" or "harness-tooling", "ideation"] | [Source: "user-steering", "agent-infered"] [Memory Description (1 - 3 sentences)]
 * Must cleanup the current milestone spec file with all the relevant learnings from implementation / user planning / discussion, by ammending spec expecataions, documenting what changed based on necesssary and overall using it as a historical document of decisions made and epxecations outlined for a specific feature!:
+* **Compounding Summary Output**: At end of compounding, write `.planning/<milestone>/compounding_summary.md`:
+  ```markdown
+  # Compounding Summary
+
+  ## Detected Issues
+  - [List patterns detected from user patches, failed prompts, user feedback]
+
+  ## Tooling Fixes
+  - [Skill file changes made]
+  - [Validation suite changes made]
+
+  ## Flow Updates
+  - [Any flow file adjustments]
+
+  ## Memories Added
+  - [References to new entries in .allhands/memories.md]
+
+  ## User Feedback Addressed
+  - [Specific user concerns that were resolved through compounding]
+  ```
 * This should be fairly idempotent. IE if the compounding is run again straght agter it was already run and the HARNESS MAINTAINED FILES have not changed, or the codebase  implementation has not changed either, then comopunding should have nothing to do. Not sure how to maintain this.
 * other misc notes:
   - [ ] Compounding

@@ -1,6 +1,11 @@
 ---
 name: claude-code-patterns
 description: Must use when building agents, skills, hooks, commands, or Claude Code tool configs. Contains Claude Code native feature documentation and structure patterns that are essential context.
+globs:
+  - ".allhands/**/*.ts"
+  - ".allhands/**/*.md"
+  - "**/CLAUDE.md"
+  - ".claude/**/*"
 ---
 
 <objective>

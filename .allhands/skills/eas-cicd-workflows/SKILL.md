@@ -4,6 +4,10 @@ description: Helps understand and write EAS workflow YAML files for Expo project
 allowed-tools: "Read,Write,Bash(node:*)"
 version: 1.0.0
 license: MIT License
+globs:
+  - ".eas/workflows/**/*.yml"
+  - ".eas/workflows/**/*.yaml"
+  - "**/eas.json"
 ---
 
 # EAS Workflows Skill

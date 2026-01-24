@@ -27,6 +27,27 @@ Create, edit, and maintain Prompt Task files - the atomic unit of work in this h
 - Minimize blocking chains - parallelize where possible
 - Each prompt should be completable once dependencies are met
 
+## Skills Integration
+
+**This embeds domain expertise into prompts.** Skills are "how to do it right."
+
+Follow `.allhands/flows/shared/SKILL_EXTRACTION.md` to:
+1. Run `ah skills list` to discover available skills
+2. Match skills to the prompt's domain (by globs and description)
+3. Read matched skill files for patterns, best practices, and guidelines
+4. Extract relevant knowledge and embed in the prompt's Tasks section
+5. Add matched skill file paths to the prompt's `skills` frontmatter
+
+Skills provide:
+- Code patterns and library preferences
+- Common pitfalls to avoid
+- Domain-specific best practices
+- Reference sub-documents for deeper context
+
+If no skill matches the prompt's domain:
+- Proceed without skill-derived guidance
+- Note the gap for potential skill creation follow-up
+
 ## Validation Tooling Integration
 
 **This is the crux of the harness.** Each prompt needs explicit validation tooling.
@@ -57,4 +78,6 @@ If no suite matches the prompt's domain:
 ## Writing / Editing the prompt file
 - Use the prompts directory path to write the prompt file to
 - Naming convention: `<two_digit_number>-<prompt_type>-<title>["-DONE"].prompt.md`
+- Include `skills: [.allhands/skills/skill-1/SKILL.md, .allhands/skills/skill-2/SKILL.md]` in frontmatter
 - Include `validation_suites: [.allhands/validation-tooling/suite-1.md, .allhands/validation-tooling/suite-2.md]` in frontmatter
+- For user-patch prompts, include `patches_prompts: [X, Y]` referencing which prompts this patch addresses

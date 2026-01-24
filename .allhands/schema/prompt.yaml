@@ -55,6 +55,18 @@ frontmatter:
     default: []
     description: "Paths to validation suite files elected for this prompt (e.g., .allhands/validation-tooling/typescript-typecheck.md)"
 
+  skills:
+    type: array
+    items: string
+    default: []
+    description: "Paths to skill files for domain expertise (e.g., .allhands/skills/building-expo-ui/SKILL.md)"
+
+  patches_prompts:
+    type: array
+    items: integer
+    default: []
+    description: "Prompt numbers this user-patch addresses (only valid for type: user-patch). References which prompts required user intervention."
+
 body:
   description: "Markdown task instructions for the executing agent"
   sections:

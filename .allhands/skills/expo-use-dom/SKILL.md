@@ -3,6 +3,9 @@ name: expo-use-dom
 description: Use Expo DOM components to run web code in a webview on native and as-is on web. Migrate web code to native incrementally.
 version: 1.0.0
 license: MIT
+globs:
+  - "components/**/*.tsx"
+  - "app/**/*.tsx"
 ---
 
 ## What are DOM Components?

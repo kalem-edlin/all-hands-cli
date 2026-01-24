@@ -95,5 +95,8 @@ function inferSchemaType(file: string): string | null {
   if (file.includes('/validation-tooling/') && file.endsWith('.md')) {
     return 'validation-suite';
   }
+  if (file.includes('/skills/') && file.endsWith('SKILL.md')) {
+    return 'skill';
+  }
   return null;
 }

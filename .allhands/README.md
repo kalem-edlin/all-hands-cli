@@ -107,6 +107,33 @@ ah specs resurrect <name>        # Mark spec incomplete
 
 Options: `--json`, `--domains-only`, `--domain <name>`
 
+### skills - Domain Expertise Discovery
+
+```bash
+ah skills list                   # List all skills with descriptions and globs
+```
+
+Skills provide domain expertise that agents use during prompt curation. Each skill is a folder in `.allhands/skills/` containing a `SKILL.md` file with:
+- `name`: Skill identifier (must match folder name)
+- `description`: When/why to use this skill
+- `globs`: File patterns this skill applies to
+
+Skills are "how to do it right" - patterns, best practices, and domain knowledge that gets embedded into prompt instructions.
+
+### validation-tools - Validation Suite Discovery
+
+```bash
+ah validation-tools list         # List all validation suites with descriptions and globs
+```
+
+Validation tooling provides deterministic acceptance criteria. Each suite is a file in `.allhands/validation-tooling/` with:
+- `name`: Suite identifier
+- `description`: When/why to use this suite
+- `globs`: File patterns this suite validates
+- Validation commands and interpreting results
+
+Validation suites are "how to prove it's right" - specific commands and success criteria that ensure quality gates are met.
+
 ### notify - Desktop Notifications
 
 ```bash

@@ -4,6 +4,11 @@ NOTES:
   * alignment doc from path
   * ls the prompt directory to see all prompts currently active
 * Highly conversational with the user, always looking to carify what the user wants if unclear in order to provide the best harness implementation coordination  assistnace
+* **User-Patch Directive**: When creating user-patch prompts, MUST:
+  * Set `type: user-patch` in frontmatter
+  * Include `patches_prompts: [X, Y]` listing the prompt numbers being fixed
+  * Document in the prompt body what went wrong (user feedback, specific issues)
+  * This enables compounding to cross-reference and improve skills/validation-suites
 * ON invocation highlights and provides the following services to the user as options for them to choose / use to coordinate:
   * Quick Prompt file creation for an easy / deterministic fix / adjustment given by the user if requested using `.allhands/flows/PROMPT_TASKS_CURATION.md`
   * Able to run surgery on emergent refinement prompt files using `.allhands/flows/EMERGENT_REFINEMENT_ANALYSIS.md` which will invoke a user interview to figure out what to keep / what to axe.

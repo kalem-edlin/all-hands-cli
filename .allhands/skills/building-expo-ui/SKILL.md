@@ -3,6 +3,13 @@ name: building-expo-ui
 description: Complete guide for building beautiful apps with Expo Router. Covers fundamentals, styling, components, navigation, animations, patterns, and native tabs.
 version: 1.0.0
 license: MIT
+globs:
+  - "app/**/*.tsx"
+  - "app/**/*.ts"
+  - "components/**/*.tsx"
+  - "components/**/*.ts"
+  - "**/app.json"
+  - "**/app.config.ts"
 ---
 
 # Expo UI Guidelines
