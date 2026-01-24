@@ -37,7 +37,7 @@ Investigate the MCP package to understand its requirements:
 
 1. **Copy template**:
 ```bash
-cp .allhands/src/mcp/_template.ts .allhands/src/mcp/<server-name>.ts
+cp .allhands/harness/src/mcp/_template.ts .allhands/harness/src/mcp/<server-name>.ts
 ```
 
 2. **Edit the config file** with researched values:
@@ -70,7 +70,7 @@ grep "VAR_NAME" .env.ai 2>/dev/null || echo "Not found"
 
 1. **Build the harness** to compile the new config:
 ```bash
-cd .allhands && npm run build
+cd .allhands/harness && npm run build
 ```
 
 2. **List servers** to confirm discovery:
@@ -96,7 +96,7 @@ If the call fails due to missing auth, that's expected - document and proceed.
 
 Report back with:
 
-1. **Config file created**: `.allhands/src/mcp/<server-name>.ts`
+1. **Config file created**: `.allhands/harness/src/mcp/<server-name>.ts`
 
 2. **Available tools**: List of tools with brief descriptions
 

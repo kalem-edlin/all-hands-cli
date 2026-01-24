@@ -5,15 +5,15 @@ Internal CLI for the All Hands agentic harness.
 ## Installation
 
 ```bash
-cd .allhands
+cd .allhands/harness
 npm install
 ```
 
-The `ah` command is automatically installed to `~/.local/bin/ah` when you run `npx all-hands init`. This shim finds and executes the project-local `.allhands/ah` from any subdirectory.
+The `ah` command is automatically installed to `~/.local/bin/ah` when you run `npx all-hands init`. This shim finds and executes the project-local `.allhands/harness/ah` from any subdirectory.
 
-For local development, run:
+For local development, copy the shim to your PATH:
 ```bash
-./scripts/install-shim.sh
+cp .allhands/harness/ah ~/.local/bin/ah
 ```
 
 ## Usage
@@ -126,7 +126,7 @@ Skills are "how to do it right" - patterns, best practices, and domain knowledge
 ah validation-tools list         # List all validation suites with descriptions and globs
 ```
 
-Validation tooling provides deterministic acceptance criteria. Each suite is a file in `.allhands/validation-tooling/` with:
+Validation tooling provides deterministic acceptance criteria. Each suite is a file in `.allhands/validation/` with:
 - `name`: Suite identifier
 - `description`: When/why to use this suite
 - `globs`: File patterns this suite validates
@@ -191,7 +191,7 @@ Options: `--json`, `--help-tool`
 
 ## Hooks Reference
 
-Hooks are internal commands used by Claude Code's hook system. They're configured in `.claude/settings.json`.
+Hooks are internal commands used by Claude Code's hook system. They're configured in `.allhands/harness/src/platforms/claude/settings.json`.
 
 ### Context Hooks (PreToolUse)
 
@@ -323,7 +323,7 @@ Where `hash` is the git commit hash (7 chars) of the file when the reference was
 
 Two types of schemas serve different purposes:
 
-### Agent-Facing Schemas (`schema/*.yaml`)
+### Agent-Facing Schemas (`schemas/*.yaml`)
 
 YAML schemas exposed to agents via `ah schema <type>`. Define frontmatter structure for markdown files:
 
@@ -338,7 +338,7 @@ YAML schemas exposed to agents via `ah schema <type>`. Define frontmatter struct
 
 Agents reference these when creating or modifying files to ensure correct structure.
 
-### Internal Schemas (`src/lib/schemas/*.ts`)
+### Internal Schemas (`harness/src/lib/schemas/*.ts`)
 
 Zod schemas for harness configuration. NOT exposed to agents:
 

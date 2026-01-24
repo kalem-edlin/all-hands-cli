@@ -275,7 +275,7 @@ async function handleListServers(agentId: string, json?: boolean): Promise<void>
       console.log(JSON.stringify({ success: true, servers: [] }));
     } else {
       console.log('No MCP servers configured.');
-      console.log('Add servers in .allhands/src/mcp/ (copy _template.ts)');
+      console.log('Add servers in .allhands/harness/src/mcp/ (copy _template.ts)');
     }
     return;
   }

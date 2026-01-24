@@ -543,7 +543,7 @@ export function spawnAgent(
   const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
   // Build command: VAR=value VAR2=value claude --settings ... --dangerously-skip-permissions 'prompt'
-  const fullCommand = `${envPrefix} claude --settings .allhands/src/platforms/claude/settings.json --dangerously-skip-permissions '${escapedPrompt}'`;
+  const fullCommand = `${envPrefix} claude --settings .allhands/harness/src/platforms/claude/settings.json --dangerously-skip-permissions '${escapedPrompt}'`;
   sendKeys(sessionName, windowName, fullCommand);
 
   // Switch focus to the new window if requested (default for TUI actions)

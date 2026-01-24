@@ -15,8 +15,9 @@ NOTES:
   * Be sure to explian that the harness is ever changing and this file itself must be updated to reflect the latest changes and improvements giveen the `./HARNESS_FLOWS.md` file.
   * For example right now the hanress functionality lifecylce is best suited for milestone / ideation development. Not bug fixing, problem investations, performance improvements, etc.
 * Must outline motications and rules for the agents/ directory (agent profiles and how they are used), schema/ (the standards of how HARNESS MANGED FILES pass infromation around the lifecycle of the harness)
-* How the Harness is run and plugs into the coding agent (only claude code for now) via spawning a claude code instance with a specific claude-settings.json file so its hooks are correctly configured.
+* How the Harness is run and plugs into the coding agent (only claude code for now) via spawning a claude code instance with a specific `.allhands/harness/src/platforms/claude/settings.json` file so its hooks are correctly configured.
   * This is importnat to have loaded into context, because otherwise the coding agent will assume the settings file is broken / non exsiting, even though it will be CLI loaded with the corresponding settings file in teh @.allhands directory
 * Explain how flows are progressivley disclosed, inherit to specific agents, and are the vessel used to inform agents on how to USE THE HARNESS via commands etc (a very valid and progressibly disclosing replacement of traditional MCP, Commands, Skills etc)
+* This file just needs to provide one resource / knowledge base for all of the reponsibliities of this .allhands harness, and how to maintain / refine it. It is a strong overview / lookup map and it should be documented here that this will often go out of data, and the caller MUST be aware about updating this file whenever tuning/cahnges are being made to the harness
 
 
