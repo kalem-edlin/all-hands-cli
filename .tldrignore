@@ -82,3 +82,7 @@ Thumbs.db
 # ===================
 # large_test_fixtures/
 # data/
+
+.reposearch/
+.planning/
+docs/

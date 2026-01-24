@@ -3,8 +3,8 @@ Acquire explicit documentation and implementation inspiration from external tech
 </goal>
 
 <inputs>
-- Query for context7 or btca usage
-- Query type indication: open source git project OR proprietary documentation only
+- Query for context7 or open source repo exploration
+- Query type indication: open source GitHub project OR proprietary documentation only
 - Relevant codebase files to inject into query context (if applicable)
 </inputs>
 
@@ -15,8 +15,9 @@ Acquire explicit documentation and implementation inspiration from external tech
 
 <constraints>
 - MUST use context7 for documentation references
-- MUST use btca for open source library dissection
-- MUST run both tools in parallel when query benefits from dual perspective
+- MUST clone open source repos to `.reposearch/` for local exploration
+- MUST run both approaches in parallel when query benefits from dual perspective
+- MUST NOT USE OTHER TOOLING THAN DESCRIBED HERE UNLESS BOTH OPTIONS ARE FAILING TO PROVIDE RESULTS
 </constraints>
 
 ## Tool Selection
@@ -24,7 +25,7 @@ Acquire explicit documentation and implementation inspiration from external tech
 | Query Type | Tool | Purpose |
 |------------|------|---------|
 | Documentation lookup | `ah context7 search` | Official docs and API references |
-| Open source dissection | `btca` | Implementation inspiration from source |
+| Open source exploration | `gh search` + clone | Clone repo locally for full file navigation |
 | Both applicable | Run in parallel | Well-rounded perspective |
 
 ## Usage Patterns
@@ -36,13 +37,42 @@ For proprietary domains with documentation pages:
 - Extract API patterns, configuration examples
 - Note version-specific behaviors
 
-### Open Source Inspiration (btca)
+### Open Source Inspiration (Clone & Browse)
 
-For dissecting git repositories:
-- Run `btca "<repo> <query>"`
-- Study implementation patterns
+For exploring GitHub repositories locally:
+
+1. **Search for repositories**:
+   ```bash
+   gh search repos "<query>" --limit 5
+   ```
+
+2. **Clone to local research folder**:
+   ```bash
+   # Clone into .reposearch folder (gitignored)
+   mkdir -p .reposearch
+   git clone --depth 1 <repo-url> .reposearch/<repo-name>
+   ```
+
+   Note: Ensure `.reposearch/` is in the project's `.gitignore`.
+
+3. **Browse locally with standard tooling**:
+   - Use `Glob` to find files by pattern
+   - Use `Grep` to search code content
+   - Use `Read` to examine specific files
+   - Use `ls` to explore directory structure
+
+4. **Clean up when done** (optional):
+   ```bash
+   rm -rf .reposearch/<repo-name>
+   ```
+
+This approach leverages the agent's superior local file navigation capabilities:
+- Full regex search across the codebase
+- Fast pattern matching and file discovery
+- Direct file reading without API encoding issues
+- Study implementation patterns in similar projects
 - Extract architectural decisions
-- Note how library handles similar problems
+- Note how libraries handle similar problems
 
 ### Parallel Exploration
 

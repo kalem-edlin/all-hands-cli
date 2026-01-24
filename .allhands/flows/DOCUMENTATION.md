@@ -51,6 +51,34 @@ Candidate subdomain if:
 - High complexity score
 - Distinct responsibility
 
+### Group by Feature, Not Path
+Before creating subdomain structure, identify cross-cutting features:
+
+1. **Detect feature clusters**
+   - Run `ah knowledge search "<feature-name>"` to find all related files
+   - A feature often spans: `commands/` (CLI surface) + `lib/` (implementation) + `hooks/` (lifecycle)
+   - These should become ONE subdomain, not three
+
+2. **Subdomain = Feature boundary**
+   - ❌ `docs/harness/commands/`, `docs/harness/lib/` (mirrors source paths)
+   - ✅ `docs/harness/semantic-search/`, `docs/harness/notifications/` (mirrors features)
+
+3. **Example clustering**
+   ```
+   Feature: "semantic-search"
+   Sources: commands/knowledge.ts, lib/semantic-search/, lib/embeddings/
+   → Subdomain: docs/harness/semantic-search/
+
+   Feature: "notifications"
+   Sources: commands/notify.ts, lib/system-notifications.ts, hooks/notifications/
+   → Subdomain: docs/harness/notifications/
+   ```
+
+4. **Within each feature subdomain**, writers create focused docs per aspect:
+   - `overview.md` - what problem this feature solves
+   - `architecture.md` - how components interact
+   - `patterns.md` - common usage patterns (if complex)
+
 ### Flag Critical Tech
 Check `package.json`. Flag if imported in 10+ files, defines architecture, is platform-specific, or is non-obvious choice.
 
@@ -65,17 +93,28 @@ Check `package.json`. Flag if imported in 10+ files, defines architecture, is pl
 Provide each writer:
 ```yaml
 domain: "<product-name>"
-doc_directory: "docs/<domain>/<subdomain>/"
-source_directories: ["<path/to/src>"]
+feature: "<feature-name>"  # the cross-cutting feature this covers
+doc_directory: "docs/<domain>/<feature>/"
+source_directories: ["<path/to/src>", "<related/lib>", "<hooks/if-any>"]  # all sources for this feature
 critical_technologies: ["<tech>"]
-target_file_count: 3-6
-notes: "<what knowledge to capture>"
+target_file_count: 2-4
+notes: "<what knowledge to capture about this feature>"
 ```
 
-### Finalize
+### Validate
 After all writers complete:
+- Run `ah docs validate --json` to check all references
+- If validation returns `stale_refs` or `invalid_refs`:
+  - Spawn fix tasks for affected docs
+  - Instruct fixers to read `.allhands/flows/shared/DOCUMENTATION_WRITING.md` **Fix Mode** section
+  - Provide each fixer: `{ mode: "fix", doc_path: "<path>", stale_refs: [...], invalid_refs: [...] }`
+- Re-run validation until clean
+
+### Finalize
+After validation passes:
 - Read all produced docs
 - Write README.md per main domain with overview, mermaid diagram, navigation table, and entry points
+- Run `ah knowledge docs reindex` to update the docs knowledge index
 
 ---
 
@@ -93,6 +132,9 @@ Incremental documentation for changes only.
 
 ### Delegate
 - Follow Init Mode delegation but only for affected areas
+
+### Validate & Finalize
+- Follow Init Mode **Validate** and **Finalize** steps
 
 ---
 

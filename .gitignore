@@ -11,4 +11,7 @@ node_modules/
 .env.ai
 .tldr/
 
+# External repo research
+.reposearch/
 
+docs/

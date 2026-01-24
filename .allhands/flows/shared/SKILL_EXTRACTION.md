@@ -41,7 +41,7 @@ Select all skills that apply to implementation scope.
 ## Step 3: Read Skill Documentation
 
 For each relevant skill, read the full file:
-- Run `cat .allhands/skills/<skill-name>/SKILL.md`
+- Read `.allhands/skills/<skill-name>/SKILL.md`
 
 Extract:
 - **Key patterns**: Code patterns, library preferences, common pitfalls

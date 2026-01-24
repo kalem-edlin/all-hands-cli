@@ -76,6 +76,9 @@ Per **Ideation First**:
 
 Use "Assuming X exists..." or "Assuming any of X, Y, Z exist..." to express dependencies on milestones that will be implemented by the time this one is.
 
+After writing the spec:
+- Run `ah knowledge roadmap reindex` to update the roadmap knowledge index
+
 ## Closing
 
 After writing the spec, ask the engineer:

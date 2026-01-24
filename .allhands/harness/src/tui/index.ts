@@ -722,16 +722,20 @@ export class TUI {
     // Handle Enter key - submit
     textarea.key(['enter'], () => {
       const customMessage = textarea.getValue().trim();
+      textarea.cancel(); // Exit input mode before destroying
       modalRef.destroy();
       this.activeModal = null;
+      this.screen.focusPop(); // Restore focus to screen
       this.spawnCustomFlowAgent(flowPath, customMessage);
       this.render();
     });
 
     // Handle Escape key - cancel
     textarea.key(['escape'], () => {
+      textarea.cancel(); // Exit input mode before destroying
       modalRef.destroy();
       this.activeModal = null;
+      this.screen.focusPop(); // Restore focus to screen
       this.render();
     });
 
@@ -783,6 +787,93 @@ export class TUI {
       this.activeModal = null;
       this.render();
     }
+  }
+
+  /**
+   * Show a confirmation dialog and wait for user response.
+   * Returns true if user confirms, false if cancelled.
+   */
+  public showConfirmation(title: string, message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (this.activeModal) {
+        this.closeModal();
+      }
+
+      const width = 60;
+      const lines = message.split('\n');
+      const height = Math.min(lines.length + 6, 20);
+
+      const box = blessed.box({
+        parent: this.screen,
+        top: 'center',
+        left: 'center',
+        width,
+        height,
+        border: {
+          type: 'line',
+        },
+        label: ` ${title} `,
+        tags: true,
+        style: {
+          border: {
+            fg: 'yellow',
+          },
+          bg: 'black',
+        },
+      });
+
+      // Add message text
+      blessed.text({
+        parent: box,
+        top: 1,
+        left: 2,
+        right: 2,
+        content: message,
+        tags: true,
+      });
+
+      // Add button hints
+      blessed.text({
+        parent: box,
+        bottom: 0,
+        left: 1,
+        content: '{green-fg}[Enter]{/green-fg} Proceed  {red-fg}[Esc]{/red-fg} Cancel',
+        tags: true,
+      });
+
+      // Focus the box for key events
+      box.focus();
+
+      // Store modal reference
+      const modalRef: Modal = {
+        box,
+        selectedIndex: 0,
+        destroy: () => box.destroy(),
+        navigate: () => {},
+        select: () => {},
+      };
+      this.activeModal = modalRef;
+
+      // Handle Enter - confirm
+      box.key(['enter'], () => {
+        modalRef.destroy();
+        this.activeModal = null;
+        this.screen.focusPop();
+        this.render();
+        resolve(true);
+      });
+
+      // Handle Escape - cancel
+      box.key(['escape'], () => {
+        modalRef.destroy();
+        this.activeModal = null;
+        this.screen.focusPop();
+        this.render();
+        resolve(false);
+      });
+
+      this.screen.render();
+    });
   }
 
   public openFileViewer(title: string, filePath: string): void {

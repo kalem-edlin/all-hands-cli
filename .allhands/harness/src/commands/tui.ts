@@ -290,11 +290,44 @@ async function handleAction(
       try {
         // Find spec file using specs library
         const cwd = process.cwd();
-        const spec = findSpecById(specId, cwd);
+        let spec = findSpecById(specId, cwd);
 
         if (!spec) {
           tui.log(`Error: Spec file not found: ${specId}`);
           break;
+        }
+
+        // Check if spec is completed - if so, warn and offer to resurrect
+        if (spec.status === 'completed') {
+          const confirmed = await tui.showConfirmation(
+            'Resurrect Completed Milestone?',
+            `Milestone "${spec.title}" is marked as completed.\n\n` +
+            'Selecting it will move the spec back to the roadmap\n' +
+            'and you will need to mark it completed again when done.\n\n' +
+            'Both docs and roadmap indexes will be updated.'
+          );
+
+          if (!confirmed) {
+            tui.log('Milestone selection cancelled');
+            break;
+          }
+
+          // Resurrect the spec using the ah command (handles reindexing)
+          tui.log('Resurrecting milestone to roadmap...');
+          try {
+            execSync(`ah specs resurrect "${spec.id}"`, { stdio: 'pipe', cwd });
+            tui.log('Milestone resurrected and indexes updated ✓');
+
+            // Re-find the spec since its path has changed
+            spec = findSpecById(specId, cwd);
+            if (!spec) {
+              tui.log(`Error: Spec file not found after resurrection: ${specId}`);
+              break;
+            }
+          } catch (resErr) {
+            tui.log(`Error resurrecting spec: ${resErr instanceof Error ? resErr.message : String(resErr)}`);
+            break;
+          }
         }
 
         const specPath = spec.path;

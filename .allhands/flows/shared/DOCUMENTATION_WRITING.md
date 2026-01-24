@@ -5,10 +5,11 @@ Write knowledge-base docs - capture decisions, rationale, patterns. Per **Contex
 <inputs>
 ```yaml
 domain: "<product-name>"
-doc_directory: "docs/<domain>/<subdomain>/"
-source_directories: ["<paths>"]
+feature: "<feature-name>"  # cross-cutting feature this covers
+doc_directory: "docs/<domain>/<feature>/"
+source_directories: ["<paths>"]  # may span commands/, lib/, hooks/ for same feature
 critical_technologies: ["<tech>"]
-target_file_count: 3-6
+target_file_count: 2-4
 notes: "<guidance>"
 ```
 </inputs>
@@ -25,12 +26,14 @@ coverage_gaps: []  # report any gaps
 - MUST use `ah docs format-reference` for ALL refs
 - MUST include `description` front-matter
 - MUST include Overview, Key Decisions, Use Cases sections
-- MUST create 3-10 files per subdomain
-- MUST cover ALL `source_directories` and `critical_technologies`
+- MUST create files within `target_file_count` range
+- MUST cover ALL `source_directories` (may span multiple source paths for one feature)
+- MUST cover ALL `critical_technologies`
 - MUST NOT commit (taxonomist commits after all writers)
 - MUST NOT create directories (taxonomist pre-creates)
 - MUST NOT write README.md
 - NEVER write inline code blocks
+- NEVER duplicate docs for same feature across different source paths
 </constraints>
 
 ## Philosophy
@@ -39,7 +42,8 @@ coverage_gaps: []  # report any gaps
 - Explain WHY, not WHAT (code shows what)
 - Zero inline code - every mention is a reference
 - Concise > verbose - drop articles, use fragments
-- 3-10 focused files per subdomain (RAG-optimized)
+- Feature = unit of documentation (not source path)
+- Multiple focused files per feature subdomain (RAG-optimized)
 
 ## What to Document
 
@@ -92,9 +96,10 @@ ah docs format-reference <file>
    - Note `critical_technologies` usage
 
 3. **Plan file breakdown**
-   - 3-10 distinct topics per subdomain
-   - Each file answers specific question types
-   - Map critical tech to files
+   - 2-4 distinct docs per feature subdomain
+   - Each doc answers specific question types about the feature
+   - Source directories may span lib/, commands/, hooks/ - unify into feature docs
+   - Map critical tech to relevant docs
 
 4. **Write focused files**
    - Use `ah docs format-reference` for ALL refs
@@ -145,11 +150,14 @@ How to work with this (only if needed).
 
 ## Example Breakdown
 
-For a `services/` subdomain:
-- `media-processing.md` - FFmpeg pipeline decisions
-- `api-client.md` - TRPC integration patterns
-- `auth-flow.md` - Token management rationale
-- `sync-strategy.md` - Offline/conflict approach
+For a `semantic-search` feature spanning `commands/knowledge.ts`, `lib/semantic-search/`, `lib/embeddings/`:
+- `architecture.md` - how indexing, embeddings, and query systems connect
+- `query-patterns.md` - how to search effectively, ranking decisions
+- `indexing-strategy.md` - when/how content gets indexed
+
+For a `notifications` feature spanning `commands/notify.ts`, `lib/notifications/`, `hooks/on-complete/`:
+- `delivery-system.md` - how notifications reach users
+- `hook-integration.md` - lifecycle events that trigger notifications
 
 ## Fix Mode
 

@@ -11,9 +11,10 @@
 
 import { Command } from 'commander';
 import { existsSync, readFileSync, writeFileSync, renameSync, readdirSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, relative } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { getGitRoot } from '../lib/planning.js';
+import { KnowledgeService } from '../lib/knowledge.js';
 
 interface SpecFrontmatter {
   name: string;
@@ -115,6 +116,41 @@ function loadAllSpecs(): SpecInfo[] {
 function findSpecByName(name: string): SpecInfo | null {
   const specs = loadAllSpecs();
   return specs.find((s) => s.name === name) || null;
+}
+
+/**
+ * Reindex knowledge bases after spec file moves.
+ * Updates both 'docs' and 'roadmap' indexes to reflect the file move.
+ */
+async function reindexAfterMove(
+  gitRoot: string,
+  oldPath: string,
+  newPath: string,
+  quiet: boolean = false
+): Promise<void> {
+  const service = new KnowledgeService(gitRoot, { quiet });
+  const oldRelPath = relative(gitRoot, oldPath);
+  const newRelPath = relative(gitRoot, newPath);
+
+  // Update roadmap index: remove old location if it was in roadmap
+  if (oldRelPath.startsWith('specs/roadmap/')) {
+    await service.reindexFromChanges('roadmap', [
+      { path: oldRelPath, deleted: true },
+    ]);
+  }
+  // Add new location if it's now in roadmap
+  if (newRelPath.startsWith('specs/roadmap/')) {
+    await service.reindexFromChanges('roadmap', [
+      { path: newRelPath, added: true },
+    ]);
+  }
+
+  // Update docs index: docs includes all of specs/
+  // Remove from old location, add to new location
+  await service.reindexFromChanges('docs', [
+    { path: oldRelPath, deleted: true },
+    { path: newRelPath, added: true },
+  ]);
 }
 
 export function register(program: Command): void {
@@ -269,9 +305,16 @@ export function register(program: Command): void {
       }
 
       // Move file if it's in roadmap
-      if (spec.path.includes('/roadmap/')) {
+      const wasInRoadmap = spec.path.includes('/roadmap/');
+      if (wasInRoadmap) {
         mkdirSync(dirname(targetPath), { recursive: true });
         renameSync(spec.path, targetPath);
+
+        // Reindex knowledge bases to reflect the move
+        if (!options.json) {
+          console.log('  Reindexing knowledge bases...');
+        }
+        await reindexAfterMove(gitRoot, spec.path, targetPath, options.json);
       }
 
       if (options.json) {
@@ -279,14 +322,16 @@ export function register(program: Command): void {
           success: true,
           name,
           status: 'completed',
-          path: spec.path.includes('/roadmap/') ? targetPath : spec.path,
+          path: wasInRoadmap ? targetPath : spec.path,
+          reindexed: wasInRoadmap,
         }, null, 2));
         return;
       }
 
       console.log(`Marked spec completed: ${name}`);
-      if (spec.path.includes('/roadmap/')) {
+      if (wasInRoadmap) {
         console.log(`  Moved to: ${targetPath}`);
+        console.log('  Knowledge indexes updated ✓');
       }
     });
 
@@ -331,9 +376,16 @@ export function register(program: Command): void {
       }
 
       // Move file if it's not already in roadmap
-      if (!spec.path.includes('/roadmap/')) {
+      const wasNotInRoadmap = !spec.path.includes('/roadmap/');
+      if (wasNotInRoadmap) {
         mkdirSync(roadmapDir, { recursive: true });
         renameSync(spec.path, targetPath);
+
+        // Reindex knowledge bases to reflect the move
+        if (!options.json) {
+          console.log('  Reindexing knowledge bases...');
+        }
+        await reindexAfterMove(gitRoot, spec.path, targetPath, options.json);
       }
 
       if (options.json) {
@@ -341,14 +393,16 @@ export function register(program: Command): void {
           success: true,
           name,
           status: 'roadmap',
-          path: !spec.path.includes('/roadmap/') ? targetPath : spec.path,
+          path: wasNotInRoadmap ? targetPath : spec.path,
+          reindexed: wasNotInRoadmap,
         }, null, 2));
         return;
       }
 
       console.log(`Resurrected spec to roadmap: ${name}`);
-      if (!spec.path.includes('/roadmap/')) {
+      if (wasNotInRoadmap) {
         console.log(`  Moved to: ${targetPath}`);
+        console.log('  Knowledge indexes updated ✓');
       }
     });
 }

@@ -72,6 +72,23 @@ Acceptance criteria must be:
 
 If no suite matches: note gap, flag for CREATE_VALIDATION_TOOLING follow-up, use basic validation.
 
+## Context Budget (Critical)
+
+Per **Context is Precious**, agents degrade with context. Hard limits:
+
+| Context Usage | Quality | Claude's State |
+|---------------|---------|----------------|
+| 0-30% | PEAK | Thorough, comprehensive |
+| 30-50% | GOOD | Solid work |
+| 50-70% | DEGRADING | Efficiency mode |
+| 70%+ | POOR | Rushed, minimal |
+
+**Scope Limits:**
+- **Target ~50% context max**
+- 0-3 files modified = small (~15%)
+- 4-6 files modified = medium (~25%)
+- 7+ files modified = large - SPLIT the prompt
+
 ## Task Breakdown Guidelines
 
 - 2-6 tasks per prompt (validatable as a unit)

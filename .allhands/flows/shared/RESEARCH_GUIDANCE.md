@@ -1,12 +1,38 @@
 <goal>
-Pick the right research tool for the need. Per **Context is Precious**, use targeted tools to gather external knowledge efficiently.
+Pick the right research tool and depth for the need. Per **Context is Precious**, use targeted tools to gather external knowledge efficiently.
 </goal>
 
 <constraints>
+- MUST determine discovery level before researching
 - MUST parse JSON results from all research tools
 - MUST use `gh` CLI for GitHub content, not research tools
 - NEVER use a single tool when combination would give better results
 </constraints>
+
+## Discovery Levels
+
+Gate research effort based on what's being planned:
+
+| Level | When | Action |
+|-------|------|--------|
+| **Level 0 - Skip** | Pure internal work, existing patterns | No research needed |
+| **Level 1 - Quick** | Single known library, confirming syntax | Quick query, no documentation |
+| **Level 2 - Standard** | Choosing between 2-3 options, new integration | Full research with documentation |
+| **Level 3 - Deep** | Architectural decision, novel problem | Full research with DISCOVERY output |
+
+**Depth Indicators:**
+- Level 2+: New library not in package.json, external API, "choose/evaluate" in task
+- Level 3: "architecture/design/system", multiple services, data modeling, auth design
+
+## Confidence Levels
+
+Treat Model's training data as hypothesis, not fact (6-18 months stale):
+
+| Level | Sources | Use |
+|-------|---------|-----|
+| HIGH | Official docs, verified sources | State as fact |
+| MEDIUM | WebSearch verified with official source | State with attribution |
+| LOW | Unverified, training data only | Flag for validation |
 
 ## Decision Tree
 
