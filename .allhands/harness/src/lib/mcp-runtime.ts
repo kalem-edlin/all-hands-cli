@@ -14,7 +14,8 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ALLHANDS_ROOT = join(__dirname, '..', '..');
+// Path: harness/src/lib/ -> harness/src/ -> harness/ -> .allhands/
+const ALLHANDS_ROOT = join(__dirname, '..', '..', '..');
 const CACHE_DIR = join(ALLHANDS_ROOT, '.cache', 'mcp');
 
 /**

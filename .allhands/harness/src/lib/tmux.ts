@@ -25,15 +25,13 @@
 
 import { execSync, spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { getCurrentBranch, getPlanningPaths } from './planning.js';
 import {
+  buildAgentInvocation,
   listAgentProfiles,
   loadAgentProfile,
-  buildAgentInvocation,
-  type AgentProfile,
-  type TemplateContext,
+  type TemplateContext
 } from './opencode/index.js';
+import { getCurrentBranch, getPlanningPaths } from './planning.js';
 
 /**
  * Agent type = agent profile name.
@@ -545,7 +543,7 @@ export function spawnAgent(
   const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
   // Build command: VAR=value VAR2=value claude --settings ... --dangerously-skip-permissions 'prompt'
-  const fullCommand = `${envPrefix} claude --settings .allhands/claude-settings.json --dangerously-skip-permissions '${escapedPrompt}'`;
+  const fullCommand = `${envPrefix} claude --settings .allhands/src/platforms/claude/settings.json --dangerously-skip-permissions '${escapedPrompt}'`;
   sendKeys(sessionName, windowName, fullCommand);
 
   // Switch focus to the new window if requested (default for TUI actions)

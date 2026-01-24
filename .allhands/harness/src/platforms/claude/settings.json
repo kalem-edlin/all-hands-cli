@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "(WebFetch|Bash)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement github-url"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement research-fetch"
+          }
+        ]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement research-search"
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks notification elicitation"
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context tldr-inject"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks context arch-inject"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context edit-inject"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks context signature"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context read-enforcer",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context search-router",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "(Write|Edit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks validation schema-pre"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Write|Edit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks validation diagnostics"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks context edit-notify"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks session tldr-warm"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks lifecycle agent-stop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks lifecycle agent-compact"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "PARALLEL_MAX_WORKERS": "3",
+    "SEARCH_SIMILARITY_THRESHOLD": "0.65",
+    "SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD": "0.82",
+    "SEARCH_CONTEXT_TOKEN_LIMIT": "5000",
+    "KNOWLEDGE_AGGREGATOR_TOKEN_THRESHOLD": "3500",
+    "MAX_LOGS_TOKENS": "10000",
+    "BASH_MAX_TIMEOUT_MS": "3600000",
+    "BASE_BRANCH": "main",
+    "ORACLE_DEFAULT_PROVIDER": "openai",
+    "ENVOY_LOG_MAX_STRING_LENGTH": "150",
+    "AGENT_MODEL": "opencode/grok-code",
+    "_AGENT_MODEL_ALT": "google/gemini-2.5-flash",
+    "CODESEARCH_TOOL_BUDGET": "12"
+  },
+  "permissions": {
+    "deny": ["Task(claude-code-guide)", "Task(Explore)", "Task(Plan)"],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": false,
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true,
+    "vtsls@claude-code-lsps": true,
+    "basedpyright@claude-code-lsps": true,
+    "vscode-langservers@claude-code-lsps": true
+  }
+}

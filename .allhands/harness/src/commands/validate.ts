@@ -11,14 +11,14 @@
 
 import { Command } from 'commander';
 import { existsSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import {
-  validateFile,
-  listSchemas,
-  formatErrors,
-} from '../lib/schema.js';
 import { loadAllProfiles } from '../lib/opencode/index.js';
+import {
+  formatErrors,
+  listSchemas,
+  validateFile,
+} from '../lib/schema.js';
 import { TEMPLATE_VAR_NAMES } from '../lib/schemas/template-vars.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -151,7 +151,7 @@ function inferSchemaType(file: string): string | null {
   if (file.includes('/docs/') && file.endsWith('.md')) {
     return 'documentation';
   }
-  if (file.includes('/validation-tooling/') && file.endsWith('.md')) {
+  if (file.includes('/validation/') && file.endsWith('.md')) {
     return 'validation-suite';
   }
   if (file.includes('/skills/') && file.endsWith('SKILL.md')) {

@@ -8,19 +8,23 @@
 
 set -e
 
+# SCRIPT_DIR = .allhands/harness/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+# ALLHANDS_DIR = .allhands/
+ALLHANDS_DIR="$(dirname "$SCRIPT_DIR")"
+# PROJECT_ROOT = parent of .allhands/
+PROJECT_ROOT="$(dirname "$ALLHANDS_DIR")"
 
 # Load .env.ai from project root if exists
-if [ -f "$ROOT_DIR/.env.ai" ]; then
+if [ -f "$PROJECT_ROOT/.env.ai" ]; then
     set -a
-    . "$ROOT_DIR/.env.ai"
+    . "$PROJECT_ROOT/.env.ai"
     set +a
 fi
 
-# Also check git root for .env.ai (may be different from ROOT_DIR in worktrees)
-GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$ROOT_DIR")
-if [ -f "$GIT_ROOT/.env.ai" ] && [ "$GIT_ROOT" != "$ROOT_DIR" ]; then
+# Also check git root for .env.ai (may be different in worktrees)
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")
+if [ -f "$GIT_ROOT/.env.ai" ] && [ "$GIT_ROOT" != "$PROJECT_ROOT" ]; then
     set -a
     . "$GIT_ROOT/.env.ai"
     set +a

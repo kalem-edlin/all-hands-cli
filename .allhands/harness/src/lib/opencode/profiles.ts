@@ -58,18 +58,18 @@ export const STOCK_ENV_VARS = [
 
 /**
  * Get the agents directory path
- * Path: src/lib/opencode/ -> src/lib/ -> src/ -> .allhands/ -> agents/
+ * Path: harness/src/lib/opencode/ -> harness/src/lib/ -> harness/src/ -> harness/ -> .allhands/ -> agents/
  */
 function getAgentsDir(): string {
-  return join(__dirname, '..', '..', '..', 'agents');
+  return join(__dirname, '..', '..', '..', '..', 'agents');
 }
 
 /**
  * Get the flows directory path
- * Path: src/lib/opencode/ -> src/lib/ -> src/ -> .allhands/ -> flows/
+ * Path: harness/src/lib/opencode/ -> harness/src/lib/ -> harness/src/ -> harness/ -> .allhands/ -> flows/
  */
 function getFlowsDir(): string {
-  return join(__dirname, '..', '..', '..', 'flows');
+  return join(__dirname, '..', '..', '..', '..', 'flows');
 }
 
 /**

@@ -22,7 +22,8 @@ export function register(program: Command): void {
     .description('Output schema for a file type (prompt, alignment, spec, documentation). Optionally specify a top-level property to inspect.')
     .option('--json', 'Output as JSON instead of YAML')
     .action(async (type: string, property: string | undefined, options: { json?: boolean }) => {
-      const schemaDir = join(__dirname, '..', '..', 'schema');
+      // Path: harness/src/commands/ -> harness/src/ -> harness/ -> .allhands/ -> schemas/
+      const schemaDir = join(__dirname, '..', '..', '..', 'schemas');
       const schemaPath = join(schemaDir, `${type}.yaml`);
 
       if (!existsSync(schemaPath)) {

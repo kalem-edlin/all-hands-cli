@@ -9,7 +9,7 @@
 
 import { Command } from 'commander';
 import { existsSync, readdirSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
 
@@ -48,10 +48,11 @@ function extractFrontmatter(content: string): Record<string, unknown> | null {
 }
 
 /**
- * Get the validation-tooling directory path
+ * Get the validation directory path
+ * Path: harness/src/commands/ -> harness/src/ -> harness/ -> .allhands/ -> validation/
  */
 function getValidationToolingDir(): string {
-  return join(__dirname, '..', '..', 'validation-tooling');
+  return join(__dirname, '..', '..', '..', 'validation');
 }
 
 /**
@@ -77,7 +78,7 @@ function listValidationSuites(): ValidationSuiteEntry[] {
         name: frontmatter.name,
         description: frontmatter.description,
         globs: frontmatter.globs,
-        file: `.allhands/validation-tooling/${file}`,
+        file: `.allhands/validation/${file}`,
       });
     }
   }
@@ -101,7 +102,7 @@ export function register(program: Command): void {
         console.log(JSON.stringify({
           success: true,
           suites: [],
-          message: 'No validation suites found. Create suites in .allhands/validation-tooling/ using `ah schema validation-suite` for the file structure.',
+          message: 'No validation suites found. Create suites in .allhands/validation/ using `ah schema validation-suite` for the file structure.',
         }, null, 2));
         return;
       }

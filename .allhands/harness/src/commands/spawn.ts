@@ -20,7 +20,7 @@ const getProjectRoot = (): string => {
 };
 
 // Load prompt
-const CODESEARCH_PROMPT_PATH = join(__dirname, "../lib/agents/prompts/codesearch.md");
+const CODESEARCH_PROMPT_PATH = join(__dirname, "../lib/opencode/prompts/codesearch.md");
 const getCodesearchPrompt = (): string => readFileSync(CODESEARCH_PROMPT_PATH, "utf-8");
 
 // Defaults

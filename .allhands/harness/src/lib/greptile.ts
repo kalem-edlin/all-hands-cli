@@ -136,7 +136,7 @@ export async function triggerGreptileReview(
   try {
     // Post a comment to trigger Greptile
     const output = execSync(
-      `gh pr comment ${prInfo.number} --body "@greptile review" --repo ${prInfo.owner}/${prInfo.repo}`,
+      `gh pr comment ${prInfo.number} --body "@greptile" --repo ${prInfo.owner}/${prInfo.repo}`,
       {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],

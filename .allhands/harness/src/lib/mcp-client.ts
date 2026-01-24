@@ -26,7 +26,8 @@ import type { McpServerConfig, McpToolSchema } from './mcp-runtime.js';
 import { resolveEnvVars } from './mcp-runtime.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ALLHANDS_ROOT = join(__dirname, '..', '..');
+// Path: harness/src/lib/ -> harness/src/ -> harness/ -> .allhands/
+const ALLHANDS_ROOT = join(__dirname, '..', '..', '..');
 const SESSIONS_DIR = join(ALLHANDS_ROOT, '.cache', 'sessions');
 const DAEMON_SCRIPT = join(__dirname, 'mcp-daemon.ts');
 

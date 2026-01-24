@@ -53,7 +53,7 @@ frontmatter:
     type: array
     items: string
     default: []
-    description: "Paths to validation suite files elected for this prompt (e.g., .allhands/validation-tooling/typescript-typecheck.md)"
+    description: "Paths to validation suite files elected for this prompt (e.g., .allhands/validation/typescript-typecheck.md)"
 
   skills:
     type: array

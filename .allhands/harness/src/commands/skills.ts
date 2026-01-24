@@ -51,9 +51,10 @@ function extractFrontmatter(content: string): Record<string, unknown> | null {
 
 /**
  * Get the skills directory path
+ * Path: harness/src/commands/ -> harness/src/ -> harness/ -> .allhands/ -> skills/
  */
 function getSkillsDir(): string {
-  return join(__dirname, '..', '..', 'skills');
+  return join(__dirname, '..', '..', '..', 'skills');
 }
 
 /**

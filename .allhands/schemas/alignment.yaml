@@ -25,10 +25,10 @@ body:
       required: true
       description: "High-level overview of milestone motivations and goals"
 
-    - name: "Hard Requirements"
+    - name: "Hard User Requirements"
       required: true
       description: "Concise, immutable user requirements. Guidelines for emergent mode."
-      
+
     - append_format: |
         ### [Prompt ##: Title]
         **Decision**: What was decided

@@ -8,13 +8,13 @@
  */
 
 import { execSync } from 'child_process';
-import { extname, join, dirname } from 'path';
-import { existsSync, readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
 import type { Command } from 'commander';
-import { parse as parseYaml } from 'yaml';
-import { HookInput, outputContext, allowTool, blockTool, denyTool, readHookInput, getProjectDir } from './shared.js';
+import { existsSync, readFileSync } from 'fs';
 import { minimatch } from 'minimatch';
+import { dirname, extname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { parse as parseYaml } from 'yaml';
+import { allowTool, blockTool, denyTool, getProjectDir, HookInput, outputContext, readHookInput } from './shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -206,7 +206,7 @@ const SCHEMA_PATTERNS: SchemaPattern[] = [
   { pattern: 'specs/**/*.spec.md', schemaType: 'spec' },
   { pattern: 'specs/roadmap/**/*.spec.md', schemaType: 'spec' },
   { pattern: 'docs/**/*.md', schemaType: 'documentation' },
-  { pattern: '.allhands/validation-tooling/*.md', schemaType: 'validation-suite' },
+  { pattern: '.allhands/validation/*.md', schemaType: 'validation-suite' },
   { pattern: '.allhands/skills/*/SKILL.md', schemaType: 'skill' },
 ];
 
@@ -256,7 +256,8 @@ function detectSchemaType(filePath: string): 'prompt' | 'alignment' | 'spec' | '
  * Load schema definition from YAML file
  */
 function loadSchema(schemaType: string): SchemaDefinition | null {
-  const schemaPath = join(__dirname, '..', '..', 'schema', `${schemaType}.yaml`);
+  // Path: harness/src/hooks/ -> harness/src/ -> harness/ -> .allhands/ -> schemas/
+  const schemaPath = join(__dirname, '..', '..', '..', 'schemas', `${schemaType}.yaml`);
   if (!existsSync(schemaPath)) {
     return null;
   }

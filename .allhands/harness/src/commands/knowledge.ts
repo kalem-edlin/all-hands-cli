@@ -34,7 +34,7 @@ const getProjectRoot = (): string => {
 
 // Load aggregator prompt from file
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const AGGREGATOR_PROMPT_PATH = join(__dirname, "../lib/agents/prompts/knowledge-aggregator.md");
+const AGGREGATOR_PROMPT_PATH = join(__dirname, "../lib/opencode/prompts/knowledge-aggregator.md");
 
 const getAggregatorPrompt = (): string => {
   return readFileSync(AGGREGATOR_PROMPT_PATH, "utf-8");

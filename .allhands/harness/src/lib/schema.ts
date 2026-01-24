@@ -54,9 +54,10 @@ const schemaCache = new Map<string, Schema>();
 
 /**
  * Get the schema directory path
+ * Path: harness/src/lib/ -> harness/src/ -> harness/ -> .allhands/ -> schemas/
  */
 function getSchemaDir(): string {
-  return join(__dirname, '..', '..', 'schema');
+  return join(__dirname, '..', '..', '..', 'schemas');
 }
 
 /**
