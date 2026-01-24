@@ -318,3 +318,75 @@ Where `hash` is the git commit hash (7 chars) of the file when the reference was
 | `GEMINI_API_KEY` | API key for Gemini (oracle) |
 | `BASE_BRANCH` | Override auto-detected base branch |
 | `AGENT_ID` | Agent identifier for session management |
+
+## Schema Architecture
+
+Two types of schemas serve different purposes:
+
+### Agent-Facing Schemas (`schema/*.yaml`)
+
+YAML schemas exposed to agents via `ah schema <type>`. Define frontmatter structure for markdown files:
+
+| Schema | Purpose |
+|--------|---------|
+| `prompt.yaml` | Prompt file frontmatter |
+| `alignment.yaml` | Alignment doc frontmatter |
+| `spec.yaml` | Milestone spec frontmatter |
+| `documentation.yaml` | Documentation file frontmatter |
+| `validation-suite.yaml` | Validation tooling frontmatter |
+| `skill.yaml` | Skill manifest frontmatter |
+
+Agents reference these when creating or modifying files to ensure correct structure.
+
+### Internal Schemas (`src/lib/schemas/*.ts`)
+
+Zod schemas for harness configuration. NOT exposed to agents:
+
+| Schema | Purpose |
+|--------|---------|
+| `template-vars.ts` | Registry of valid template variables for agent message templates |
+| `agent-profile.ts` | Schema for agent profile YAML files in `agents/` |
+
+Why Zod instead of YAML for internal schemas:
+- **Type safety** - Compile-time checks, IDE autocomplete
+- **Runtime validation** - Catches misconfigurations at spawn time
+- **Pattern validation** - e.g., `PROMPT_NUMBER` must match `\d{2}`
+
+## Agent Profiles
+
+Agent profiles in `agents/*.yaml` define how agents are spawned. Key fields:
+
+```yaml
+name: my-agent              # Agent identifier
+flow: MY_FLOW.md            # Flow file in flows/
+tui_action: my-action       # TUI button that spawns this agent
+tui_label: My Agent         # Display label in TUI
+tui_requires_milestone: true
+template_vars:              # Required context variables
+  - MILESTONE_NAME
+  - ALIGNMENT_PATH
+message_template: |         # Preamble injected before flow
+  Working on: ${MILESTONE_NAME}
+```
+
+### Valid Template Variables
+
+| Variable | Description |
+|----------|-------------|
+| `SPEC_PATH` | Path to milestone spec file |
+| `ALIGNMENT_PATH` | Path to alignment doc |
+| `PROMPTS_FOLDER` | Path to prompts directory |
+| `PROMPT_PATH` | Path to specific prompt file |
+| `OUTPUT_PATH` | Output file path |
+| `PLANNING_FOLDER` | Path to `.planning/{branch}` directory |
+| `MILESTONE_NAME` | Current milestone name |
+| `PROMPT_NUMBER` | Prompt number as two digits (01, 02) |
+| `BRANCH` | Current git branch name |
+
+### Validation
+
+```bash
+ah validate agents  # Validate all agent profiles
+```
+
+Catches: missing flow files, invalid template variables, unused/undeclared vars

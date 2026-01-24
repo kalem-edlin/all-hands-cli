@@ -1,6 +1,10 @@
 name: judge
 flow: JUDGE_REVIEWING.md
 prompt_scoped: false
+tui_action: review-jury
+tui_label: Review Jury
+tui_requires_milestone: true
+non_coding: true
 message_template: |
   Reviewing milestone: ${MILESTONE_NAME}
   Alignment doc: ${ALIGNMENT_PATH}

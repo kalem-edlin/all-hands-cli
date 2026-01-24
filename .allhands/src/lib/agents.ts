@@ -2,36 +2,45 @@
  * Agent Profile Management
  *
  * Loads agent profiles and builds invocation contexts for TUI-delegated agents.
- * Profiles define: flow, env vars, and message templates for each agent type.
+ * Profiles define: flow, template vars, and message templates for each agent type.
+ *
+ * This module provides:
+ * - Profile loading with Zod validation
+ * - Template variable resolution
+ * - Context building for agent spawning
  */
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
+import {
+  RawAgentProfileSchema,
+  normalizeProfile,
+  validateProfileSemantics,
+  type AgentProfile,
+} from './schemas/agent-profile.js';
+import {
+  validateContext,
+  type TemplateContext,
+  type TemplateVarName,
+} from './schemas/template-vars.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export interface AgentProfile {
-  name: string;
-  flow: string;
-  env: Record<string, string>;
-  messageTemplate?: string;
-  templateVars?: string[];
-  /**
-   * If true, this agent is scoped to a specific prompt and can have multiple
-   * instances running concurrently (one per prompt).
-   * Prompt-scoped agents include the prompt number in their ID (e.g., "executor-01").
-   * Non-prompt-scoped agents use their name as AGENT_ID (e.g., "coordinator").
-   */
-  promptScoped?: boolean;
-}
-
+/**
+ * Result of building an agent invocation
+ */
 export interface AgentInvocation {
+  /** Environment variables to set for the agent */
   env: Record<string, string>;
+  /** Absolute path to the flow file */
   flowPath: string;
+  /** Resolved message template (preamble) */
   preamble: string;
+  /** The profile used */
+  profile: AgentProfile;
 }
 
 /**
@@ -39,20 +48,13 @@ export interface AgentInvocation {
  * These are derived from context, not defined in profiles.
  */
 export const STOCK_ENV_VARS = [
-  'AGENT_NAME',      // Derived from profile.name
-  'MILESTONE_NAME',  // Current milestone
-  'BRANCH',          // Current git branch
-  'PROMPT_FILE_NAME', // Current prompt file (if applicable)
+  'AGENT_ID',
+  'AGENT_NAME',
+  'AGENT_TYPE',
+  'MILESTONE_NAME',
+  'BRANCH',
+  'PROMPT_NUMBER',
 ] as const;
-
-interface RawAgentProfile {
-  name: string;
-  flow: string;
-  env?: Record<string, string>;
-  message_template?: string;
-  template_vars?: string[];
-  prompt_scoped?: boolean;
-}
 
 /**
  * Get the agents directory path
@@ -81,17 +83,19 @@ export function loadAgentProfile(name: string): AgentProfile | null {
 
   try {
     const content = readFileSync(profilePath, 'utf-8');
-    const raw = parseYaml(content) as RawAgentProfile;
+    const rawData = parseYaml(content);
 
-    return {
-      name: raw.name,
-      flow: raw.flow,
-      env: raw.env || {},
-      messageTemplate: raw.message_template,
-      templateVars: raw.template_vars,
-      promptScoped: raw.prompt_scoped ?? false,
-    };
-  } catch {
+    // Validate with Zod
+    const parseResult = RawAgentProfileSchema.safeParse(rawData);
+
+    if (!parseResult.success) {
+      console.error(`Invalid profile ${name}:`, parseResult.error.format());
+      return null;
+    }
+
+    return normalizeProfile(parseResult.data);
+  } catch (err) {
+    console.error(`Failed to load profile ${name}:`, err);
     return null;
   }
 }
@@ -112,58 +116,104 @@ export function listAgentProfiles(): string[] {
 }
 
 /**
+ * Get all profiles indexed by their TUI action
+ */
+export function getProfilesByTuiAction(): Map<string, AgentProfile[]> {
+  const map = new Map<string, AgentProfile[]>();
+  const names = listAgentProfiles();
+
+  for (const name of names) {
+    const profile = loadAgentProfile(name);
+    if (profile?.tuiAction) {
+      const existing = map.get(profile.tuiAction) ?? [];
+      existing.push(profile);
+      map.set(profile.tuiAction, existing);
+    }
+  }
+
+  return map;
+}
+
+/**
  * Resolve template variables in a string
  *
  * Replaces ${VAR_NAME} with values from context.
- * Unresolved variables are left as-is.
+ * Unresolved variables are left as-is (for debugging visibility).
  */
-export function resolveTemplate(
-  template: string,
-  context: Record<string, string>
-): string {
+export function resolveTemplate(template: string, context: TemplateContext): string {
   return template.replace(/\$\{([^}]+)\}/g, (match, varName) => {
-    return context[varName] !== undefined ? context[varName] : match;
+    const value = context[varName as TemplateVarName];
+    return value !== undefined ? value : match;
   });
+}
+
+/**
+ * Validate that a profile's flow file exists
+ */
+export function validateProfileFlowExists(profile: AgentProfile): {
+  valid: boolean;
+  error?: string;
+} {
+  const flowsDir = getFlowsDir();
+  const flowPath = join(flowsDir, profile.flow);
+
+  if (!existsSync(flowPath)) {
+    return {
+      valid: false,
+      error: `Flow file not found: ${profile.flow}`,
+    };
+  }
+
+  return { valid: true };
 }
 
 /**
  * Build a complete agent invocation from profile and context
  *
- * Returns:
- * - env: Merged environment variables with resolved values
- * - flowPath: Absolute path to the flow file
- * - preamble: Resolved message template to inject above flow
+ * This is the main entry point for spawning agents. It:
+ * 1. Validates required template variables are provided
+ * 2. Resolves the message template
+ * 3. Returns everything needed to spawn the agent
  *
- * Stock env vars are injected automatically:
- * - AGENT_NAME: From profile.name
- * - MILESTONE_NAME: From context
- * - BRANCH: From context
- * - PROMPT_FILE_NAME: From context (if provided)
+ * @param profile - The agent profile (from loadAgentProfile)
+ * @param context - Template variable values
+ * @returns AgentInvocation or throws on validation failure
  */
 export function buildAgentInvocation(
   profile: AgentProfile,
-  context: Record<string, string>
+  context: TemplateContext
 ): AgentInvocation {
-  // Start with stock env vars
+  // Validate required template variables
+  const validation = validateContext(context, profile.templateVars);
+
+  if (!validation.valid) {
+    throw new Error(
+      `Missing required template variables for agent "${profile.name}": ${validation.errors.join(', ')}`
+    );
+  }
+
+  // Validate flow file exists
+  const flowCheck = validateProfileFlowExists(profile);
+  if (!flowCheck.valid) {
+    throw new Error(`Agent "${profile.name}": ${flowCheck.error}`);
+  }
+
+  // Build environment variables
   const env: Record<string, string> = {
     AGENT_NAME: profile.name,
+    AGENT_TYPE: profile.name,
   };
 
-  // Add stock vars from context
+  // Add context values that map to env vars
   if (context.MILESTONE_NAME) env.MILESTONE_NAME = context.MILESTONE_NAME;
   if (context.BRANCH) env.BRANCH = context.BRANCH;
-  if (context.PROMPT_FILE_NAME) env.PROMPT_FILE_NAME = context.PROMPT_FILE_NAME;
-
-  // Add profile-specific env overrides (if any)
-  for (const [key, value] of Object.entries(profile.env)) {
-    env[key] = resolveTemplate(value, context);
-  }
+  if (context.PROMPT_NUMBER) env.PROMPT_NUMBER = context.PROMPT_NUMBER;
 
   // Resolve flow path
   const flowsDir = getFlowsDir();
   const flowPath = join(flowsDir, profile.flow);
 
-  // Resolve preamble
+  // Resolve preamble from message template
   const preamble = profile.messageTemplate
     ? resolveTemplate(profile.messageTemplate, context)
     : '';
@@ -172,51 +222,66 @@ export function buildAgentInvocation(
     env,
     flowPath,
     preamble,
+    profile,
   };
 }
 
 /**
- * Validate that a profile's flow file exists
+ * Build invocation for an agent by name
+ *
+ * Convenience wrapper that loads the profile first.
  */
-export function validateProfile(profile: AgentProfile): {
-  valid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-  const flowsDir = getFlowsDir();
-  const flowPath = join(flowsDir, profile.flow);
+export function buildAgentInvocationByName(
+  agentName: string,
+  context: TemplateContext
+): AgentInvocation {
+  const profile = loadAgentProfile(agentName);
 
-  if (!existsSync(flowPath)) {
-    errors.push(`Flow file not found: ${profile.flow}`);
+  if (!profile) {
+    throw new Error(`Agent profile not found: ${agentName}`);
   }
 
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+  return buildAgentInvocation(profile, context);
 }
 
 /**
  * Load and validate all agent profiles
+ *
+ * Returns all valid profiles and any validation errors.
  */
 export function loadAllProfiles(): {
   profiles: AgentProfile[];
-  errors: Array<{ name: string; errors: string[] }>;
+  errors: Array<{ name: string; errors: string[]; warnings: string[] }>;
 } {
   const names = listAgentProfiles();
   const profiles: AgentProfile[] = [];
-  const errors: Array<{ name: string; errors: string[] }> = [];
+  const errors: Array<{ name: string; errors: string[]; warnings: string[] }> = [];
 
   for (const name of names) {
     const profile = loadAgentProfile(name);
+
     if (!profile) {
-      errors.push({ name, errors: ['Failed to parse profile'] });
+      errors.push({ name, errors: ['Failed to parse profile'], warnings: [] });
       continue;
     }
 
-    const validation = validateProfile(profile);
-    if (!validation.valid) {
-      errors.push({ name, errors: validation.errors });
+    // Validate flow exists
+    const flowCheck = validateProfileFlowExists(profile);
+
+    // Validate semantic consistency
+    const semanticCheck = validateProfileSemantics(profile);
+
+    const allErrors: string[] = [];
+    const allWarnings: string[] = [...semanticCheck.warnings];
+
+    if (!flowCheck.valid && flowCheck.error) {
+      allErrors.push(flowCheck.error);
+    }
+
+    allErrors.push(...semanticCheck.errors);
+
+    if (allErrors.length > 0 || allWarnings.length > 0) {
+      errors.push({ name, errors: allErrors, warnings: allWarnings });
     }
 
     profiles.push(profile);
@@ -224,3 +289,7 @@ export function loadAllProfiles(): {
 
   return { profiles, errors };
 }
+
+// Re-export types
+export type { AgentProfile } from './schemas/agent-profile.js';
+export type { TemplateContext, TemplateVarName } from './schemas/template-vars.js';

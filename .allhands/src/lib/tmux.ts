@@ -26,8 +26,14 @@
 import { execSync, spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { getCurrentBranch } from './planning.js';
-import { listAgentProfiles, loadAgentProfile } from './agents.js';
+import { getCurrentBranch, getPlanningPaths } from './planning.js';
+import {
+  listAgentProfiles,
+  loadAgentProfile,
+  buildAgentInvocation,
+  type AgentProfile,
+  type TemplateContext,
+} from './agents.js';
 
 /**
  * Agent type = agent profile name.
@@ -548,6 +554,116 @@ export function spawnAgent(
   }
 
   return { sessionName, windowName };
+}
+
+/**
+ * Configuration for profile-based agent spawning
+ */
+export interface ProfileSpawnConfig {
+  /** Agent profile name (must exist in .allhands/agents/) */
+  agentName: string;
+  /** Template context for variable resolution */
+  context: TemplateContext;
+  /** Optional prompt number for prompt-scoped agents */
+  promptNumber?: number;
+  /** If true, switch focus to the new window (default: true) */
+  focusWindow?: boolean;
+}
+
+/**
+ * Spawn an agent using its profile definition
+ *
+ * This is the preferred way to spawn agents. It:
+ * 1. Loads the agent profile
+ * 2. Validates required template variables
+ * 3. Resolves the message template
+ * 4. Spawns the agent with proper configuration
+ *
+ * @param config - Profile spawn configuration
+ * @param branch - Git branch (defaults to current)
+ * @param cwd - Working directory
+ * @returns Session and window names
+ * @throws Error if profile not found, validation fails, or non-prompt-scoped agent already exists
+ */
+export function spawnAgentFromProfile(
+  config: ProfileSpawnConfig,
+  branch?: string,
+  cwd?: string
+): { sessionName: string; windowName: string } {
+  const profile = loadAgentProfile(config.agentName);
+
+  if (!profile) {
+    throw new Error(`Agent profile not found: ${config.agentName}`);
+  }
+
+  // Build the invocation (validates template vars)
+  const invocation = buildAgentInvocation(profile, config.context);
+
+  // Convert to SpawnConfig
+  const spawnConfig: SpawnConfig = {
+    name: profile.name,
+    agentType: profile.name,
+    flowPath: invocation.flowPath,
+    preamble: invocation.preamble,
+    promptNumber: config.promptNumber,
+    milestoneName: config.context.MILESTONE_NAME,
+    nonCoding: profile.nonCoding,
+    focusWindow: config.focusWindow,
+    promptScoped: profile.promptScoped,
+  };
+
+  return spawnAgent(spawnConfig, branch, cwd);
+}
+
+/**
+ * Build standard template context from planning state
+ *
+ * This constructs the context object needed for agent spawning
+ * by reading the current planning state.
+ */
+export function buildTemplateContext(
+  branch: string,
+  milestoneName?: string,
+  promptNumber?: number,
+  promptPath?: string,
+  cwd?: string
+): TemplateContext {
+  const paths = getPlanningPaths(branch, cwd);
+
+  const context: TemplateContext = {
+    BRANCH: branch,
+    PLANNING_FOLDER: paths.root,
+    PROMPTS_FOLDER: paths.prompts,
+    ALIGNMENT_PATH: paths.alignment,
+  };
+
+  if (milestoneName) {
+    context.MILESTONE_NAME = milestoneName;
+  }
+
+  if (promptNumber !== undefined) {
+    context.PROMPT_NUMBER = String(promptNumber).padStart(2, '0');
+  }
+
+  if (promptPath) {
+    context.PROMPT_PATH = promptPath;
+  }
+
+  // Try to read spec path from status (YAML format)
+  if (existsSync(paths.status)) {
+    try {
+      const content = readFileSync(paths.status, 'utf-8');
+      // Simple YAML parsing for specPath
+      const specMatch = content.match(/specPath:\s*(.+)/);
+      if (specMatch) {
+        context.SPEC_PATH = specMatch[1].trim();
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
+  return context;
 }
 
 /**

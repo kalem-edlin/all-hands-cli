@@ -1,6 +1,10 @@
 name: planner
 flow: MILESTONE_PLANNING.md
 prompt_scoped: false
+tui_action: planner
+tui_label: Planner
+tui_requires_milestone: true
+non_coding: false
 message_template: |
   Milestone: ${MILESTONE_NAME}
   Spec: ${SPEC_PATH}
