@@ -10,7 +10,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "vitest run src/__tests__/e2e/",
+    "test:e2e:verbose": "vitest run src/__tests__/e2e/ --reporter=verbose",
+    "test:unit": "vitest run src/lib/__tests__/ src/mcp/__tests__/"
   },
   "devDependencies": {
     "@types/blessed": "^0.1.25",

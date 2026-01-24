@@ -5,7 +5,7 @@
  * Schemas are the single source of truth for file structure requirements.
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
@@ -92,10 +92,9 @@ export function listSchemas(): string[] {
     return [];
   }
 
-  const { readdirSync } = require('fs');
   return readdirSync(schemaDir)
-    .filter((f: string) => f.endsWith('.yaml'))
-    .map((f: string) => f.replace('.yaml', ''));
+    .filter((f) => f.endsWith('.yaml'))
+    .map((f) => f.replace('.yaml', ''));
 }
 
 /**
