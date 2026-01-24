@@ -1,12 +1,12 @@
 /**
- * Milestone Commands (Agent-Facing)
+ * Specs Commands (Agent-Facing)
  *
- * High-level milestone management operations.
+ * High-level spec management operations.
  *
  * Commands:
- * - ah milestone list              - List all milestones grouped by domain_name
- * - ah milestone complete <name>   - Mark milestone completed, move spec out of roadmap
- * - ah milestone resurrect <name>  - Mark milestone incomplete, move spec back to roadmap
+ * - ah specs list              - List all specs grouped by domain_name
+ * - ah specs complete <name>   - Mark spec completed, move spec out of roadmap
+ * - ah specs resurrect <name>  - Mark spec incomplete, move spec back to roadmap
  */
 
 import { Command } from 'commander';
@@ -118,22 +118,23 @@ function findSpecByName(name: string): SpecInfo | null {
 }
 
 export function register(program: Command): void {
-  const milestone = program
-    .command('milestone')
-    .description('Milestone management');
+  const specs = program
+    .command('specs')
+    .description('Spec management');
 
-  // ah milestone list
-  milestone
+  // ah specs list
+  specs
     .command('list')
-    .description('List all milestones grouped by domain')
+    .description('List all specs grouped by domain')
     .option('--json', 'Output as JSON')
     .option('--domains-only', 'Only list domain names')
-    .action(async (options: { json?: boolean; domainsOnly?: boolean }) => {
-      const specs = loadAllSpecs();
+    .option('--domain <name>', 'Filter to a specific domain')
+    .action(async (options: { json?: boolean; domainsOnly?: boolean; domain?: string }) => {
+      const allSpecs = loadAllSpecs();
 
       // Group by domain_name
       const byDomain: Record<string, SpecInfo[]> = {};
-      for (const spec of specs) {
+      for (const spec of allSpecs) {
         const domain = spec.domain_name || 'uncategorized';
         if (!byDomain[domain]) {
           byDomain[domain] = [];
@@ -143,6 +144,7 @@ export function register(program: Command): void {
 
       const domains = Object.keys(byDomain).sort();
 
+      // Handle --domains-only
       if (options.domainsOnly) {
         if (options.json) {
           console.log(JSON.stringify({
@@ -158,16 +160,49 @@ export function register(program: Command): void {
         return;
       }
 
+      // Handle --domain <name>
+      if (options.domain) {
+        const domainSpecs = byDomain[options.domain];
+        if (!domainSpecs) {
+          if (options.json) {
+            console.log(JSON.stringify({ success: false, error: `Domain not found: ${options.domain}` }));
+          } else {
+            console.error(`Domain not found: ${options.domain}`);
+          }
+          process.exit(1);
+        }
+
+        const sortedSpecs = domainSpecs.sort((a, b) => a.name.localeCompare(b.name));
+
+        if (options.json) {
+          console.log(JSON.stringify({
+            success: true,
+            domain: options.domain,
+            count: sortedSpecs.length,
+            specs: sortedSpecs,
+          }, null, 2));
+        } else {
+          console.log(`## ${options.domain}\n`);
+          for (const spec of sortedSpecs) {
+            const statusIcon = spec.status === 'completed' ? '[x]' : spec.status === 'in_progress' ? '[>]' : '[ ]';
+            const deps = spec.dependencies.length > 0 ? ` (deps: ${spec.dependencies.join(', ')})` : '';
+            console.log(`  ${statusIcon} ${spec.name}${deps}`);
+          }
+        }
+        return;
+      }
+
+      // Default: list all specs grouped by domain
       if (options.json) {
         console.log(JSON.stringify({
           success: true,
-          count: specs.length,
+          count: allSpecs.length,
           domains: byDomain,
         }, null, 2));
         return;
       }
 
-      console.log(`Found ${specs.length} milestone(s):\n`);
+      console.log(`Found ${allSpecs.length} spec(s):\n`);
 
       for (const domain of domains) {
         console.log(`## ${domain}`);
@@ -181,28 +216,28 @@ export function register(program: Command): void {
       }
     });
 
-  // ah milestone complete <name>
-  milestone
+  // ah specs complete <name>
+  specs
     .command('complete <name>')
-    .description('Mark milestone completed and move spec to specs/')
+    .description('Mark spec completed and move to specs/')
     .option('--json', 'Output as JSON')
     .action(async (name: string, options: { json?: boolean }) => {
       const spec = findSpecByName(name);
 
       if (!spec) {
         if (options.json) {
-          console.log(JSON.stringify({ success: false, error: `Milestone not found: ${name}` }));
+          console.log(JSON.stringify({ success: false, error: `Spec not found: ${name}` }));
         } else {
-          console.error(`Milestone not found: ${name}`);
+          console.error(`Spec not found: ${name}`);
         }
         process.exit(1);
       }
 
       if (spec.status === 'completed') {
         if (options.json) {
-          console.log(JSON.stringify({ success: false, error: `Milestone already completed: ${name}` }));
+          console.log(JSON.stringify({ success: false, error: `Spec already completed: ${name}` }));
         } else {
-          console.error(`Milestone already completed: ${name}`);
+          console.error(`Spec already completed: ${name}`);
         }
         process.exit(1);
       }
@@ -237,34 +272,34 @@ export function register(program: Command): void {
         return;
       }
 
-      console.log(`Marked milestone completed: ${name}`);
+      console.log(`Marked spec completed: ${name}`);
       if (spec.path.includes('/roadmap/')) {
         console.log(`  Moved to: ${targetPath}`);
       }
     });
 
-  // ah milestone resurrect <name>
-  milestone
+  // ah specs resurrect <name>
+  specs
     .command('resurrect <name>')
-    .description('Mark milestone incomplete and move spec back to roadmap')
+    .description('Mark spec incomplete and move back to roadmap')
     .option('--json', 'Output as JSON')
     .action(async (name: string, options: { json?: boolean }) => {
       const spec = findSpecByName(name);
 
       if (!spec) {
         if (options.json) {
-          console.log(JSON.stringify({ success: false, error: `Milestone not found: ${name}` }));
+          console.log(JSON.stringify({ success: false, error: `Spec not found: ${name}` }));
         } else {
-          console.error(`Milestone not found: ${name}`);
+          console.error(`Spec not found: ${name}`);
         }
         process.exit(1);
       }
 
       if (spec.status === 'roadmap') {
         if (options.json) {
-          console.log(JSON.stringify({ success: false, error: `Milestone already in roadmap: ${name}` }));
+          console.log(JSON.stringify({ success: false, error: `Spec already in roadmap: ${name}` }));
         } else {
-          console.error(`Milestone already in roadmap: ${name}`);
+          console.error(`Spec already in roadmap: ${name}`);
         }
         process.exit(1);
       }
@@ -299,7 +334,7 @@ export function register(program: Command): void {
         return;
       }
 
-      console.log(`Resurrected milestone to roadmap: ${name}`);
+      console.log(`Resurrected spec to roadmap: ${name}`);
       if (!spec.path.includes('/roadmap/')) {
         console.log(`  Moved to: ${targetPath}`);
       }

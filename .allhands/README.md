@@ -36,7 +36,7 @@ The `ah` command works from any directory within an all-hands project.
 | `ah grok` | X/Twitter search for technology research |
 | `ah hooks` | Hook commands (internal use) |
 | `ah knowledge` | Semantic search and indexing for docs and specs |
-| `ah milestone` | Milestone management |
+| `ah specs` | Spec management |
 | `ah notify` | Desktop notifications |
 | `ah oracle` | Multi-provider LLM inference |
 | `ah perplexity` | Deep research with citations |
@@ -95,15 +95,17 @@ ah knowledge reindex   # Rebuild all indexes
 ah knowledge status    # Check status of all indexes
 ```
 
-### milestone - Milestone Management
+### specs - Spec Management
 
 ```bash
-ah milestone list                # List all milestones grouped by domain
-ah milestone complete <name>     # Mark milestone completed
-ah milestone resurrect <name>    # Mark milestone incomplete
+ah specs list                    # List all specs grouped by domain
+ah specs list --domains-only     # List only domain names
+ah specs list --domain <name>    # List specs for a specific domain
+ah specs complete <name>         # Mark spec completed
+ah specs resurrect <name>        # Mark spec incomplete
 ```
 
-Options: `--json`
+Options: `--json`, `--domains-only`, `--domain <name>`
 
 ### notify - Desktop Notifications
 
