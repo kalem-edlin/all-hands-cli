@@ -347,8 +347,12 @@ export class KnowledgeService {
     // Generate query embedding
     const queryEmbedding = await this.embed(query);
 
+    // Over-fetch to compensate for deleted entries that remain in vector index
+    // (USearch doesn't support deletion, so we filter in metadata post-search)
+    const searchK = Math.min(k * 2, index.size());
+
     // Search (1 thread for CLI usage)
-    const searchResult = index.search(queryEmbedding, k, 1);
+    const searchResult = index.search(queryEmbedding, searchK, 1);
     const keys = searchResult.keys;
     const distances = searchResult.distances;
 
@@ -391,6 +395,9 @@ export class KnowledgeService {
       }
 
       results.push(result);
+
+      // Stop once we have enough results (we over-fetched to handle deleted entries)
+      if (results.length >= k) break;
     }
 
     return results;
