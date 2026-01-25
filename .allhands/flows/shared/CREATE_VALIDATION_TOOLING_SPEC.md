@@ -35,28 +35,18 @@ Confirm engineer agrees and understands this creates a blocking dependency.
 
 ## Spec Creation
 
-Create `specs/roadmap/validation-<name>.spec.md`:
-
-```yaml
----
-name: validation-<name>
-domain_name: infrastructure
-status: pending
-dependencies: []
-tags: [validation-tooling]
----
-```
-
-Update original spec with `dependencies: [validation-<name>]`.
+Use `name: validation-{name}` and `domain_name: infrastructure`.
 
 Body sections: Context, Acceptance Criteria (setup, coverage, meta-testing, CICD, documentation), Technical Constraints, Out of Scope.
+
+Follow `.allhands/flows/shared/CREATE_SPEC.md`.
+
+Update original spec with `dependencies: [validation-{name}]`.
 
 ## Handoff
 
 Ask engineer: "This validation tooling spec is ready and blocks your original work. Would you like to switch focus to it now?"
 
-If yes (enable now):
-- Follow `.allhands/flows/shared/ENABLE_SPEC.md` with `spec_path` set to the newly created spec
+If yes: checkout the branch and run `ah planning ensure`
 
-If no:
-- Inform engineer spec is saved in `specs/roadmap/` and original spec is blocked until this is complete
+If no: inform engineer spec is saved and original spec is blocked until this is complete

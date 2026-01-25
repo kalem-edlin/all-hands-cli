@@ -97,15 +97,15 @@ Before writing spec, verify coverage:
 
 If gaps exist, return to Surveying for specific categories.
 
-## Spec Output
+## Spec Content
 
-- Run `ah schema spec` for spec format
-- Write `specs/roadmap/{SPEC_NAME}.spec.md` capturing:
-  - Engineer desires and expectations (what, why, success criteria)
-  - Assumptions about other milestones (use "Assuming X exists...", not cross-references)
-  - Open questions for architect to research/decide
-  - Technical considerations grounded in codebase reality
-  - Milestone dependencies
+Prepare content for spec creation:
+
+**Body sections:**
+- Engineer desires and expectations (what, why, success criteria)
+- Assumptions about other milestones (use "Assuming X exists...", not cross-references)
+- Open questions for architect to research/decide
+- Technical considerations grounded in codebase reality
 
 ### Preference Language
 
@@ -125,42 +125,22 @@ If gaps exist, return to Surveying for specific categories.
 
 Use "Assuming X exists..." or "Assuming any of X, Y, Z exist..." to express dependencies on milestones that will be implemented by the time this one is.
 
-## Spec Flow Analysis (Optional if you feel there are still ambiguities in the complexity of this milestone)
+## Closing
 
-After writing the spec, offer flow analysis:
+Follow `.allhands/flows/shared/CREATE_SPEC.md` to write, persist, and optionally enable the spec.
+
+### Optional: Spec Flow Analysis
+
+Before or after creating the spec, you may offer flow analysis for complex features:
 
 Ask engineer: "Would you like me to analyze this spec for user flow coverage and gaps?"
 
 If yes:
 - Read `.allhands/flows/shared/SPEC_FLOW_ANALYSIS.md` and follow instructions
 - Returns: identified flows, gaps, clarifying questions
-- Engineer chooses which gaps to address before enabling milestone
+- Engineer chooses which gaps to address
 
-This is recommended for:
+Recommended for:
 - User-facing features with multiple paths
 - Complex integrations with external systems
 - Features with unclear scope boundaries
-
-## Closing
-
-After writing the spec:
-- Persist the spec to `$BASE_BRANCH` (works from any branch):
-  ```bash
-  ah specs persist specs/roadmap/{SPEC_NAME}.spec.md
-  ```
-- Run `ah knowledge roadmap reindex` to update the roadmap knowledge index
-
-Ask the engineer:
-
-> **"Would you like to enable this spec now?"**
->
-> This will:
-> 1. Initialize `.planning/{spec}/` for work tracking
-> 2. Set this spec as active
-> 3. Set up a working branch (new or continue existing)
-> 4. Allow you to proceed to planning and execution
->
-> If no, the spec remains in `specs/roadmap/` for later activation via TUI.
-
-If yes:
-- Follow `.allhands/flows/shared/ENABLE_SPEC.md` with `spec_path` set to the newly created spec

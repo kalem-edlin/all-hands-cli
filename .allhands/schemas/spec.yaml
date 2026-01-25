@@ -24,6 +24,12 @@ frontmatter:
     default: []
     description: "Other spec names this depends on"
 
+  branch:
+    type: string
+    required: true
+    default: "feature/{name}"
+    description: "Working branch for this spec"
+
 body:
   description: "Markdown document capturing the spec vision"
   sections:
