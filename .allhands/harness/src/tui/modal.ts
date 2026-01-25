@@ -106,7 +106,7 @@ export function createModal(
 
   // Add help text (fixed at bottom of container, outside scrollable area)
   const helpText = onClear
-    ? '{gray-fg}[Space] Select  [x] Clear  [Esc] Cancel{/gray-fg}'
+    ? '{gray-fg}[Space] Select  [x] Close  [Esc] Cancel{/gray-fg}'
     : '{gray-fg}[Space] Select  [Esc] Cancel{/gray-fg}';
   blessed.text({
     parent: container,

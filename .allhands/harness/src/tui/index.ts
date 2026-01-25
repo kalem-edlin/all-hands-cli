@@ -636,10 +636,10 @@ export class TUI {
       onCancel: () => {
         this.closeModal();
       },
-      onClear: this.state.spec ? () => {
+      onClear: () => {
         this.closeModal();
         this.options.onAction('clear-spec');
-      } : undefined,
+      },
     });
     this.screen.render();
   }
