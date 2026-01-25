@@ -10,10 +10,11 @@
 import { execSync } from 'child_process';
 import type { Command } from 'commander';
 import { existsSync, readFileSync } from 'fs';
-import { minimatch } from 'minimatch';
 import { dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
+import { minimatch } from 'minimatch';
+import { detectSchemaType, type SchemaType } from '../lib/schema.js';
 import { allowTool, blockTool, denyTool, FormatConfig, getProjectDir, HookInput, loadProjectSettings, outputContext, readHookInput } from './shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,21 +196,6 @@ function formatDiagnosticsContext(results: DiagnosticResult[]): string {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-interface SchemaPattern {
-  pattern: string;
-  schemaType: 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite' | 'skill';
-}
-
-const SCHEMA_PATTERNS: SchemaPattern[] = [
-  { pattern: '.planning/**/prompts/*.md', schemaType: 'prompt' },
-  { pattern: '.planning/**/alignment.md', schemaType: 'alignment' },
-  { pattern: 'specs/**/*.spec.md', schemaType: 'spec' },
-  { pattern: 'specs/roadmap/**/*.spec.md', schemaType: 'spec' },
-  { pattern: 'docs/**/*.md', schemaType: 'documentation' },
-  { pattern: '.allhands/validation/*.md', schemaType: 'validation-suite' },
-  { pattern: '.allhands/skills/*/SKILL.md', schemaType: 'skill' },
-];
-
 interface SchemaDefinition {
   frontmatter: Record<string, {
     type: string;
@@ -235,21 +221,10 @@ interface ValidationError {
 }
 
 /**
- * Detect which schema applies to a file path
+ * Detect which schema applies to a file path (wrapper for shared function)
  */
-function detectSchemaType(filePath: string): 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite' | 'skill' | null {
-  const projectDir = getProjectDir();
-  // Make path relative to project
-  const relativePath = filePath.startsWith(projectDir)
-    ? filePath.slice(projectDir.length + 1)
-    : filePath;
-
-  for (const { pattern, schemaType } of SCHEMA_PATTERNS) {
-    if (minimatch(relativePath, pattern)) {
-      return schemaType;
-    }
-  }
-  return null;
+function detectSchemaTypeLocal(filePath: string): SchemaType | null {
+  return detectSchemaType(filePath, getProjectDir());
 }
 
 /**
@@ -389,7 +364,7 @@ function validateFrontmatter(
  */
 function runSchemaValidation(filePath: string): ValidationError[] | null {
   // Detect schema type
-  const schemaType = detectSchemaType(filePath);
+  const schemaType = detectSchemaTypeLocal(filePath);
   if (!schemaType) {
     // Not a schema-managed file
     return null;
@@ -434,7 +409,7 @@ function runSchemaValidation(filePath: string): ValidationError[] | null {
  */
 function runSchemaValidationOnContent(filePath: string, content: string): ValidationError[] | null {
   // Detect schema type
-  const schemaType = detectSchemaType(filePath);
+  const schemaType = detectSchemaTypeLocal(filePath);
   if (!schemaType) {
     // Not a schema-managed file
     return null;
@@ -595,7 +570,7 @@ export function register(parent: Command): void {
         const errors = runSchemaValidation(filePath!);
 
         if (errors && errors.length > 0) {
-          const schemaType = detectSchemaType(filePath!) || 'unknown';
+          const schemaType = detectSchemaTypeLocal(filePath!) || 'unknown';
           const context = formatSchemaErrors(errors, schemaType);
           blockTool(context);
         }
@@ -672,7 +647,7 @@ export function register(parent: Command): void {
         const errors = runSchemaValidationOnContent(filePath, contentToValidate);
 
         if (errors && errors.length > 0) {
-          const schemaType = detectSchemaType(filePath) || 'unknown';
+          const schemaType = detectSchemaTypeLocal(filePath) || 'unknown';
           const context = formatSchemaErrors(errors, schemaType);
           denyTool(context);
         }

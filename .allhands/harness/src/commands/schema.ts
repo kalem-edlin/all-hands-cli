@@ -8,7 +8,7 @@
  */
 
 import { Command } from 'commander';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse, stringify } from 'yaml';
@@ -66,8 +66,7 @@ export function register(program: Command): void {
 function getAvailableSchemas(schemaDir: string): string[] {
   if (!existsSync(schemaDir)) return [];
 
-  const { readdirSync } = require('fs');
   return readdirSync(schemaDir)
-    .filter((f: string) => f.endsWith('.yaml'))
-    .map((f: string) => f.replace('.yaml', ''));
+    .filter((f) => f.endsWith('.yaml'))
+    .map((f) => f.replace('.yaml', ''));
 }

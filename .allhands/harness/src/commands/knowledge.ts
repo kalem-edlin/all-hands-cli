@@ -164,8 +164,17 @@ class SearchCommand extends BaseCommand {
 
       // Aggregate with AI
       const runner = new AgentRunner(projectRoot);
-      const fullResults = results.filter(r => r.full_resource_context);
-      const minimizedResults = results.filter(r => !r.full_resource_context);
+      const { fullResults, minimizedResults } = results.reduce(
+        (acc, r) => {
+          if (r.full_resource_context) {
+            acc.fullResults.push(r);
+          } else {
+            acc.minimizedResults.push(r);
+          }
+          return acc;
+        },
+        { fullResults: [] as SearchResult[], minimizedResults: [] as SearchResult[] }
+      );
 
       const userMessage = JSON.stringify({
         query,

@@ -30,19 +30,9 @@ if [ -f "$GIT_ROOT/.env.ai" ] && [ "$GIT_ROOT" != "$PROJECT_ROOT" ]; then
     set +a
 fi
 
-# Auto-install if node_modules missing
-if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
-    echo "Installing allhands dependencies..." >&2
-    if ! npm install --prefix "$SCRIPT_DIR" --legacy-peer-deps 2>/dev/null; then
-        echo "ERROR: npm install failed for allhands CLI" >&2
-        exit 1
-    fi
-    cp "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null || true
-fi
-
-# Reinstall if package.json changed
-if ! cmp -s "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null; then
-    echo "Updating allhands dependencies..." >&2
+# Auto-install if node_modules missing or package.json changed
+if [ ! -d "$SCRIPT_DIR/node_modules" ] || ! cmp -s "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null; then
+    echo "Installing/updating allhands dependencies..." >&2
     if ! npm install --prefix "$SCRIPT_DIR" --legacy-peer-deps 2>/dev/null; then
         echo "ERROR: npm install failed for allhands CLI" >&2
         exit 1

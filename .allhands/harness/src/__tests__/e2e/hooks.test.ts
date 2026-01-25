@@ -176,7 +176,6 @@ status: pending
   describe('validation hooks', () => {
     describe('schema-pre (PreWrite validation)', () => {
       it('runs without crashing on valid prompt', async () => {
-        // The actual hook is 'schema-pre' not 'schema-check'
         const result = await runHook(
           'validation',
           'schema-pre',

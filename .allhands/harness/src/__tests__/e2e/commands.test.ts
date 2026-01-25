@@ -82,8 +82,8 @@ invalid_field: true
 `);
       const filePath = join(fixture.root, '.planning/e2e-commands/prompts/bad.md');
       const result = await runInFixture(fixture, ['validate', 'file', filePath]);
-      // Validation may succeed but report issues, or fail - depends on schema strictness
-      expect(result.exitCode).toBeDefined();
+      // Validation should fail due to missing required fields
+      assertFailure(result);
     });
 
     it('fails on missing required fields', async () => {

@@ -9,6 +9,7 @@ import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
+import { minimatch } from 'minimatch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -319,4 +320,77 @@ export function formatErrors(result: ValidationResult): string {
       return msg;
     })
     .join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema Type Detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type SchemaType = 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite' | 'skill';
+
+interface SchemaPattern {
+  pattern: string;
+  schemaType: SchemaType;
+}
+
+const SCHEMA_PATTERNS: SchemaPattern[] = [
+  { pattern: '.planning/**/prompts/*.md', schemaType: 'prompt' },
+  { pattern: '.planning/**/alignment.md', schemaType: 'alignment' },
+  { pattern: 'specs/**/*.spec.md', schemaType: 'spec' },
+  { pattern: 'specs/roadmap/**/*.spec.md', schemaType: 'spec' },
+  { pattern: 'docs/**/*.md', schemaType: 'documentation' },
+  { pattern: '.allhands/validation/*.md', schemaType: 'validation-suite' },
+  { pattern: '.allhands/skills/*/SKILL.md', schemaType: 'skill' },
+];
+
+/**
+ * Detect which schema type applies to a file path.
+ * Uses glob pattern matching against known schema patterns.
+ *
+ * @param filePath - Absolute or relative file path
+ * @param projectDir - Optional project root directory for relative path calculation
+ * @returns The detected schema type, or null if no schema applies
+ */
+export function detectSchemaType(filePath: string, projectDir?: string): SchemaType | null {
+  // Make path relative to project
+  let relativePath = filePath;
+  if (projectDir && filePath.startsWith(projectDir)) {
+    relativePath = filePath.slice(projectDir.length + 1);
+  }
+
+  for (const { pattern, schemaType } of SCHEMA_PATTERNS) {
+    if (minimatch(relativePath, pattern)) {
+      return schemaType;
+    }
+  }
+  return null;
+}
+
+/**
+ * Infer schema type from file path using string matching.
+ * Fallback method when glob patterns don't match.
+ *
+ * @param file - File path to analyze
+ * @returns The inferred schema type, or null if unknown
+ */
+export function inferSchemaType(file: string): SchemaType | null {
+  if (file.includes('/prompts/') || file.match(/prompt.*\.md$/i)) {
+    return 'prompt';
+  }
+  if (file.includes('alignment') || file.match(/alignment\.md$/i)) {
+    return 'alignment';
+  }
+  if (file.includes('/specs/') || file.endsWith('.spec.md')) {
+    return 'spec';
+  }
+  if (file.includes('/docs/') && file.endsWith('.md')) {
+    return 'documentation';
+  }
+  if (file.includes('/validation/') && file.endsWith('.md')) {
+    return 'validation-suite';
+  }
+  if (file.includes('/skills/') && file.endsWith('SKILL.md')) {
+    return 'skill';
+  }
+  return null;
 }

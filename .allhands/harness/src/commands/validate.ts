@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url';
 import { loadAllProfiles } from '../lib/opencode/index.js';
 import {
   formatErrors,
+  inferSchemaType,
   listSchemas,
   validateFile,
 } from '../lib/schema.js';
@@ -23,6 +24,7 @@ import { TEMPLATE_VAR_NAMES } from '../lib/schemas/template-vars.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// Note: inferSchemaType is now imported from lib/schema.ts
 
 export function register(program: Command): void {
   const validateCmd = program
@@ -138,24 +140,3 @@ export function register(program: Command): void {
     });
 }
 
-function inferSchemaType(file: string): string | null {
-  if (file.includes('/prompts/') || file.match(/prompt.*\.md$/i)) {
-    return 'prompt';
-  }
-  if (file.includes('alignment') || file.match(/alignment\.md$/i)) {
-    return 'alignment';
-  }
-  if (file.includes('/specs/') || file.endsWith('.spec.md')) {
-    return 'spec';
-  }
-  if (file.includes('/docs/') && file.endsWith('.md')) {
-    return 'documentation';
-  }
-  if (file.includes('/validation/') && file.endsWith('.md')) {
-    return 'validation-suite';
-  }
-  if (file.includes('/skills/') && file.endsWith('SKILL.md')) {
-    return 'skill';
-  }
-  return null;
-}
