@@ -7,7 +7,7 @@
  * All functions gracefully degrade if TLDR is not installed or daemon is unavailable.
  */
 
-import { execSync, spawnSync } from 'child_process';
+import { execSync, spawnSync, spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { createHash } from 'crypto';
 import { join } from 'path';
@@ -171,6 +171,125 @@ export function buildSemanticIndex(
   } catch {
     return false;
   }
+}
+
+export interface SemanticIndexResult {
+  success: boolean;
+  filesIndexed: number;
+  languages: string[];
+}
+
+/**
+ * Build semantic index asynchronously with progress reporting.
+ * Returns result object with success status, file count, and languages.
+ *
+ * @param projectDir - Project directory to index
+ * @param onProgress - Callback for progress messages (each line of output)
+ * @param lang - Language to index (default 'all')
+ */
+export async function buildSemanticIndexAsync(
+  projectDir: string,
+  onProgress?: (message: string) => void,
+  lang: string = 'all'
+): Promise<SemanticIndexResult> {
+  if (!isTldrInstalled()) {
+    return { success: false, filesIndexed: 0, languages: [] };
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn('tldr', ['semantic', 'index', projectDir, '--lang', lang], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    // Buffer for partial lines
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
+
+    // Track file counts and languages from output
+    let totalFilesIndexed = 0;
+    const detectedLanguages: string[] = [];
+
+    const processLine = (line: string) => {
+      if (!line.trim()) return;
+
+      // Parse "Detected languages: javascript, typescript"
+      const langMatch = line.match(/Detected languages?:\s*(.+)/i);
+      if (langMatch) {
+        const langs = langMatch[1].split(',').map(l => l.trim());
+        detectedLanguages.push(...langs);
+      }
+
+      // Parse "Indexed N files" or "Extracted N code units" patterns
+      const indexedMatch = line.match(/(?:Indexed|Extracted|Processed)\s+(\d+)\s+(?:files?|code units?)/i);
+      if (indexedMatch) {
+        totalFilesIndexed += parseInt(indexedMatch[1], 10);
+      }
+
+      // Also check for patterns like "✓ 123 files indexed"
+      const filesMatch = line.match(/(\d+)\s+files?\s+indexed/i);
+      if (filesMatch) {
+        totalFilesIndexed = parseInt(filesMatch[1], 10); // Use this as the total
+      }
+
+      if (onProgress) {
+        onProgress(line.trim());
+      }
+    };
+
+    child.stdout?.on('data', (data: Buffer) => {
+      stdoutBuffer += data.toString();
+      const lines = stdoutBuffer.split('\n');
+      // Keep incomplete last line in buffer
+      stdoutBuffer = lines.pop() || '';
+      for (const line of lines) {
+        processLine(line);
+      }
+    });
+
+    child.stderr?.on('data', (data: Buffer) => {
+      stderrBuffer += data.toString();
+      const lines = stderrBuffer.split('\n');
+      stderrBuffer = lines.pop() || '';
+      for (const line of lines) {
+        processLine(line);
+      }
+    });
+
+    child.on('close', (code) => {
+      // Flush any remaining content in buffers
+      if (stdoutBuffer.trim()) {
+        processLine(stdoutBuffer);
+      }
+      if (stderrBuffer.trim()) {
+        processLine(stderrBuffer);
+      }
+
+      if (code === 0) {
+        trackIndexedBranch(projectDir);
+        resolve({
+          success: true,
+          filesIndexed: totalFilesIndexed,
+          languages: detectedLanguages,
+        });
+      } else {
+        resolve({
+          success: false,
+          filesIndexed: totalFilesIndexed,
+          languages: detectedLanguages,
+        });
+      }
+    });
+
+    child.on('error', () => {
+      resolve({ success: false, filesIndexed: 0, languages: [] });
+    });
+
+    // Set timeout (5 minutes)
+    setTimeout(() => {
+      child.kill();
+      resolve({ success: false, filesIndexed: totalFilesIndexed, languages: detectedLanguages });
+    }, 300000);
+  });
 }
 
 /**

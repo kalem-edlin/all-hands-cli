@@ -45,7 +45,6 @@ import { getProfilesByTuiAction } from '../lib/opencode/index.js';
 import { buildPR } from '../lib/oracle.js';
 import type { PromptFile } from '../lib/prompts.js';
 import { findSpecById, getSpecForBranch, type SpecFile } from '../lib/specs.js';
-import { isTldrInstalled, hasSemanticIndex, buildSemanticIndex, needsSemanticRebuild } from '../lib/tldr.js';
 import { logTuiError, logTuiAction, logTuiLifecycle } from '../lib/trace-store.js';
 
 /**
@@ -67,16 +66,7 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
   // Find current spec from branch using planning dir as source of truth
   const currentSpec = getSpecForBranch(branch, cwd);
 
-  // Build semantic index if missing or stale (branch switch)
-  if (isTldrInstalled()) {
-    if (!hasSemanticIndex(cwd)) {
-      console.log('Building semantic index for first run...');
-      buildSemanticIndex(cwd);
-    } else if (needsSemanticRebuild(cwd)) {
-      console.log('Rebuilding semantic index (branch changed)...');
-      buildSemanticIndex(cwd);
-    }
-  }
+  // TLDR semantic indexing now runs in background after TUI launches (see TUI.startBackgroundIndexing)
 
   // Load initial state from current branch's planning directory
   const status = planningDirExists(planningKey, cwd) ? readStatus(planningKey, cwd) : null;

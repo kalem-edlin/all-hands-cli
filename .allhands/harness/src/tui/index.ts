@@ -26,11 +26,12 @@ import { getHubWindowId, clearTuiSession, getSpawnedWindows } from '../lib/sessi
 import { KnowledgeService } from '../lib/knowledge.js';
 import { validateDocs } from '../lib/docs-validation.js';
 import { loadAllProfiles } from '../lib/opencode/index.js';
-import { logTuiError } from '../lib/trace-store.js';
+import { logTuiError, clearLogs } from '../lib/trace-store.js';
 import { loadAllPrompts, type PromptFile } from '../lib/prompts.js';
 import { readStatus, sanitizeBranchForDir, planningDirExists } from '../lib/planning.js';
-import { loadAllSpecs, specsToModalItems } from '../lib/specs.js';
+import { loadAllSpecs, specsToModalItems, type SpecFile } from '../lib/specs.js';
 import { loadAllFlows, flowsToModalItems } from '../lib/flows.js';
+import { isTldrInstalled, hasSemanticIndex, needsSemanticRebuild, buildSemanticIndexAsync } from '../lib/tldr.js';
 import { join } from 'path';
 
 export type PaneId = 'actions' | 'prompts' | 'status';
@@ -281,6 +282,29 @@ export class TUI {
     this.render();
 
     try {
+      // Build TLDR semantic index if missing or stale (non-blocking with progress)
+      if (isTldrInstalled()) {
+        const needsIndex = !hasSemanticIndex(this.options.cwd);
+        const needsRebuild = needsSemanticRebuild(this.options.cwd);
+
+        if (needsIndex || needsRebuild) {
+          this.log(needsIndex ? 'Building semantic index for first run...' : 'Rebuilding semantic index (branch changed)...');
+          this.render();
+          const result = await buildSemanticIndexAsync(this.options.cwd, (msg) => {
+            this.log(msg);
+            this.render();
+          });
+          if (result.success) {
+            const langInfo = result.languages.length > 0 ? ` (${result.languages.join(', ')})` : '';
+            const countInfo = result.filesIndexed > 0 ? `${result.filesIndexed} files` : '';
+            this.log(`Semantic index ready${countInfo ? `: ${countInfo}` : ''}${langInfo} ✓`);
+          } else {
+            this.log('Semantic index failed');
+          }
+          this.render();
+        }
+      }
+
       // Validate agent profiles first
       this.log('Validating agent profiles...');
       this.render();
@@ -404,9 +428,11 @@ export class TUI {
       { id: 'separator-toggles', label: '─ Toggles ─', type: 'separator' },
       { id: 'toggle-loop', label: 'Loop', key: 'O', type: 'toggle', checked: this.state.loopEnabled },
       { id: 'toggle-emergent', label: 'Emergent', key: 'E', type: 'toggle', checked: this.state.emergentEnabled },
-      { id: 'separator-bottom', label: '─────────', type: 'separator' },
-      { id: 'quit', label: 'Quit', key: 'Q', type: 'action' },
+      { id: 'separator-controls', label: '─ Controls ─', type: 'separator' },
+      { id: 'view-logs', label: 'View Logs', key: 'L', type: 'action' },
+      { id: 'clear-logs', label: 'Clear Logs', key: 'C', type: 'action' },
       { id: 'refresh', label: 'Refresh', key: 'R', type: 'action' },
+      { id: 'quit', label: 'Quit', key: 'Q', type: 'action' },
     ];
   }
 
@@ -509,7 +535,7 @@ export class TUI {
       }
     });
 
-    // Q for quit, R for refresh
+    // Q for quit, R for refresh, L for view logs, C for clear logs
     this.screen.key(['q'], () => {
       if (!this.activeModal) {
         this.handleAction('quit');
@@ -518,6 +544,16 @@ export class TUI {
     this.screen.key(['r'], () => {
       if (!this.activeModal) {
         this.handleAction('refresh');
+      }
+    });
+    this.screen.key(['l'], () => {
+      if (!this.activeModal) {
+        this.handleAction('view-logs');
+      }
+    });
+    this.screen.key(['c'], () => {
+      if (!this.activeModal) {
+        this.handleAction('clear-logs');
       }
     });
 
@@ -602,6 +638,12 @@ export class TUI {
         this.buildActionItems();
         this.options.onAction('toggle-emergent', { enabled: this.state.emergentEnabled });
         this.render();
+        break;
+      case 'view-logs':
+        this.openLogModal();
+        break;
+      case 'clear-logs':
+        this.clearAllLogs();
         break;
       case 'switch-spec':
         this.openSpecModal();
@@ -993,6 +1035,20 @@ export class TUI {
   }
 
   /**
+   * Clear all logs: both trace store (SQLite + JSONL) and in-memory TUI logs
+   */
+  private clearAllLogs(): void {
+    // Clear trace store logs
+    clearLogs(this.options.cwd);
+
+    // Clear in-memory TUI logs
+    this.logEntries = [];
+
+    this.log('Logs cleared');
+    this.render();
+  }
+
+  /**
    * Set PR URL for Greptile feedback monitoring
    */
   public setPRUrl(url: string | null): void {
@@ -1003,6 +1059,22 @@ export class TUI {
       this.state.prActionState = 'greptile-reviewing';
       this.buildActionItems();
       this.render();
+    }
+  }
+
+  /**
+   * Sync EventLoop's branch context after TUI-initiated branch changes.
+   *
+   * Call this after switch-spec, clear-spec, or mark-completed to prevent
+   * the EventLoop from detecting a "stale" branch change and overwriting
+   * the TUI's correct state with incorrect data from findSpecByBranch().
+   *
+   * @param branch - The new branch name
+   * @param spec - The spec for this branch (or null if no spec)
+   */
+  public syncBranchContext(branch: string, spec: SpecFile | null): void {
+    if (this.eventLoop) {
+      this.eventLoop.setBranchContext(branch, spec);
     }
   }
 
