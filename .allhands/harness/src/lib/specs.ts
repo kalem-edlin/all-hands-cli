@@ -174,11 +174,11 @@ export function specsToModalItems(
       type: 'header',
     });
 
-    // Add specs
+    // Add specs (use id which is the filename without extension)
     for (const spec of group.specs) {
       items.push({
         id: spec.id,
-        label: spec.title,
+        label: spec.id,
         type: 'item',
       });
     }

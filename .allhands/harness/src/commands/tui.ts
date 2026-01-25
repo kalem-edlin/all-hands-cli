@@ -11,7 +11,7 @@
  */
 
 import { Command } from 'commander';
-import { join, basename } from 'path';
+import { join, basename, dirname } from 'path';
 import { existsSync, readFileSync, mkdirSync, renameSync } from 'fs';
 import { execSync } from 'child_process';
 import { TUI } from '../tui/index.js';
@@ -36,19 +36,30 @@ import {
   spawnAgentFromProfile,
   buildTemplateContext,
   getRunningAgents,
-  renameCurrentWindow,
+  renameWindow,
+  getCurrentWindowId,
 } from '../lib/tmux.js';
+import { setHubWindowId, clearTuiSession } from '../lib/session.js';
 import { getProfilesByTuiAction } from '../lib/opencode/index.js';
 import { buildPR } from '../lib/oracle.js';
 import type { PromptFile } from '../lib/prompts.js';
 import { findSpecById } from '../lib/specs.js';
 import { isTldrInstalled, hasSemanticIndex, buildSemanticIndex, needsSemanticRebuild } from '../lib/tldr.js';
+import { logTuiError } from '../lib/trace-store.js';
 
 /**
  * Launch the TUI - can be called directly or via command
  */
 export async function launchTUI(options: { spec?: string } = {}): Promise<void> {
   const cwd = process.cwd();
+
+  // IMMEDIATELY capture window ID before any slow operations (like tldr indexing)
+  // This ensures we track the correct window even if user switches away during init
+  const hubWindowId = getCurrentWindowId();
+  if (hubWindowId) {
+    setHubWindowId(hubWindowId, cwd);
+  }
+
   const branch = getCurrentBranch(cwd);
 
   // Determine active spec (from option or .active file)
@@ -99,8 +110,8 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
     customFlowCounter: 0,
   };
 
-  // Rename current tmux window to 'hub'
-  renameCurrentWindow('hub');
+  // Rename the hub window (using captured ID to target correct window even if focus changed)
+  renameWindow(hubWindowId, 'hub');
 
   const tui = new TUI({
     onAction: (action: string, data) => {
@@ -193,7 +204,14 @@ async function spawnAgentsForAction(
 
       tui.log(`Spawned ${profile.name} in ${result.sessionName}:${result.windowName}`);
     } catch (e) {
-      tui.log(`Error spawning ${profile.name}: ${e instanceof Error ? e.message : String(e)}`);
+      const message = e instanceof Error ? e.message : String(e);
+      tui.log(`Error spawning ${profile.name}: ${message}`);
+      logTuiError('spawn-agent', e instanceof Error ? e : message, {
+        action,
+        profileName: profile.name,
+        spec,
+        branch,
+      }, cwd);
     }
   }
 
@@ -244,9 +262,18 @@ async function handleAction(
         } else {
           tui.log(`Error: ${result.body}`);
           tui.log('You may need to push your branch first or check gh auth status.');
+          logTuiError('create-pr', result.body || 'PR creation failed', {
+            spec,
+            branch,
+          }, cwd);
         }
       } catch (e) {
-        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+        const message = e instanceof Error ? e.message : String(e);
+        tui.log(`Error: ${message}`);
+        logTuiError('create-pr', e instanceof Error ? e : message, {
+          spec,
+          branch,
+        }, cwd);
       }
       break;
     }
@@ -299,7 +326,12 @@ async function handleAction(
 
         tui.log(`Spec completed. Now on branch: ${baseBranch}`);
       } catch (e) {
-        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+        const message = e instanceof Error ? e.message : String(e);
+        tui.log(`Error: ${message}`);
+        logTuiError('mark-completed', e instanceof Error ? e : message, {
+          spec,
+          branch,
+        }, cwd);
       }
       break;
     }
@@ -364,7 +396,13 @@ async function handleAction(
               break;
             }
           } catch (resErr) {
-            tui.log(`Error resurrecting spec: ${resErr instanceof Error ? resErr.message : String(resErr)}`);
+            const message = resErr instanceof Error ? resErr.message : String(resErr);
+            tui.log(`Error resurrecting spec: ${message}`);
+            logTuiError('resurrect-spec', resErr instanceof Error ? resErr : message, {
+              specId,
+              spec,
+              branch,
+            }, cwd);
             break;
           }
         }
@@ -384,7 +422,7 @@ async function handleAction(
           ensurePlanningDir(specName, cwd);
 
           // Initialize status with null branch (agent flows handle branching)
-          const gitRoot = require('path').dirname(specPath).replace(/\/specs\/.*$/, '');
+          const gitRoot = dirname(specPath).replace(/\/specs\/.*$/, '');
           const relativeSpecPath = specPath.replace(gitRoot + '/', '');
           initializeStatus(specName, relativeSpecPath, null, cwd);
         }
@@ -407,7 +445,13 @@ async function handleAction(
           })),
         });
       } catch (e) {
-        tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
+        const message = e instanceof Error ? e.message : String(e);
+        tui.log(`Error: ${message}`);
+        logTuiError('switch-spec', e instanceof Error ? e : message, {
+          specId: data?.specId,
+          spec,
+          branch,
+        }, cwd);
       }
       break;
     }
@@ -504,6 +548,12 @@ function spawnExecutorForPrompt(tui: TUI, prompt: PromptFile, branch: string): v
     tui.log(`Spawned executor in ${result.sessionName}:${result.windowName}`);
     updateRunningAgents(tui, branch);
   } catch (e) {
-    tui.log(`Error spawning executor: ${e instanceof Error ? e.message : String(e)}`);
+    const message = e instanceof Error ? e.message : String(e);
+    tui.log(`Error spawning executor: ${message}`);
+    logTuiError('spawn-executor', e instanceof Error ? e : message, {
+      promptNumber,
+      promptTitle: prompt.frontmatter.title,
+      branch,
+    }, cwd);
   }
 }

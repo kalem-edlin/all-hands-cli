@@ -222,7 +222,7 @@
     "CODESEARCH_TOOL_BUDGET": "12"
   },
   "permissions": {
-    "deny": ["Task(claude-code-guide)", "Task(Explore)", "Task(Plan)"],
+    "deny": ["Task(claude-code-guide)", "Task(Plan)"],
     "ask": []
   },
   "enableAllProjectMcpServers": false,

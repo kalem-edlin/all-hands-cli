@@ -21,11 +21,14 @@ import { createStatusPane, AgentInfo, FileStates, StatusPaneOptions } from './st
 import { createModal, Modal } from './modal.js';
 import { createFileViewer, FileViewer, getPlanningFilePath, getSpecFilePath } from './file-viewer-modal.js';
 import { EventLoop } from '../lib/event-loop.js';
-import { killWindow, listWindows, getCurrentSession, spawnCustomFlow } from '../lib/tmux.js';
+import { killWindow, listWindows, getCurrentSession, spawnCustomFlow, getSpawnedAgentRegistry } from '../lib/tmux.js';
+import { getHubWindowId, clearTuiSession, getSpawnedWindows } from '../lib/session.js';
 import { KnowledgeService } from '../lib/knowledge.js';
 import { validateDocs } from '../lib/docs-validation.js';
 import { loadAllProfiles } from '../lib/opencode/index.js';
-import type { PromptFile } from '../lib/prompts.js';
+import { logTuiError } from '../lib/trace-store.js';
+import { loadAllPrompts, type PromptFile } from '../lib/prompts.js';
+import { readStatus } from '../lib/planning.js';
 import { loadAllSpecs, specsToModalItems } from '../lib/specs.js';
 import { loadAllFlows, flowsToModalItems } from '../lib/flows.js';
 import { join } from 'path';
@@ -214,8 +217,6 @@ export class TUI {
 
             // Reload prompts for new spec
             if (newSpec && this.options.cwd) {
-              const { loadAllPrompts } = require('../lib/prompts.js');
-              const { readStatus } = require('../lib/planning.js');
               const prompts = loadAllPrompts(newSpec, this.options.cwd);
               const status = readStatus(newSpec, this.options.cwd);
 
@@ -329,6 +330,10 @@ export class TUI {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.log(`Index error: ${message}`);
+      logTuiError('backgroundIndexing', err instanceof Error ? err : message, {
+        spec: this.state.spec,
+        branch: this.state.branch,
+      }, this.options.cwd);
       this.render();
     }
   }
@@ -815,7 +820,15 @@ export class TUI {
       ];
       this.render();
     } catch (e) {
-      this.log(`Error spawning custom flow: ${e instanceof Error ? e.message : String(e)}`);
+      const message = e instanceof Error ? e.message : String(e);
+      this.log(`Error spawning custom flow: ${message}`);
+      logTuiError('spawnCustomFlow', e instanceof Error ? e : message, {
+        flowPath,
+        windowName,
+        customMessage: customMessage || undefined,
+        spec: this.state.spec,
+        branch: this.state.branch,
+      }, this.options.cwd);
     }
   }
 
@@ -1072,20 +1085,34 @@ export class TUI {
       this.eventLoop.stop();
     }
 
-    // Kill all agent windows (non-hub windows in the current session)
+    // Only kill windows that were spawned by this TUI session
     const currentSession = getCurrentSession();
     if (currentSession) {
+      const hubWindowId = getHubWindowId(this.options.cwd);
+      const spawnedWindows = getSpawnedWindows(this.options.cwd);
       const windows = listWindows(currentSession);
+
       for (const window of windows) {
-        // Skip the hub window (TUI itself)
-        if (window.name === 'hub') continue;
+        // Skip the hub window - check by ID (stable) or name (fallback)
+        if (window.id === hubWindowId || window.name === 'hub') continue;
+
+        // Only kill windows that were spawned by this TUI session
+        if (!spawnedWindows.includes(window.name)) continue;
+
         try {
           killWindow(currentSession, window.name);
-        } catch {
-          // Ignore errors - window might already be closed
+        } catch (e) {
+          // Log but don't fail - window might already be closed
+          logTuiError('killWindow', e instanceof Error ? e : String(e), {
+            session: currentSession,
+            window: window.name,
+          }, this.options.cwd);
         }
       }
     }
+
+    // Clear the TUI session state
+    clearTuiSession(this.options.cwd);
 
     try {
       this.screen.destroy();

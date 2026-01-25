@@ -8,7 +8,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { parse as parseYaml } from 'yaml';
 import { getActiveSpec, getGitRoot } from './planning.js';
 
@@ -53,7 +53,6 @@ export function findSpecForPath(specPath: string, cwd?: string): string | null {
   }
 
   // Normalize the spec path for comparison
-  const { resolve } = require('path');
   const normalizedSpecPath = resolve(workDir, specPath);
   const relativeSpecPath = normalizedSpecPath.replace(gitRoot + '/', '');
 

@@ -34,6 +34,7 @@ import {
 } from './opencode/index.js';
 import { getCurrentBranch, getPlanningPaths } from './planning.js';
 import { getBaseBranch } from './git.js';
+import { addSpawnedWindow, removeSpawnedWindow, getSpawnedWindows } from './session.js';
 
 /**
  * Agent type = agent profile name.
@@ -82,37 +83,58 @@ export interface SessionSetupResult {
 export const SESSION_NAME = 'ah-hub';
 
 /**
- * In-memory registry of agents spawned by ALL HANDS.
- * This prevents the TUI from picking up unrelated tmux windows.
+ * In-memory cache of agents spawned by ALL HANDS.
+ * Also persisted to session.json for cross-process visibility.
  */
 const spawnedAgentRegistry = new Set<string>();
 
 /**
- * Register an agent as spawned by ALL HANDS
+ * Register an agent as spawned by ALL HANDS (persisted to disk)
  */
-export function registerSpawnedAgent(windowName: string): void {
+export function registerSpawnedAgent(windowName: string, cwd?: string): void {
   spawnedAgentRegistry.add(windowName);
+  addSpawnedWindow(windowName, cwd);
 }
 
 /**
- * Unregister an agent (called when window is destroyed)
+ * Unregister an agent (persisted to disk)
  */
-export function unregisterSpawnedAgent(windowName: string): void {
+export function unregisterSpawnedAgent(windowName: string, cwd?: string): void {
   spawnedAgentRegistry.delete(windowName);
+  removeSpawnedWindow(windowName, cwd);
 }
 
 /**
  * Check if an agent was spawned by ALL HANDS
  */
-export function isSpawnedAgent(windowName: string): boolean {
-  return spawnedAgentRegistry.has(windowName);
+export function isSpawnedAgent(windowName: string, cwd?: string): boolean {
+  // Check both in-memory cache and persisted state
+  if (spawnedAgentRegistry.has(windowName)) return true;
+  return getSpawnedWindows(cwd).includes(windowName);
 }
 
 /**
- * Get all registered spawned agents
+ * Get all registered spawned agents (from persisted state)
  */
-export function getSpawnedAgentRegistry(): Set<string> {
-  return new Set(spawnedAgentRegistry);
+export function getSpawnedAgentRegistry(cwd?: string): Set<string> {
+  // Merge in-memory and persisted for complete view
+  const persisted = getSpawnedWindows(cwd);
+  return new Set([...spawnedAgentRegistry, ...persisted]);
+}
+
+/**
+ * Get current tmux window ID (stable identifier like @0)
+ */
+export function getCurrentWindowId(): string | null {
+  if (!process.env.TMUX) return null;
+  try {
+    return execSync('tmux display-message -p "#{window_id}"', {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -314,10 +336,10 @@ export function ensureSession(branch?: string, cwd?: string): string {
 /**
  * List windows in a session
  */
-export function listWindows(sessionName: string): Array<{ index: number; name: string }> {
+export function listWindows(sessionName: string): Array<{ index: number; name: string; id: string }> {
   try {
     const output = execSync(
-      `tmux list-windows -t "${sessionName}" -F "#{window_index}:#{window_name}"`,
+      `tmux list-windows -t "${sessionName}" -F "#{window_index}:#{window_name}:#{window_id}"`,
       { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
 
@@ -326,8 +348,11 @@ export function listWindows(sessionName: string): Array<{ index: number; name: s
       .split('\n')
       .filter((line) => line.length > 0)
       .map((line) => {
-        const [index, name] = line.split(':');
-        return { index: parseInt(index, 10), name };
+        const parts = line.split(':');
+        const index = parseInt(parts[0], 10);
+        const name = parts[1];
+        const id = parts[2] || '';
+        return { index, name, id };
       });
   } catch {
     return [];
@@ -423,6 +448,25 @@ export function renameCurrentWindow(newName: string): void {
   if (!process.env.TMUX) return;
   try {
     execSync(`tmux rename-window "${newName}"`, { stdio: 'pipe' });
+  } catch {
+    // Ignore errors
+  }
+}
+
+/**
+ * Rename a specific window by ID (stable even if focus changes)
+ * Falls back to renaming current window if no target specified
+ */
+export function renameWindow(targetWindowId: string | null, newName: string): void {
+  if (!process.env.TMUX) return;
+  try {
+    if (targetWindowId) {
+      // Use -t to target the specific window by ID
+      execSync(`tmux rename-window -t "${targetWindowId}" "${newName}"`, { stdio: 'pipe' });
+    } else {
+      // Fallback to current window
+      execSync(`tmux rename-window "${newName}"`, { stdio: 'pipe' });
+    }
   } catch {
     // Ignore errors
   }
@@ -819,7 +863,7 @@ export function buildTemplateContext(
       const branchMatch = content.match(/^last_known_branch:\s*(.+)/m);
       if (branchMatch) {
         const branchValue = branchMatch[1].trim();
-        context.LAST_KNOWN_BRANCH = branchValue === 'null' ? null : branchValue;
+        context.LAST_KNOWN_BRANCH = branchValue === 'null' ? undefined : branchValue;
       }
     } catch {
       // Ignore parse errors
