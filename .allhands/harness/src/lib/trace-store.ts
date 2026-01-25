@@ -38,6 +38,7 @@ export type TraceEventType =
   | 'bash.error'        // Bash command non-zero exit
   | 'hook.error'        // Hook execution failed
   | 'harness.error'     // Internal harness error
+  | 'tui.error'         // TUI runtime error
   | 'agent.spawn'
   | 'agent.stop'
   | 'agent.compact';
@@ -49,6 +50,7 @@ export const ERROR_EVENT_TYPES: TraceEventType[] = [
   'bash.error',
   'hook.error',
   'harness.error',
+  'tui.error',
 ];
 
 export interface TraceEvent {
@@ -212,15 +214,19 @@ function getStoragePaths(cwd?: string): { dbPath: string; jsonlPath: string } {
 // SQLite Database
 // ============================================================================
 
-let db: Database.Database | null = null;
+// Cache databases by path to support multiple projects in same process
+const dbCache = new Map<string, Database.Database>();
 
 function getDb(cwd?: string): Database.Database {
-  if (db) return db;
-
   const { dbPath } = getStoragePaths(cwd);
+
+  // Return cached connection for this path
+  const cached = dbCache.get(dbPath);
+  if (cached) return cached;
+
   mkdirSync(dirname(dbPath), { recursive: true });
 
-  db = new Database(dbPath);
+  const db = new Database(dbPath);
 
   // Create tables
   db.exec(`
@@ -245,6 +251,7 @@ function getDb(cwd?: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_events_is_error ON events(is_error);
   `);
 
+  dbCache.set(dbPath, db);
   return db;
 }
 
@@ -351,6 +358,27 @@ export function logHookError(
     hook: hookName,
     error: errorMessage,
     input: input ? sanitizePayload(input) : undefined,
+  }, undefined, cwd);
+}
+
+/**
+ * Log a TUI runtime error
+ * Use this for errors that occur within the TUI (e.g., rendering, modal handling, agent spawning)
+ */
+export function logTuiError(
+  component: string,
+  error: Error | string,
+  context: Record<string, unknown> = {},
+  cwd?: string
+): void {
+  const errorMessage = error instanceof Error ? error.message : error;
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
+  logEvent('tui.error', {
+    component,
+    error: errorMessage,
+    stack: errorStack,
+    ...context,
   }, undefined, cwd);
 }
 
@@ -493,13 +521,19 @@ export function getStats(since?: string, cwd?: string): TraceStats {
   `).all(...params) as Array<{ event_type: string; count: number }>;
 
   // By agent type
+  const agentTypeWhereClause = whereClause
+    ? `${whereClause} AND agent_type IS NOT NULL`
+    : 'WHERE agent_type IS NOT NULL';
   const agentTypeRows = database.prepare(`
-    SELECT agent_type, COUNT(*) as count FROM events ${whereClause} WHERE agent_type IS NOT NULL GROUP BY agent_type
+    SELECT agent_type, COUNT(*) as count FROM events ${agentTypeWhereClause} GROUP BY agent_type
   `).all(...params) as Array<{ agent_type: string; count: number }>;
 
   // By tool name
+  const toolNameWhereClause = whereClause
+    ? `${whereClause} AND tool_name IS NOT NULL`
+    : 'WHERE tool_name IS NOT NULL';
   const toolNameRows = database.prepare(`
-    SELECT tool_name, COUNT(*) as count FROM events ${whereClause} WHERE tool_name IS NOT NULL GROUP BY tool_name
+    SELECT tool_name, COUNT(*) as count FROM events ${toolNameWhereClause} GROUP BY tool_name
   `).all(...params) as Array<{ tool_name: string; count: number }>;
 
   return {
@@ -512,11 +546,11 @@ export function getStats(since?: string, cwd?: string): TraceStats {
 }
 
 /**
- * Close database connection (for cleanup)
+ * Close all database connections (for cleanup)
  */
 export function closeDb(): void {
-  if (db) {
+  for (const db of dbCache.values()) {
     db.close();
-    db = null;
   }
+  dbCache.clear();
 }

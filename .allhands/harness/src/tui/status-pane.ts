@@ -1,19 +1,22 @@
 /**
- * Status Pane - Right area showing view buttons, active agents, and log stream
+ * Status Pane - Right area showing spec info, active agents, and log stream
  *
  * Layout:
  * ┌─ Status ─────────────────────┐
- * │ [View Spec] [Alignment]      │  <- View buttons
+ * │ Spec: my-feature-spec        │  <- Current spec (green) or "No spec selected" (yellow)
+ * │ Branch: feature/my-branch    │  <- Current branch (cyan)
+ * │ Base: main                   │  <- Base branch (gray)
+ * │                              │
+ * │ [View Spec] [Alignment]      │  <- View buttons (if spec selected)
  * │ [E2E Test Plan]              │
- * │ ─────────────────────────────│
+ * │ ── Active Agents ────────────│
  * │  ┌────────┐  ┌────────┐      │  <- Agent grid
  * │  │ coord  │  │ planner│      │
  * │  │ ●      │  │ ●      │      │
  * │  └────────┘  └────────┘      │
- * │ ─────────────────────────────│
+ * │ ── Recent Activity ──────────│
  * │ [12:34] Agent spawned        │  <- Log stream
  * │ [12:35] Prompt 03 started    │
- * │ [12:36] Loop iteration 4     │
  * └──────────────────────────────┘
  */
 
@@ -56,6 +59,7 @@ export function createStatusPane(
   selectedIndex?: number,
   spec?: string,
   branch?: string,
+  baseBranch?: string,
   logEntries: string[] = [],
   fileStates?: FileStates,
   options?: StatusPaneOptions
@@ -79,6 +83,50 @@ export function createStatusPane(
   });
 
   let currentY = 0;
+
+  // Current spec indicator (always shown at top)
+  if (spec) {
+    blessed.text({
+      parent: pane,
+      top: currentY,
+      left: 1,
+      content: `{bold}{green-fg}Spec: ${truncate(spec, 25)}{/green-fg}{/bold}`,
+      tags: true,
+    });
+  } else {
+    blessed.text({
+      parent: pane,
+      top: currentY,
+      left: 1,
+      content: '{bold}{yellow-fg}No spec selected{/yellow-fg}{/bold}',
+      tags: true,
+    });
+  }
+  currentY += 1;
+
+  // Branch indicators
+  if (branch) {
+    blessed.text({
+      parent: pane,
+      top: currentY,
+      left: 1,
+      content: `{cyan-fg}Branch:{/cyan-fg} ${truncate(branch, 22)}`,
+      tags: true,
+    });
+    currentY += 1;
+  }
+  if (baseBranch) {
+    blessed.text({
+      parent: pane,
+      top: currentY,
+      left: 1,
+      content: `{gray-fg}Base: ${truncate(baseBranch, 24)}{/gray-fg}`,
+      tags: true,
+    });
+    currentY += 1;
+  }
+
+  currentY += 1; // spacing
 
   // View buttons row (only show if spec is selected)
   if (spec) {
@@ -151,16 +199,6 @@ export function createStatusPane(
       e2eButton.on('click', () => options.onViewE2ETestPlan?.());
       currentY += 1;
     }
-  } else {
-    // No spec selected
-    blessed.text({
-      parent: pane,
-      top: currentY,
-      left: 1,
-      content: '{gray-fg}No spec selected{/gray-fg}',
-      tags: true,
-    });
-    currentY += 1;
   }
 
   currentY += 1;
