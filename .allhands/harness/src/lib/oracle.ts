@@ -14,6 +14,7 @@
  */
 
 import { execSync } from 'child_process';
+import { z } from 'zod';
 import { ask } from './llm.js';
 import {
   readAlignment,
@@ -21,6 +22,83 @@ import {
 } from './planning.js';
 import { loadAllPrompts, type PromptFile } from './prompts.js';
 import { getBaseBranch } from './git.js';
+
+// ============================================================================
+// Zod Schemas for LLM Response Validation
+// ============================================================================
+
+const PRContentSchema = z.object({
+  title: z.string(),
+  body: z.string(),
+  reviewSteps: z.string(),
+});
+
+const ConversationAnalysisSchema = z.object({
+  wasGettingClose: z.boolean(),
+  progressPercentage: z.number().min(0).max(100),
+  keyLearnings: z.array(z.string()),
+  blockers: z.array(z.string()),
+  partialWork: z.array(z.string()),
+});
+
+const ActionRecommendationSchema = z.object({
+  action: z.enum(['scratch', 'continue']),
+  reasoning: z.string(),
+  preserveFiles: z.array(z.string()),
+  discardFiles: z.array(z.string()),
+});
+
+/**
+ * Extract JSON from LLM response text.
+ * Handles responses wrapped in markdown code blocks or bare JSON.
+ */
+function extractJSON(text: string): string | null {
+  // Try markdown code block first (```json ... ``` or ``` ... ```)
+  const codeBlockMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+  if (codeBlockMatch) {
+    return codeBlockMatch[1].trim();
+  }
+
+  // Fall back to finding first complete JSON object
+  // Find the first { and match to its closing }
+  const startIdx = text.indexOf('{');
+  if (startIdx === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = startIdx; i < text.length; i++) {
+    const char = text[i];
+
+    if (escape) {
+      escape = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+
+    if (char === '"' && !escape) {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') depth++;
+      if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          return text.slice(startIdx, i + 1);
+        }
+      }
+    }
+  }
+
+  return null;
+}
 
 // ============================================================================
 // Types
@@ -160,12 +238,12 @@ ${gitDiff}
       context: 'You must respond with valid JSON only. No markdown code blocks.',
     });
 
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const jsonStr = extractJSON(result.text);
+    if (!jsonStr) {
       throw new Error('No JSON found in response');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as PRContent;
+    const parsed = PRContentSchema.parse(JSON.parse(jsonStr));
     return parsed;
   } catch {
     // Fallback
@@ -229,12 +307,12 @@ ${logs}
       context: 'You must respond with valid JSON only. No markdown code blocks. Be concise.',
     });
 
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const jsonStr = extractJSON(result.text);
+    if (!jsonStr) {
       throw new Error('No JSON found in response');
     }
 
-    return JSON.parse(jsonMatch[0]) as ConversationAnalysis;
+    return ConversationAnalysisSchema.parse(JSON.parse(jsonStr));
   } catch {
     // Conservative fallback - assume some progress was made
     return {
@@ -294,19 +372,13 @@ ${gitDiff}
       context: 'You must respond with valid JSON only. No markdown code blocks.',
     });
 
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const jsonStr = extractJSON(result.text);
+    if (!jsonStr) {
       throw new Error('No JSON found in response');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as ActionRecommendation;
-
-    // Validate action
-    if (parsed.action !== 'continue' && parsed.action !== 'scratch') {
-      parsed.action = 'continue';
-    }
-
-    return parsed;
+    // Zod validates action is 'scratch' | 'continue'
+    return ActionRecommendationSchema.parse(JSON.parse(jsonStr));
   } catch {
     // Default to continue to avoid losing code
     return {
