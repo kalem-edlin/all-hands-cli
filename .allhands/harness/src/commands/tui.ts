@@ -44,7 +44,7 @@ import { setHubWindowId, clearTuiSession } from '../lib/session.js';
 import { getProfilesByTuiAction } from '../lib/opencode/index.js';
 import { buildPR } from '../lib/oracle.js';
 import type { PromptFile } from '../lib/prompts.js';
-import { findSpecById, findSpecByBranch, type SpecFile } from '../lib/specs.js';
+import { findSpecById, getSpecForBranch, type SpecFile } from '../lib/specs.js';
 import { isTldrInstalled, hasSemanticIndex, buildSemanticIndex, needsSemanticRebuild } from '../lib/tldr.js';
 import { logTuiError, logTuiAction, logTuiLifecycle } from '../lib/trace-store.js';
 
@@ -64,8 +64,8 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
   const branch = getCurrentBranch(cwd);
   const planningKey = sanitizeBranchForDir(branch);
 
-  // Find current spec from branch (branch-keyed model)
-  const currentSpec = findSpecByBranch(branch, cwd);
+  // Find current spec from branch using planning dir as source of truth
+  const currentSpec = getSpecForBranch(branch, cwd);
 
   // Build semantic index if missing or stale (branch switch)
   if (isTldrInstalled()) {
@@ -120,7 +120,7 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
       // Get current branch/spec from TUI state (not captured at init time)
       const currentBranch = tui.getState().branch || getCurrentBranch(cwd);
       const currentPlanningKey = sanitizeBranchForDir(currentBranch);
-      const spec = findSpecByBranch(currentBranch, cwd);
+      const spec = getSpecForBranch(currentBranch, cwd);
       handleAction(tui, action, currentPlanningKey, spec, currentBranch, data);
     },
     onExit: () => {
@@ -338,6 +338,9 @@ async function handleAction(
           prompts: [],
         });
 
+        // Sync EventLoop state to prevent stale branch detection
+        tui.syncBranchContext(baseBranch, null);
+
         tui.log(`Spec completed. Now on branch: ${baseBranch}`);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
@@ -438,7 +441,7 @@ async function handleAction(
         if (!planningDirExists(newPlanningKey, cwd)) {
           tui.log(`Creating .planning/${newPlanningKey}/`);
           ensurePlanningDir(newPlanningKey, cwd);
-          initializeStatus(newPlanningKey, specFile.path, null, cwd);
+          initializeStatus(newPlanningKey, specFile.path, specBranch, cwd);
         }
 
         // Update TUI state
@@ -453,6 +456,9 @@ async function handleAction(
             status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
           })),
         });
+
+        // Sync EventLoop state to prevent stale branch detection
+        tui.syncBranchContext(specBranch, specFile);
 
         tui.log(`Switched to spec: ${specFile.id} on branch: ${specBranch}`);
       } catch (e) {
@@ -537,6 +543,10 @@ async function handleAction(
           branch: baseBranch,
           prompts: [],
         });
+
+        // Sync EventLoop state to prevent stale branch detection
+        tui.syncBranchContext(baseBranch, null);
+
         tui.log(`Now on branch: ${baseBranch} (no spec)`);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);

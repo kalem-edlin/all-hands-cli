@@ -9,12 +9,14 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
 import { parse as parseYaml } from 'yaml';
+import { ensurePlanningDir, initializeStatus } from './planning.js';
 
 export interface SpecFrontmatter {
   name?: string;
   domain_name?: string;
   status?: 'roadmap' | 'in_progress' | 'completed';
   dependencies?: string[];
+  branch?: string;  // Source of truth for spec's working branch
 }
 
 export interface SpecFile {
@@ -26,6 +28,7 @@ export interface SpecFile {
   domain_name: string;
   status: 'roadmap' | 'in_progress' | 'completed';
   dependencies: string[];
+  branch?: string;  // Source of truth for spec's working branch
 }
 
 export interface SpecGroup {
@@ -97,6 +100,7 @@ function scanSpecDir(
       domain_name: frontmatter?.domain_name || 'uncategorized',
       status: frontmatter?.status || (category === 'completed' ? 'completed' : category === 'roadmap' ? 'roadmap' : 'in_progress'),
       dependencies: frontmatter?.dependencies || [],
+      branch: frontmatter?.branch,
     };
   });
 }
@@ -236,4 +240,92 @@ export function getSpecsByStatus(
 ): SpecFile[] {
   const groups = loadAllSpecs(cwd);
   return groups.flatMap((g) => g.specs).filter((s) => s.status === status);
+}
+
+/**
+ * Find a spec by its branch field
+ * Returns the spec whose frontmatter.branch matches the given branch name
+ *
+ * NOTE: This only works if the spec file exists on the current branch.
+ * For robust lookup that works across branch switches, use getSpecForBranch().
+ */
+export function findSpecByBranch(branch: string, cwd?: string): SpecFile | null {
+  const groups = loadAllSpecs(cwd);
+  for (const group of groups) {
+    const spec = group.specs.find((s) => s.branch === branch);
+    if (spec) {
+      return spec;
+    }
+  }
+  return null;
+}
+
+/**
+ * Get the spec associated with a branch, using .planning/ as the source of truth.
+ *
+ * This function works correctly even when spec files don't exist on the current
+ * branch (e.g., when on a feature branch but specs live on main).
+ *
+ * Lookup order:
+ * 1. Check .planning/{sanitized_branch}/status.yaml for persisted spec path
+ * 2. If found, extract spec ID and try to load full spec from current tree
+ * 3. If spec file not on current branch, return minimal SpecFile with ID
+ * 4. Fall back to findSpecByBranch() - if found, create planning dir
+ */
+export function getSpecForBranch(branch: string, cwd?: string): SpecFile | null {
+  const basePath = cwd || process.cwd();
+  const planningKey = branch.replace(/[^a-zA-Z0-9_-]/g, '-');
+  const statusPath = join(basePath, '.planning', planningKey, 'status.yaml');
+
+  // Check if planning directory exists with status file
+  if (existsSync(statusPath)) {
+    try {
+      const content = readFileSync(statusPath, 'utf-8');
+      const status = parseYaml(content) as { spec?: string; name?: string };
+
+      if (status?.spec) {
+        // Extract spec ID from path (e.g., "specs/roadmap/my-spec.md" -> "my-spec")
+        const specId = basename(status.spec)
+          .replace(/\.spec\.md$/i, '')
+          .replace(/\.md$/i, '');
+
+        // Try to find the full spec in current tree
+        const fullSpec = findSpecById(specId, cwd);
+        if (fullSpec) {
+          return fullSpec;
+        }
+
+        // Spec file not on current branch - return minimal SpecFile
+        // This happens when spec is on main but we're on a feature branch
+        return {
+          id: specId,
+          filename: basename(status.spec),
+          path: status.spec,
+          title: specId.replace(/-/g, ' '),
+          category: 'active',
+          domain_name: 'unknown',
+          status: 'in_progress',
+          dependencies: [],
+          branch: branch,
+        };
+      }
+    } catch {
+      // Status file parse error - fall through to findSpecByBranch
+    }
+  }
+
+  // No planning dir or no spec in status - try branch-based lookup
+  const spec = findSpecByBranch(branch, cwd);
+
+  // If we found a spec but no planning dir exists, create it
+  if (spec) {
+    try {
+      ensurePlanningDir(planningKey, cwd);
+      initializeStatus(planningKey, spec.path, branch, cwd);
+    } catch {
+      // Failed to create planning dir - continue without it
+    }
+  }
+
+  return spec;
 }
