@@ -18,19 +18,22 @@ Enable a spec by setting up its planning directory and activating it. Per **Fron
 - NEVER work directly on `$BASE_BRANCH` or other protected branches
 </constraints>
 
-## Planning Setup
+## Activate Spec
 
-1. Validate spec exists at `<spec_path>`
-2. Run `ah planning setup --spec <spec_path>` - parse JSON for `spec` name
-3. Run `ah planning activate <spec>`
-4. Run `ah planning status --spec <spec>` - check `last_known_branch`
+Run `ah planning activate <spec_path>` - this:
+- Creates `.planning/{spec}/` if it doesn't exist
+- Sets the spec as active
+- Returns status including `last_known_branch`
+
+Parse the JSON response to get the spec name and branch state.
 
 ## Branch Setup
 
 Ensure you have an isolated branch for this spec's work:
 
-- Check `last_known_branch` from status - this tracks prior work on this spec
-- If prior branch exists, continue there; otherwise create a new branch off `$BASE_BRANCH`
+- Check `last_known_branch` from the activate response
+- If prior branch exists and is not `$BASE_BRANCH`, continue there
+- Otherwise create a new branch off `$BASE_BRANCH`
 - Update tracking with `ah planning update-branch --spec <spec> --branch <branch>`
 
 ## Confirm

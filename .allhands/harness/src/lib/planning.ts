@@ -2,16 +2,22 @@
  * Planning Directory Management
  *
  * Handles .planning/ directory structure:
- * - .planning/{branch}/prompts/     - Prompt files for execution
- * - .planning/{branch}/alignment.md - Alignment doc with decisions
- * - .planning/{branch}/status.yaml  - Session state
+ * - .planning/{spec}/prompts/     - Prompt files for execution
+ * - .planning/{spec}/alignment.md - Alignment doc with decisions
+ * - .planning/{spec}/status.yaml  - Session state
+ *
+ * Active spec is stored in .allhands/harness/.cache/session.json (see session.ts)
+ *
+ * The harness is a "dumb filing cabinet" - specs are the directory key.
+ * Branch management is handled by agent flows, not the harness.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { execSync } from 'child_process';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { execSync } from 'child_process';
 import { getBaseBranch } from './git.js';
+import { getActiveSpec, setActiveSpec, clearActiveSpec } from './session.js';
 
 /**
  * Locked branch patterns - branches that should never have planning dirs.
@@ -56,22 +62,6 @@ export function isLockedBranch(branch: string): boolean {
   return false;
 }
 
-/**
- * Check if the current branch has a valid planning directory.
- * Returns false for locked branches even if a .planning dir exists.
- */
-export function hasPlanningForBranch(branch?: string, cwd?: string): boolean {
-  const currentBranch = branch || getCurrentBranch(cwd);
-
-  // Locked branches never have planning
-  if (isLockedBranch(currentBranch)) {
-    return false;
-  }
-
-  // Check if planning dir exists
-  return planningDirExists(currentBranch, cwd);
-}
-
 export interface LoopConfig {
   enabled: boolean;
   emergent: boolean;
@@ -91,9 +81,9 @@ export interface GreptileStatus {
 }
 
 export interface StatusFile {
-  milestone: string;
-  spec: string;
-  branch: string;
+  name: string;           // Spec name (directory key)
+  spec: string;           // Path to spec file
+  last_known_branch: string | null;
   stage: 'planning' | 'executing' | 'reviewing' | 'pr' | 'compound';
   loop: LoopConfig;
   compound_run: boolean;
@@ -104,8 +94,8 @@ export interface StatusFile {
 }
 
 export interface AlignmentFrontmatter {
-  milestone: string;
-  spec: string;
+  name: string;           // Spec name
+  spec: string;           // Path to spec file
   created: string;
   updated: string;
 }
@@ -151,19 +141,18 @@ export function getGitRoot(cwd?: string): string {
 }
 
 /**
- * Get the .planning directory path for the current branch
+ * Get the .planning directory path for a spec
  */
-export function getPlanningDir(branch?: string, cwd?: string): string {
+export function getPlanningDir(spec: string, cwd?: string): string {
   const gitRoot = getGitRoot(cwd);
-  const currentBranch = branch || getCurrentBranch(cwd);
-  return join(gitRoot, '.planning', currentBranch);
+  return join(gitRoot, '.planning', spec);
 }
 
 /**
- * Get paths within the planning directory
+ * Get paths within the planning directory for a spec
  */
-export function getPlanningPaths(branch?: string, cwd?: string) {
-  const planningDir = getPlanningDir(branch, cwd);
+export function getPlanningPaths(spec: string, cwd?: string) {
+  const planningDir = getPlanningDir(spec, cwd);
   return {
     root: planningDir,
     prompts: join(planningDir, 'prompts'),
@@ -173,10 +162,10 @@ export function getPlanningPaths(branch?: string, cwd?: string) {
 }
 
 /**
- * Ensure the .planning directory structure exists
+ * Ensure the .planning directory structure exists for a spec
  */
-export function ensurePlanningDir(branch?: string, cwd?: string): void {
-  const paths = getPlanningPaths(branch, cwd);
+export function ensurePlanningDir(spec: string, cwd?: string): void {
+  const paths = getPlanningPaths(spec, cwd);
 
   // Create directories
   mkdirSync(paths.root, { recursive: true });
@@ -184,18 +173,18 @@ export function ensurePlanningDir(branch?: string, cwd?: string): void {
 }
 
 /**
- * Check if planning directory exists for a branch
+ * Check if planning directory exists for a spec
  */
-export function planningDirExists(branch?: string, cwd?: string): boolean {
-  const paths = getPlanningPaths(branch, cwd);
+export function planningDirExists(spec: string, cwd?: string): boolean {
+  const paths = getPlanningPaths(spec, cwd);
   return existsSync(paths.root);
 }
 
 /**
- * Read the status file
+ * Read the status file for a spec
  */
-export function readStatus(branch?: string, cwd?: string): StatusFile | null {
-  const paths = getPlanningPaths(branch, cwd);
+export function readStatus(spec: string, cwd?: string): StatusFile | null {
+  const paths = getPlanningPaths(spec, cwd);
 
   if (!existsSync(paths.status)) {
     return null;
@@ -210,27 +199,27 @@ export function readStatus(branch?: string, cwd?: string): StatusFile | null {
 }
 
 /**
- * Write the status file
+ * Write the status file for a spec
  */
-export function writeStatus(status: StatusFile, branch?: string, cwd?: string): void {
-  const paths = getPlanningPaths(branch, cwd);
-  ensurePlanningDir(branch, cwd);
+export function writeStatus(status: StatusFile, spec: string, cwd?: string): void {
+  const paths = getPlanningPaths(spec, cwd);
+  ensurePlanningDir(spec, cwd);
 
   const content = stringifyYaml(status);
   writeFileSync(paths.status, content);
 }
 
 /**
- * Update specific fields in the status file
+ * Update specific fields in the status file for a spec
  */
 export function updateStatus(
   updates: Partial<StatusFile>,
-  branch?: string,
+  spec: string,
   cwd?: string
 ): StatusFile {
-  const current = readStatus(branch, cwd);
+  const current = readStatus(spec, cwd);
   if (!current) {
-    throw new Error('No status file exists. Initialize a milestone first.');
+    throw new Error('No status file exists. Initialize a spec first.');
   }
 
   const updated: StatusFile = {
@@ -239,26 +228,30 @@ export function updateStatus(
     updated: new Date().toISOString(),
   };
 
-  writeStatus(updated, branch, cwd);
+  writeStatus(updated, spec, cwd);
   return updated;
 }
 
 /**
- * Create initial status file for a new milestone
+ * Create initial status file for a new spec
+ *
+ * @param specName - The spec name (used as directory key)
+ * @param specPath - Path to the spec file
+ * @param lastKnownBranch - Initial branch hint (nullable)
+ * @param cwd - Working directory
  */
 export function initializeStatus(
-  milestone: string,
+  specName: string,
   specPath: string,
-  branch?: string,
+  lastKnownBranch: string | null = null,
   cwd?: string
 ): StatusFile {
-  const currentBranch = branch || getCurrentBranch(cwd);
   const now = new Date().toISOString();
 
   const status: StatusFile = {
-    milestone,
+    name: specName,
     spec: specPath,
-    branch: currentBranch,
+    last_known_branch: lastKnownBranch,
     stage: 'planning',
     loop: {
       enabled: false,
@@ -270,18 +263,18 @@ export function initializeStatus(
     updated: now,
   };
 
-  writeStatus(status, branch, cwd);
+  writeStatus(status, specName, cwd);
   return status;
 }
 
 /**
- * Read the alignment doc frontmatter
+ * Read the alignment doc frontmatter for a spec
  */
 export function readAlignmentFrontmatter(
-  branch?: string,
+  spec: string,
   cwd?: string
 ): AlignmentFrontmatter | null {
-  const paths = getPlanningPaths(branch, cwd);
+  const paths = getPlanningPaths(spec, cwd);
 
   if (!existsSync(paths.alignment)) {
     return null;
@@ -299,10 +292,10 @@ export function readAlignmentFrontmatter(
 }
 
 /**
- * Read the full alignment doc
+ * Read the full alignment doc for a spec
  */
-export function readAlignment(branch?: string, cwd?: string): string | null {
-  const paths = getPlanningPaths(branch, cwd);
+export function readAlignment(spec: string, cwd?: string): string | null {
+  const paths = getPlanningPaths(spec, cwd);
 
   if (!existsSync(paths.alignment)) {
     return null;
@@ -312,22 +305,21 @@ export function readAlignment(branch?: string, cwd?: string): string | null {
 }
 
 /**
- * Create initial alignment doc
+ * Create initial alignment doc for a spec
  */
 export function initializeAlignment(
-  milestone: string,
+  specName: string,
   specPath: string,
   overview: string,
   hardRequirements: string[],
-  branch?: string,
   cwd?: string
 ): void {
-  const paths = getPlanningPaths(branch, cwd);
-  ensurePlanningDir(branch, cwd);
+  const paths = getPlanningPaths(specName, cwd);
+  ensurePlanningDir(specName, cwd);
 
   const now = new Date().toISOString();
   const frontmatter = stringifyYaml({
-    milestone,
+    name: specName,
     spec: specPath,
     created: now,
     updated: now,
@@ -357,17 +349,17 @@ ${requirementsList}
 }
 
 /**
- * Append a decision to the alignment doc
+ * Append a decision to the alignment doc for a spec
  */
 export function appendDecision(
   entry: DecisionEntry,
-  branch?: string,
+  spec: string,
   cwd?: string
 ): void {
-  const paths = getPlanningPaths(branch, cwd);
+  const paths = getPlanningPaths(spec, cwd);
 
   if (!existsSync(paths.alignment)) {
-    throw new Error('No alignment doc exists. Initialize a milestone first.');
+    throw new Error('No alignment doc exists. Initialize a spec first.');
   }
 
   const content = readFileSync(paths.alignment, 'utf-8');
@@ -396,10 +388,10 @@ export function appendDecision(
 }
 
 /**
- * List all prompt files in the planning directory
+ * List all prompt files in the planning directory for a spec
  */
-export function listPromptFiles(branch?: string, cwd?: string): string[] {
-  const paths = getPlanningPaths(branch, cwd);
+export function listPromptFiles(spec: string, cwd?: string): string[] {
+  const paths = getPlanningPaths(spec, cwd);
 
   if (!existsSync(paths.prompts)) {
     return [];
@@ -411,10 +403,10 @@ export function listPromptFiles(branch?: string, cwd?: string): string[] {
 }
 
 /**
- * Get alignment doc token count estimate (rough)
+ * Get alignment doc token count estimate (rough) for a spec
  */
-export function getAlignmentTokenCount(branch?: string, cwd?: string): number {
-  const content = readAlignment(branch, cwd);
+export function getAlignmentTokenCount(spec: string, cwd?: string): number {
+  const content = readAlignment(spec, cwd);
   if (!content) return 0;
 
   // Rough estimate: ~4 chars per token
@@ -422,12 +414,12 @@ export function getAlignmentTokenCount(branch?: string, cwd?: string): number {
 }
 
 /**
- * Update PR status in status file
+ * Update PR status in status file for a spec
  */
 export function updatePRStatus(
   url: string,
   number: number,
-  branch?: string,
+  spec: string,
   cwd?: string
 ): StatusFile {
   return updateStatus(
@@ -438,22 +430,22 @@ export function updatePRStatus(
         created: new Date().toISOString(),
       },
     },
-    branch,
+    spec,
     cwd
   );
 }
 
 /**
- * Update Greptile review status in status file
+ * Update Greptile review status in status file for a spec
  */
 export function updateGreptileStatus(
   state: Partial<GreptileStatus>,
-  branch?: string,
+  spec: string,
   cwd?: string
 ): StatusFile {
-  const current = readStatus(branch, cwd);
+  const current = readStatus(spec, cwd);
   if (!current) {
-    throw new Error('No status file exists. Initialize a milestone first.');
+    throw new Error('No status file exists. Initialize a spec first.');
   }
 
   const currentGreptile = current.greptile || {
@@ -469,7 +461,89 @@ export function updateGreptileStatus(
         ...state,
       },
     },
-    branch,
+    spec,
     cwd
   );
 }
+
+// ============================================================================
+// Active Spec Management (re-exported from session.ts)
+// ============================================================================
+
+// Session state is stored in .allhands/harness/.cache/session.json
+// Re-export for backwards compatibility
+export { getActiveSpec, setActiveSpec, clearActiveSpec } from './session.js';
+
+/**
+ * Update the last_known_branch hint for a spec
+ */
+export function updateLastKnownBranch(
+  spec: string,
+  branch: string | null,
+  cwd?: string
+): void {
+  try {
+    updateStatus({ last_known_branch: branch }, spec, cwd);
+  } catch {
+    // Ignore if status file doesn't exist
+  }
+}
+
+// ============================================================================
+// Spec Listing
+// ============================================================================
+
+export interface SpecInfo {
+  name: string;
+  specPath: string;
+  stage: string;
+  lastKnownBranch: string | null;
+  isActive: boolean;
+}
+
+/**
+ * List all specs in .planning/
+ */
+export function listSpecs(cwd?: string): SpecInfo[] {
+  const gitRoot = getGitRoot(cwd);
+  const planningRoot = join(gitRoot, '.planning');
+
+  if (!existsSync(planningRoot)) {
+    return [];
+  }
+
+  const activeSpec = getActiveSpec(cwd);
+  const entries = readdirSync(planningRoot, { withFileTypes: true });
+  const specs: SpecInfo[] = [];
+
+  for (const entry of entries) {
+    // Skip non-directories and the .active file
+    if (!entry.isDirectory() || entry.name.startsWith('.')) {
+      continue;
+    }
+
+    const statusPath = join(planningRoot, entry.name, 'status.yaml');
+    if (!existsSync(statusPath)) {
+      continue;
+    }
+
+    try {
+      const content = readFileSync(statusPath, 'utf-8');
+      const status = parseYaml(content) as StatusFile;
+
+      specs.push({
+        name: entry.name,
+        specPath: status.spec,
+        stage: status.stage,
+        lastKnownBranch: status.last_known_branch ?? null,
+        isActive: entry.name === activeSpec,
+      });
+    } catch {
+      // Skip malformed status files
+      continue;
+    }
+  }
+
+  return specs;
+}
+

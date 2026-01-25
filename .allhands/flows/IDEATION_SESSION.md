@@ -1,13 +1,23 @@
 <goal>
-Capture engineer intent into a spec that grounds expectations in codebase reality. Per **Ideation First**, the spec is an intent document, not a requirements doc - it consolidates expectations, desires, and concerns upfront.
+Capture engineer intent into a **milestone spec** that grounds expectations in codebase reality. Per **Ideation First**, the spec is an intent document, not a requirements doc - it consolidates expectations, desires, and concerns upfront.
+
+Milestone specs are one type of spec in the workflow system - they represent planned features that may build on other milestones. Other spec types (investigation, debug) will use different flows.
 </goal>
 
 <constraints>
 - MUST ask one question at a time during interview
 - MUST ground ideation in codebase reality via parallel exploration tasks
-- MUST ask engineer if they want to enable the milestone after spec writing
+- MUST ask engineer if they want to enable the spec after writing
 - NEVER use literal placeholder text in commands
 </constraints>
+
+## Pre-flight
+
+Check current git branch. If not on `$BASE_BRANCH`:
+- Inform engineer: "You're on branch `{current_branch}`. Roadmap specs should be created on `$BASE_BRANCH` so they're visible to all feature branches."
+- Ask: "Switch to `$BASE_BRANCH` before continuing?"
+- If yes, run `git checkout $BASE_BRANCH`
+- If no, continue but note the spec will only exist on this branch
 
 ## Initiation
 
@@ -94,7 +104,7 @@ If gaps exist, return to Surveying for specific categories.
 ## Spec Output
 
 - Run `ah schema spec` for spec format
-- Write `specs/roadmap/{MILESTONE_NAME}.spec.md` capturing:
+- Write `specs/roadmap/{SPEC_NAME}.spec.md` capturing:
   - Engineer desires and expectations (what, why, success criteria)
   - Assumptions about other milestones (use "Assuming X exists...", not cross-references)
   - Open questions for architect to research/decide
@@ -142,18 +152,15 @@ After writing the spec:
 
 Ask the engineer:
 
-> **"Would you like to enable this milestone now?"**
+> **"Would you like to enable this spec now?"**
 >
 > This will:
-> 1. Create a new branch for this milestone
-> 2. Initialize the `.planning/{branch}/` directory with status tracking
-> 3. Allow you to proceed to planning and execution
+> 1. Initialize `.planning/{spec}/` for work tracking
+> 2. Set this spec as active
+> 3. Set up a working branch (new or continue existing)
+> 4. Allow you to proceed to planning and execution
 >
 > If no, the spec remains in `specs/roadmap/` for later activation via TUI.
 
 If yes:
-- Run `git checkout -b <infered-branch-name-from-spec>`
-- Run `ah planning init` to initialize planning directory
-- Notify engineer the milestone is active
-
-The TUI hub monitors branch changes and will detect the new milestone branch.
+- Follow `.allhands/flows/shared/ENABLE_SPEC.md` with `spec_path` set to the newly created spec

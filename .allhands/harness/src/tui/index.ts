@@ -46,7 +46,7 @@ export interface TUIState {
   emergentEnabled: boolean;
   prompts: PromptItem[];
   activeAgents: AgentInfo[];
-  milestone?: string;
+  spec?: string;
   branch?: string;
   prActionState: PRActionState;
   compoundRun: boolean;
@@ -175,7 +175,7 @@ export class TUI {
       this.screen,
       this.state.activeAgents,
       undefined,
-      this.state.milestone,
+      this.state.spec,
       this.state.branch,
       this.logEntries,
       undefined, // fileStates - will be set on render
@@ -204,6 +204,38 @@ export class TUI {
           this.state.branch = newBranch;
           this.options.onAction('branch-changed', { branch: newBranch });
           this.render();
+        },
+        onActiveSpecChange: (newSpec) => {
+          if (newSpec !== this.state.spec) {
+            this.log(`Active spec changed to: ${newSpec ?? '(none)'}`);
+            this.state.spec = newSpec ?? undefined;
+
+            // Reload prompts for new spec
+            if (newSpec && this.options.cwd) {
+              const { loadAllPrompts } = require('../lib/prompts.js');
+              const { readStatus } = require('../lib/planning.js');
+              const prompts = loadAllPrompts(newSpec, this.options.cwd);
+              const status = readStatus(newSpec, this.options.cwd);
+
+              this.state.prompts = prompts.map((p: { frontmatter: { number: number; title: string; status: string } }) => ({
+                number: p.frontmatter.number,
+                title: p.frontmatter.title,
+                status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+              }));
+              this.state.loopEnabled = status?.loop?.enabled ?? false;
+              this.state.emergentEnabled = status?.loop?.emergent ?? false;
+              this.state.compoundRun = status?.compound_run ?? false;
+            } else {
+              this.state.prompts = [];
+              this.state.loopEnabled = false;
+              this.state.emergentEnabled = false;
+              this.state.compoundRun = false;
+            }
+
+            this.buildActionItems();
+            this.options.onAction('spec-changed', { spec: newSpec });
+            this.render();
+          }
         },
         onAgentsChange: (agents) => {
           this.state.activeAgents = agents.map((name) => ({
@@ -329,26 +361,26 @@ export class TUI {
       loopEnabled: this.state.loopEnabled,
       emergentEnabled: this.state.emergentEnabled,
       prActionState: this.state.prActionState,
-      hasMilestone: !!this.state.milestone,
+      hasSpec: !!this.state.spec,
       hasCompletedPrompts,
       compoundRun: this.state.compoundRun,
     };
   }
 
   private buildActionItems(): void {
-    const hasMilestone = !!this.state.milestone;
+    const hasSpec = !!this.state.spec;
     const hasCompletedPrompts = this.state.prompts.some(p => p.status === 'done');
     const prDisabled = this.state.prActionState === 'greptile-reviewing';
 
-    // Dynamic label for switch/choose milestone
-    const milestoneLabel = hasMilestone ? 'Switch Milestone' : 'Choose Milestone';
+    // Dynamic label for switch/choose spec
+    const specLabel = hasSpec ? 'Switch Spec' : 'Choose Spec';
 
     this.actionItems = [
       // Agent spawners - coordinator and ideation always available
       { id: 'coordinator', label: 'Coordinator', key: '1', type: 'action' },
       { id: 'ideation', label: 'Ideation', key: '2', type: 'action' },
-      // Planner requires milestone
-      { id: 'planner', label: 'Planner', key: '3', type: 'action', disabled: !hasMilestone },
+      // Planner requires spec
+      { id: 'planner', label: 'Planner', key: '3', type: 'action', disabled: !hasSpec },
       // These require at least 1 completed prompt
       { id: 'e2e-test-planner', label: 'Build E2E Test', key: '4', type: 'action', hidden: !hasCompletedPrompts },
       { id: 'review-jury', label: 'Review Jury', key: '5', type: 'action', hidden: !hasCompletedPrompts },
@@ -356,8 +388,8 @@ export class TUI {
       { id: 'compound', label: 'Compound', key: '7', type: 'action', hidden: !hasCompletedPrompts },
       // Mark completed - only visible if compound has been run
       { id: 'mark-completed', label: 'Mark Completed', key: '8', type: 'action', hidden: !this.state.compoundRun },
-      // Switch/Choose milestone - always visible, label changes
-      { id: 'switch-milestone', label: milestoneLabel, key: '9', type: 'action' },
+      // Switch/Choose spec - always visible, label changes
+      { id: 'switch-spec', label: specLabel, key: '9', type: 'action' },
       // Custom Flow - always visible, allows running any flow with custom message
       { id: 'custom-flow', label: 'Custom Flow', key: '0', type: 'action' },
       { id: 'separator-toggles', label: '─ Toggles ─', type: 'separator' },
@@ -562,8 +594,8 @@ export class TUI {
         this.options.onAction('toggle-emergent', { enabled: this.state.emergentEnabled });
         this.render();
         break;
-      case 'switch-milestone':
-        this.openMilestoneModal();
+      case 'switch-spec':
+        this.openSpecModal();
         break;
       case 'custom-flow':
         this.openCustomFlowModal();
@@ -580,17 +612,17 @@ export class TUI {
     }
   }
 
-  private openMilestoneModal(): void {
+  private openSpecModal(): void {
     // Load specs dynamically from filesystem
     const specGroups = loadAllSpecs(this.options.cwd);
     const items = specsToModalItems(specGroups);
 
     this.activeModal = createModal(this.screen, {
-      title: 'Select Milestone',
+      title: 'Select Spec',
       items,
       onSelect: (id: string) => {
         this.closeModal();
-        this.options.onAction('switch-milestone', { specId: id });
+        this.options.onAction('switch-spec', { specId: id });
       },
       onCancel: () => {
         this.closeModal();
@@ -758,7 +790,7 @@ export class TUI {
           customMessage,
           windowName,
           focusWindow: true,
-          milestoneName: this.state.milestone,
+          specName: this.state.spec,
         },
         branch,
         this.options.cwd
@@ -906,7 +938,7 @@ export class TUI {
   }
 
   /**
-   * Get planning file paths for current milestone
+   * Get planning file paths for current spec
    */
   public getFileStates(): { spec: boolean; alignment: boolean; e2eTestPlan: boolean } {
     if (!this.state.branch || !this.options.cwd) {
@@ -914,7 +946,7 @@ export class TUI {
     }
 
     return {
-      spec: this.state.milestone ? getSpecFilePath(this.options.cwd, this.state.milestone) !== null : false,
+      spec: this.state.spec ? getSpecFilePath(this.options.cwd, this.state.spec) !== null : false,
       alignment: getPlanningFilePath(this.options.cwd, this.state.branch, 'alignment') !== null,
       e2eTestPlan: getPlanningFilePath(this.options.cwd, this.state.branch, 'e2e_test_plan') !== null,
     };
@@ -973,16 +1005,16 @@ export class TUI {
       this.screen,
       this.state.activeAgents,
       this.focusedPane === 'status' ? this.selectedIndex.status : undefined,
-      this.state.milestone,
+      this.state.spec,
       this.state.branch,
       this.logEntries,
       fileStates,
       {
         onViewSpec: () => {
-          if (this.state.milestone && this.options.cwd) {
-            const specPath = getSpecFilePath(this.options.cwd, this.state.milestone);
+          if (this.state.spec && this.options.cwd) {
+            const specPath = getSpecFilePath(this.options.cwd, this.state.spec);
             if (specPath) {
-              this.openFileViewer(`Spec: ${this.state.milestone}`, specPath);
+              this.openFileViewer(`Spec: ${this.state.spec}`, specPath);
             }
           }
         },

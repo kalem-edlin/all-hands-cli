@@ -10,9 +10,7 @@
  * Uses setInterval with cleanup to prevent memory leaks.
  */
 
-import { existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { getCurrentBranch, updateGreptileStatus, readStatus, isLockedBranch } from './planning.js';
+import { getCurrentBranch, updateGreptileStatus, readStatus, getActiveSpec, updateLastKnownBranch } from './planning.js';
 import { listWindows, SESSION_NAME, sessionExists, getCurrentSession, getSpawnedAgentRegistry, unregisterSpawnedAgent } from './tmux.js';
 import { pickNextPrompt, markPromptInProgress, type PromptFile } from './prompts.js';
 import { shutdownDaemon } from './mcp-client.js';
@@ -25,6 +23,7 @@ import {
 
 export interface EventLoopState {
   currentBranch: string;
+  activeSpec: string | null;
   prUrl: string | null;
   greptileFeedbackAvailable: boolean;
   greptileReviewState: GreptileReviewState;
@@ -37,6 +36,7 @@ export interface EventLoopState {
 export interface EventLoopCallbacks {
   onGreptileFeedback?: (available: boolean) => void;
   onBranchChange?: (newBranch: string) => void;
+  onActiveSpecChange?: (spec: string | null) => void;
   onAgentsChange?: (agents: string[]) => void;
   onSpawnExecutor?: (prompt: PromptFile) => void;
   onLoopStatus?: (message: string) => void;
@@ -61,6 +61,7 @@ export class EventLoop {
     this.pollIntervalMs = pollIntervalMs;
     this.state = {
       currentBranch: getCurrentBranch(),
+      activeSpec: getActiveSpec(cwd),
       prUrl: null,
       greptileFeedbackAvailable: false,
       greptileReviewState: {
@@ -140,6 +141,7 @@ export class EventLoop {
     await Promise.all([
       this.checkGreptileFeedback(),
       this.checkGitBranch(),
+      this.checkActiveSpec(),
       this.checkAgentWindows(),
     ]);
 
@@ -180,19 +182,21 @@ export class EventLoop {
         this.state.greptileFeedbackAvailable = hasGreptileComment;
         this.state.greptileReviewState = currentState;
 
-        // Update status.yaml with Greptile state
-        try {
-          updateGreptileStatus(
-            {
-              reviewCycle: currentState.reviewCycle,
-              lastReviewTime: currentState.lastCommentTime,
-              status: currentState.status,
-            },
-            this.state.currentBranch,
-            this.cwd
-          );
-        } catch {
-          // Status file might not exist - ignore
+        // Update status.yaml with Greptile state (use active spec)
+        if (this.state.activeSpec) {
+          try {
+            updateGreptileStatus(
+              {
+                reviewCycle: currentState.reviewCycle,
+                lastReviewTime: currentState.lastCommentTime,
+                status: currentState.status,
+              },
+              this.state.activeSpec,
+              this.cwd
+            );
+          } catch {
+            // Status file might not exist - ignore
+          }
         }
 
         // Notify if there's a new review
@@ -207,21 +211,48 @@ export class EventLoop {
 
   /**
    * Check for git branch changes
+   *
+   * In the spec-based model, branch changes are informational only.
+   * If an active spec exists, update its last_known_branch hint.
+   * The TUI state is based on the active spec, not the current branch.
    */
   private async checkGitBranch(): Promise<void> {
     try {
       const currentBranch = getCurrentBranch();
 
       if (currentBranch !== this.state.currentBranch) {
-        const previousBranch = this.state.currentBranch;
         this.state.currentBranch = currentBranch;
 
-        // Check if we should auto-init .planning/ for this branch
-        if (!this.isProtectedBranch(currentBranch)) {
-          this.ensurePlanningDir(currentBranch);
+        // Update last_known_branch hint if we have an active spec
+        if (this.state.activeSpec) {
+          updateLastKnownBranch(this.state.activeSpec, currentBranch, this.cwd);
         }
 
+        // Notify callback (TUI may want to display the new branch)
         this.callbacks.onBranchChange?.(currentBranch);
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  /**
+   * Check for active spec changes
+   *
+   * Polls .allhands/harness/.cache/session.json for changes made by agents.
+   * This allows agents running in separate shells to change the active spec
+   * and have the TUI react accordingly.
+   */
+  private async checkActiveSpec(): Promise<void> {
+    try {
+      const activeSpec = getActiveSpec(this.cwd);
+
+      if (activeSpec !== this.state.activeSpec) {
+        const previousSpec = this.state.activeSpec;
+        this.state.activeSpec = activeSpec;
+
+        // Notify callback so TUI can reload prompts/status for new spec
+        this.callbacks.onActiveSpecChange?.(activeSpec);
       }
     } catch {
       // Silently fail
@@ -314,6 +345,12 @@ export class EventLoop {
       return;
     }
 
+    // Need an active spec to pick prompts
+    if (!this.state.activeSpec) {
+      this.callbacks.onLoopStatus?.('No active spec - loop paused');
+      return;
+    }
+
     try {
       // Check if there's already an executor running
       const hasExecutor = this.state.activeAgents.some(
@@ -325,8 +362,8 @@ export class EventLoop {
         return;
       }
 
-      // No executor running - pick next prompt
-      const result = pickNextPrompt(this.state.currentBranch, this.cwd);
+      // No executor running - pick next prompt from active spec
+      const result = pickNextPrompt(this.state.activeSpec, this.cwd);
 
       if (!result.prompt) {
         // No actionable prompts
@@ -347,25 +384,4 @@ export class EventLoop {
     }
   }
 
-  /**
-   * Check if a branch is protected (should not auto-init .planning/)
-   * Uses centralized isLockedBranch() from planning.ts
-   */
-  private isProtectedBranch(branch: string): boolean {
-    return isLockedBranch(branch);
-  }
-
-  /**
-   * Ensure .planning/{branch}/ directory exists
-   */
-  private ensurePlanningDir(branch: string): void {
-    const planningDir = join(this.cwd, '.planning', branch);
-
-    if (!existsSync(planningDir)) {
-      mkdirSync(planningDir, { recursive: true });
-
-      // Create subdirectories
-      mkdirSync(join(planningDir, 'prompts'), { recursive: true });
-    }
-  }
 }

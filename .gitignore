@@ -13,3 +13,4 @@ docs/
 .tldr/
 .reposearch/
 .allhands-*.backup/
+.allhands/harness/.cache/
