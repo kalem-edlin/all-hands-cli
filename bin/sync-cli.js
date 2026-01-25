@@ -4856,9 +4856,9 @@ var Yargs = YargsFactory(esm_default);
 var yargs_default = Yargs;
 
 // src/commands/init.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync8, mkdirSync as mkdirSync2, readFileSync as readFileSync7, renameSync as renameSync3, writeFileSync as writeFileSync2 } from "fs";
+import { copyFileSync, existsSync as existsSync8, mkdirSync, readFileSync as readFileSync7, writeFileSync as writeFileSync2 } from "fs";
 import { homedir } from "os";
-import { basename as basename5, dirname as dirname8, join as join7, resolve as resolve6 } from "path";
+import { basename as basename4, dirname as dirname7, join as join6, resolve as resolve6 } from "path";
 
 // src/lib/git.ts
 import { execSync, spawnSync } from "child_process";
@@ -6789,133 +6789,106 @@ function restoreDotfiles(targetDir) {
   return { renamed, skipped };
 }
 
-// src/lib/full-replace.ts
-import { copyFileSync, cpSync, existsSync as existsSync7, readFileSync as readFileSync6, renameSync as renameSync2, rmSync, writeFileSync } from "fs";
-import { join as join6 } from "path";
-var CLAUDE_MD_REFERENCE = "@.allhands/flows/CORE.md";
-var PRESERVE_IN_ALLHANDS = [
-  "node_modules"
-  // target's local dependencies
-];
-function getBackupDirName() {
-  const now = /* @__PURE__ */ new Date();
-  const ts = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  return `.allhands-${ts}.backup`;
+// src/lib/marker-sync.ts
+import { existsSync as existsSync7, readFileSync as readFileSync6, writeFileSync } from "fs";
+var SYNC_MARKER = "# ALLHANDS_SYNC";
+function syncMarkerSection(sourcePath, targetPath, verbose = false) {
+  if (!existsSync7(sourcePath)) {
+    if (verbose) console.log(`  Source file not found: ${sourcePath}`);
+    return false;
+  }
+  const sourceContent = readFileSync6(sourcePath, "utf-8");
+  const sourceMarkerIndex = sourceContent.indexOf(SYNC_MARKER);
+  if (sourceMarkerIndex === -1) {
+    if (verbose) console.log(`  No ${SYNC_MARKER} marker in source`);
+    return false;
+  }
+  const sourceMarkerSection = sourceContent.slice(sourceMarkerIndex);
+  if (!existsSync7(targetPath)) {
+    if (verbose) console.log(`  Creating ${targetPath}`);
+    writeFileSync(targetPath, sourceContent);
+    return true;
+  }
+  const targetContent = readFileSync6(targetPath, "utf-8");
+  const targetMarkerIndex = targetContent.indexOf(SYNC_MARKER);
+  let newContent;
+  if (targetMarkerIndex === -1) {
+    const separator = targetContent.endsWith("\n") ? "\n" : "\n\n";
+    newContent = targetContent + separator + sourceMarkerSection;
+    if (verbose) console.log(`  Appending ${SYNC_MARKER} section`);
+  } else {
+    const beforeMarker = targetContent.slice(0, targetMarkerIndex);
+    newContent = beforeMarker + sourceMarkerSection;
+    if (verbose) console.log(`  Updating ${SYNC_MARKER} section`);
+  }
+  if (newContent !== targetContent) {
+    writeFileSync(targetPath, newContent);
+    return true;
+  }
+  return false;
 }
-async function fullReplace(options) {
-  const { sourceRoot, targetRoot, verbose = false } = options;
-  const sourceAllhands = join6(sourceRoot, ".allhands");
-  const targetAllhands = join6(targetRoot, ".allhands");
-  const result = {
-    backupPath: null,
-    filesRestored: [],
-    claudeMdUpdated: false,
-    envExampleCopied: false
-  };
-  if (existsSync7(targetAllhands)) {
-    const backupName = getBackupDirName();
-    const backupPath = join6(targetRoot, backupName);
-    if (verbose) console.log(`Backing up .allhands \u2192 ${backupName}`);
-    renameSync2(targetAllhands, backupPath);
-    result.backupPath = backupPath;
-  }
-  if (verbose) console.log("Copying .allhands from source...");
-  cpSync(sourceAllhands, targetAllhands, { recursive: true });
-  if (result.backupPath) {
-    for (const item of PRESERVE_IN_ALLHANDS) {
-      const backupItem = join6(result.backupPath, item);
-      const targetItem = join6(targetAllhands, item);
-      if (existsSync7(backupItem)) {
-        if (existsSync7(targetItem)) {
-          rmSync(targetItem, { recursive: true, force: true });
-        }
-        if (verbose) console.log(`  Restoring ${item} from backup`);
-        cpSync(backupItem, targetItem, { recursive: true });
-        result.filesRestored.push(item);
-      }
-    }
-  }
-  const claudeMdPath = join6(targetRoot, "CLAUDE.md");
-  result.claudeMdUpdated = ensureClaudeMdReference(claudeMdPath, verbose);
-  const envExamples = [".env.example", ".env.ai.example"];
-  for (const envExample of envExamples) {
-    const sourceEnv = join6(sourceRoot, envExample);
-    const targetEnv = join6(targetRoot, envExample);
-    if (existsSync7(sourceEnv)) {
-      if (verbose) console.log(`Copying ${envExample}`);
-      copyFileSync(sourceEnv, targetEnv);
-      result.envExampleCopied = true;
-    }
-  }
-  if (verbose) console.log("Restoring dotfiles...");
-  restoreDotfiles(targetAllhands);
-  return result;
-}
-function ensureClaudeMdReference(claudeMdPath, verbose) {
+function ensureLineInFile(filePath, line, verbose = false) {
   let content = "";
   let existed = false;
-  if (existsSync7(claudeMdPath)) {
-    content = readFileSync6(claudeMdPath, "utf-8");
+  if (existsSync7(filePath)) {
+    content = readFileSync6(filePath, "utf-8");
     existed = true;
-    if (content.includes(CLAUDE_MD_REFERENCE)) {
-      if (verbose) console.log("CLAUDE.md already has CORE.md reference");
+    if (content.includes(line)) {
+      if (verbose) console.log(`  ${filePath} already contains: ${line}`);
       return false;
     }
   }
-  const reference = `${CLAUDE_MD_REFERENCE}
-`;
+  const lineWithNewline = line + "\n";
   if (existed && content.trim()) {
-    content = reference + "\n" + content;
+    content = lineWithNewline + "\n" + content;
   } else {
-    content = reference;
+    content = lineWithNewline;
   }
-  writeFileSync(claudeMdPath, content);
-  if (verbose) console.log(existed ? "Updated CLAUDE.md with CORE.md reference" : "Created CLAUDE.md with CORE.md reference");
+  writeFileSync(filePath, content);
+  if (verbose) console.log(existed ? `  Updated ${filePath}` : `  Created ${filePath}`);
   return true;
 }
 
 // src/commands/init.ts
+var CLAUDE_MD_REFERENCE = "@.allhands/flows/CORE.md";
 var AH_SHIM_SCRIPT = `#!/bin/bash
-# AllHands CLI shim - finds and executes project-local .allhands/ah
+# AllHands CLI shim - finds and executes project-local .allhands/harness/ah
 # Installed by: npx all-hands init
 
 dir="$PWD"
 while [ "$dir" != "/" ]; do
-  if [ -x "$dir/.allhands/ah" ]; then
-    exec "$dir/.allhands/ah" "$@"
+  if [ -x "$dir/.allhands/harness/ah" ]; then
+    exec "$dir/.allhands/harness/ah" "$@"
   fi
   dir="$(dirname "$dir")"
 done
 
-echo "error: not in an all-hands project (no .allhands/ah found)" >&2
+echo "error: not in an all-hands project (no .allhands/harness/ah found)" >&2
 echo "hint: run 'npx all-hands init .' to initialize this project" >&2
 exit 1
 `;
 function setupAhShim() {
-  const localBin = join7(homedir(), ".local", "bin");
-  const shimPath = join7(localBin, "ah");
+  const localBin = join6(homedir(), ".local", "bin");
+  const shimPath = join6(localBin, "ah");
   const pathEnv = process.env.PATH || "";
   const inPath = pathEnv.split(":").some(
-    (p) => p === localBin || p === join7(homedir(), ".local/bin")
+    (p) => p === localBin || p === join6(homedir(), ".local/bin")
   );
   if (existsSync8(shimPath)) {
     const existing = readFileSync7(shimPath, "utf-8");
-    if (existing.includes(".allhands/ah")) {
+    if (existing.includes(".allhands/harness/ah")) {
       return { installed: false, path: shimPath, inPath };
     }
   }
-  mkdirSync2(localBin, { recursive: true });
+  mkdirSync(localBin, { recursive: true });
   writeFileSync2(shimPath, AH_SHIM_SCRIPT, { mode: 493 });
   return { installed: true, path: shimPath, inPath };
 }
-async function cmdInit(target, autoYes = false, useFullReplace = false) {
+async function cmdInit(target, autoYes = false) {
   const resolvedTarget = resolve6(process.cwd(), target);
   const allhandsRoot = getAllhandsRoot();
   console.log(`Initializing allhands in: ${resolvedTarget}`);
   console.log(`Source: ${allhandsRoot}`);
-  if (useFullReplace) {
-    console.log("Mode: full-replace (wholesale directory replacement)");
-  }
   if (!existsSync8(resolvedTarget)) {
     console.error(`Error: Target directory does not exist: ${resolvedTarget}`);
     return 1;
@@ -6929,99 +6902,79 @@ async function cmdInit(target, autoYes = false, useFullReplace = false) {
       }
     }
   }
-  const targetClaudeMd = join7(resolvedTarget, "CLAUDE.md");
-  const targetProjectMd = join7(resolvedTarget, "CLAUDE.project.md");
-  let claudeMdMigrated = false;
-  if (existsSync8(targetClaudeMd) && !existsSync8(targetProjectMd)) {
-    console.log("\nMigrating CLAUDE.md \u2192 CLAUDE.project.md...");
-    renameSync3(targetClaudeMd, targetProjectMd);
-    claudeMdMigrated = true;
-    console.log("  Done - your instructions preserved in CLAUDE.project.md");
-  }
+  const manifest = new Manifest(allhandsRoot);
+  const distributable = manifest.getDistributableFiles();
   let copied = 0;
   let skipped = 0;
-  let backupPath = null;
   let resolution = "overwrite";
   const conflicts = [];
-  if (useFullReplace) {
-    console.log("\nPerforming full replacement...");
-    const result = await fullReplace({
-      sourceRoot: allhandsRoot,
-      targetRoot: resolvedTarget,
-      verbose: true
-    });
-    backupPath = result.backupPath;
-    if (result.backupPath) {
-      console.log(`  Backup created: ${basename5(result.backupPath)}`);
-    }
-    if (result.filesRestored.length > 0) {
-      console.log(`  Restored from backup: ${result.filesRestored.join(", ")}`);
-    }
-    if (result.claudeMdUpdated) {
-      console.log("  CLAUDE.md updated with CORE.md reference");
-    }
-    if (result.envExampleCopied) {
-      console.log("  .env example files copied");
-    }
-    console.log("\nFull replacement complete!");
-  } else {
-    const manifest = new Manifest(allhandsRoot);
-    const distributable = manifest.getDistributableFiles();
-    const projectSpecificFiles = /* @__PURE__ */ new Set(["CLAUDE.project.md", ".claude/settings.local.json"]);
-    for (const relPath of distributable) {
-      if (relPath === "CLAUDE.md" && claudeMdMigrated) continue;
-      if (projectSpecificFiles.has(relPath) && existsSync8(join7(resolvedTarget, relPath))) continue;
-      const sourceFile = join7(allhandsRoot, relPath);
-      const targetFile = join7(resolvedTarget, relPath);
-      if (existsSync8(targetFile) && existsSync8(sourceFile)) {
-        if (filesAreDifferent(sourceFile, targetFile)) {
-          conflicts.push(relPath);
-        }
+  for (const relPath of distributable) {
+    const sourceFile = join6(allhandsRoot, relPath);
+    const targetFile = join6(resolvedTarget, relPath);
+    if (existsSync8(targetFile) && existsSync8(sourceFile)) {
+      if (filesAreDifferent(sourceFile, targetFile)) {
+        conflicts.push(relPath);
       }
     }
-    if (conflicts.length > 0) {
-      if (autoYes) {
-        resolution = "overwrite";
-        console.log(`
+  }
+  if (conflicts.length > 0) {
+    if (autoYes) {
+      resolution = "overwrite";
+      console.log(`
 Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
-      } else {
-        resolution = await askConflictResolution(conflicts);
-        if (resolution === "cancel") {
-          console.log("Aborted. No changes made.");
-          return 1;
-        }
-      }
-      if (resolution === "backup") {
-        console.log("\nCreating backups...");
-        for (const relPath of conflicts) {
-          const targetFile = join7(resolvedTarget, relPath);
-          const bkPath = getNextBackupPath(targetFile);
-          copyFileSync2(targetFile, bkPath);
-          console.log(`  ${relPath} \u2192 ${basename5(bkPath)}`);
-        }
+    } else {
+      resolution = await askConflictResolution(conflicts);
+      if (resolution === "cancel") {
+        console.log("Aborted. No changes made.");
+        return 1;
       }
     }
-    console.log("\nCopying allhands files...");
-    console.log(`Found ${distributable.size} files to distribute`);
-    for (const relPath of [...distributable].sort()) {
-      const sourceFile = join7(allhandsRoot, relPath);
-      const targetFile = join7(resolvedTarget, relPath);
-      if (projectSpecificFiles.has(relPath) && existsSync8(targetFile)) {
+    if (resolution === "backup") {
+      console.log("\nCreating backups...");
+      for (const relPath of conflicts) {
+        const targetFile = join6(resolvedTarget, relPath);
+        const bkPath = getNextBackupPath(targetFile);
+        copyFileSync(targetFile, bkPath);
+        console.log(`  ${relPath} \u2192 ${basename4(bkPath)}`);
+      }
+    }
+  }
+  console.log("\nCopying allhands files...");
+  console.log(`Found ${distributable.size} files to distribute`);
+  for (const relPath of [...distributable].sort()) {
+    const sourceFile = join6(allhandsRoot, relPath);
+    const targetFile = join6(resolvedTarget, relPath);
+    if (!existsSync8(sourceFile)) continue;
+    mkdirSync(dirname7(targetFile), { recursive: true });
+    if (existsSync8(targetFile)) {
+      if (!filesAreDifferent(sourceFile, targetFile)) {
         skipped++;
         continue;
       }
-      if (!existsSync8(sourceFile)) continue;
-      mkdirSync2(dirname8(targetFile), { recursive: true });
-      if (existsSync8(targetFile)) {
-        if (!filesAreDifferent(sourceFile, targetFile)) {
-          skipped++;
-          continue;
-        }
-      }
-      copyFileSync2(sourceFile, targetFile);
-      copied++;
     }
-    restoreDotfiles(resolvedTarget);
+    copyFileSync(sourceFile, targetFile);
+    copied++;
+  }
+  restoreDotfiles(resolvedTarget);
+  console.log("\nEnsuring CLAUDE.md has CORE.md reference...");
+  const claudeMdPath = join6(resolvedTarget, "CLAUDE.md");
+  const claudeMdUpdated = ensureLineInFile(claudeMdPath, CLAUDE_MD_REFERENCE, true);
+  console.log("Syncing .gitignore...");
+  const sourceGitignore = join6(allhandsRoot, ".gitignore");
+  const targetGitignore = join6(resolvedTarget, ".gitignore");
+  syncMarkerSection(sourceGitignore, targetGitignore, true);
+  console.log("Syncing .tldrignore...");
+  const sourceTldrignore = join6(allhandsRoot, ".tldrignore");
+  const targetTldrignore = join6(resolvedTarget, ".tldrignore");
+  syncMarkerSection(sourceTldrignore, targetTldrignore, true);
+  const envExamples = [".env.example", ".env.ai.example"];
+  for (const envExample of envExamples) {
+    const sourceEnv = join6(allhandsRoot, envExample);
+    const targetEnv = join6(resolvedTarget, envExample);
+    if (existsSync8(sourceEnv)) {
+      console.log(`Copying ${envExample}`);
+      copyFileSync(sourceEnv, targetEnv);
+    }
   }
   console.log("\nSetting up `ah` command...");
   const shimResult = setupAhShim();
@@ -7031,11 +6984,11 @@ Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
     console.log(`  Shim already installed at ${shimResult.path}`);
   }
   if (!shimResult.inPath) {
-    console.log("  \u26A0\uFE0F  ~/.local/bin is not in your PATH");
+    console.log("  Warning: ~/.local/bin is not in your PATH");
     console.log("  Add this to your shell config (.zshrc/.bashrc):");
     console.log('    export PATH="$HOME/.local/bin:$PATH"');
   }
-  const syncConfigPath = join7(resolvedTarget, SYNC_CONFIG_FILENAME);
+  const syncConfigPath = join6(resolvedTarget, SYNC_CONFIG_FILENAME);
   let syncConfigCreated = false;
   if (existsSync8(syncConfigPath)) {
     console.log(`
@@ -7051,212 +7004,172 @@ ${SYNC_CONFIG_FILENAME} already exists - skipping`);
   }
   console.log(`
 ${"=".repeat(60)}`);
-  if (useFullReplace) {
-    console.log("Done: full replacement complete");
-    if (backupPath) {
-      console.log(`Backup: ${basename5(backupPath)}`);
-    }
-  } else {
-    console.log(`Done: ${copied} copied, ${skipped} unchanged`);
-    if (resolution === "backup" && conflicts.length > 0) {
-      console.log(`Created ${conflicts.length} backup file(s)`);
-    }
+  console.log(`Done: ${copied} copied, ${skipped} unchanged`);
+  if (resolution === "backup" && conflicts.length > 0) {
+    console.log(`Created ${conflicts.length} backup file(s)`);
   }
-  if (claudeMdMigrated) {
-    console.log("Migrated CLAUDE.md \u2192 CLAUDE.project.md");
+  if (claudeMdUpdated) {
+    console.log("CLAUDE.md updated with CORE.md reference");
   }
   if (syncConfigCreated) {
     console.log(`Created ${SYNC_CONFIG_FILENAME} for push customization`);
   }
-  console.log("\nProject-specific files preserved (never overwritten):");
-  console.log("  - CLAUDE.project.md");
-  console.log("  - .claude/settings.local.json");
   console.log(`${"=".repeat(60)}`);
   console.log("\nNext steps:");
-  console.log("  1. Review CLAUDE.project.md for your project-specific instructions");
-  console.log("  2. Commit the changes");
+  console.log("  1. Commit the changes");
   return 0;
 }
 
 // src/commands/update.ts
-import { existsSync as existsSync9, mkdirSync as mkdirSync3, copyFileSync as copyFileSync3, unlinkSync, renameSync as renameSync4 } from "fs";
-import { join as join8, dirname as dirname9, basename as basename6 } from "path";
-async function cmdUpdate(autoYes = false, useFullReplace = false) {
+import { existsSync as existsSync9, mkdirSync as mkdirSync2, copyFileSync as copyFileSync2, unlinkSync } from "fs";
+import { join as join7, dirname as dirname8, basename as basename5 } from "path";
+var CLAUDE_MD_REFERENCE2 = "@.allhands/flows/CORE.md";
+async function cmdUpdate(autoYes = false) {
   const targetRoot = process.cwd();
   if (!isGitRepo(targetRoot)) {
     console.error("Error: Not in a git repository");
     return 1;
   }
   const allhandsRoot = getAllhandsRoot();
-  if (!existsSync9(join8(allhandsRoot, ".internal.json"))) {
+  if (!existsSync9(join7(allhandsRoot, ".internal.json"))) {
     console.error(`Error: Internal config not found at ${allhandsRoot}`);
     console.error("Set ALLHANDS_PATH to your claude-all-hands directory");
     return 1;
   }
   console.log(`Updating from: ${allhandsRoot}`);
   console.log(`Target: ${targetRoot}`);
-  if (useFullReplace) {
-    console.log("Mode: full-replace (wholesale directory replacement)");
+  const manifest = new Manifest(allhandsRoot);
+  const distributable = manifest.getDistributableFiles();
+  const staged = getStagedFiles(targetRoot);
+  const managedPaths = new Set(distributable);
+  const stagedConflicts = [...staged].filter((f) => managedPaths.has(f));
+  if (stagedConflicts.length > 0) {
+    console.error("Error: Staged changes detected in managed files:");
+    for (const f of stagedConflicts.sort()) {
+      console.error(`  - ${f}`);
+    }
+    console.error("\nRun 'git stash' or commit first.");
+    return 1;
   }
-  const targetClaudeMd = join8(targetRoot, "CLAUDE.md");
-  const targetProjectMd = join8(targetRoot, "CLAUDE.project.md");
-  let claudeMdMigrated = false;
-  if (existsSync9(targetClaudeMd) && !existsSync9(targetProjectMd)) {
-    console.log("\nMigrating CLAUDE.md \u2192 CLAUDE.project.md...");
-    renameSync4(targetClaudeMd, targetProjectMd);
-    claudeMdMigrated = true;
-    console.log("  Done - your instructions preserved in CLAUDE.project.md");
-  }
+  console.log(`Found ${distributable.size} distributable files`);
   let updated = 0;
   let created = 0;
-  let backupPath = null;
   let resolution = "overwrite";
   const conflicts = [];
-  if (useFullReplace) {
-    console.log("\nPerforming full replacement...");
-    const result = await fullReplace({
-      sourceRoot: allhandsRoot,
-      targetRoot,
-      verbose: true
-    });
-    backupPath = result.backupPath;
-    if (result.backupPath) {
-      console.log(`  Backup created: ${basename6(result.backupPath)}`);
-    }
-    if (result.filesRestored.length > 0) {
-      console.log(`  Restored from backup: ${result.filesRestored.join(", ")}`);
-    }
-    if (result.claudeMdUpdated) {
-      console.log("  CLAUDE.md updated with CORE.md reference");
-    }
-    if (result.envExampleCopied) {
-      console.log("  .env example files copied");
-    }
-    console.log("\nFull replacement complete!");
-  } else {
-    const manifest = new Manifest(allhandsRoot);
-    const distributable = manifest.getDistributableFiles();
-    const staged = getStagedFiles(targetRoot);
-    const managedPaths = new Set(distributable);
-    const stagedConflicts = [...staged].filter((f) => managedPaths.has(f));
-    if (stagedConflicts.length > 0) {
-      console.error("Error: Staged changes detected in managed files:");
-      for (const f of stagedConflicts.sort()) {
-        console.error(`  - ${f}`);
-      }
-      console.error("\nRun 'git stash' or commit first.");
-      return 1;
-    }
-    console.log(`Found ${distributable.size} distributable files`);
-    const deletedInSource = [];
-    const projectSpecificFiles = /* @__PURE__ */ new Set(["CLAUDE.project.md", ".claude/settings.local.json"]);
-    for (const relPath of distributable) {
-      if (relPath === "CLAUDE.md" && claudeMdMigrated) continue;
-      if (projectSpecificFiles.has(relPath)) continue;
-      const sourceFile = join8(allhandsRoot, relPath);
-      const targetFile = join8(targetRoot, relPath);
-      if (!existsSync9(sourceFile)) {
-        if (existsSync9(targetFile)) {
-          deletedInSource.push(relPath);
-        }
-        continue;
-      }
+  const deletedInSource = [];
+  for (const relPath of distributable) {
+    const sourceFile = join7(allhandsRoot, relPath);
+    const targetFile = join7(targetRoot, relPath);
+    if (!existsSync9(sourceFile)) {
       if (existsSync9(targetFile)) {
-        if (filesAreDifferent(sourceFile, targetFile)) {
-          conflicts.push(relPath);
-        }
+        deletedInSource.push(relPath);
+      }
+      continue;
+    }
+    if (existsSync9(targetFile)) {
+      if (filesAreDifferent(sourceFile, targetFile)) {
+        conflicts.push(relPath);
       }
     }
-    if (conflicts.length > 0) {
-      if (autoYes) {
-        resolution = "overwrite";
-        console.log(`
-Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
-      } else {
-        resolution = await askConflictResolution(conflicts);
-        if (resolution === "cancel") {
-          console.log("Aborted. No changes made.");
-          return 1;
-        }
-      }
-      if (resolution === "backup") {
-        console.log("\nCreating backups...");
-        for (const relPath of conflicts) {
-          const targetFile = join8(targetRoot, relPath);
-          const bkPath = getNextBackupPath(targetFile);
-          copyFileSync3(targetFile, bkPath);
-          console.log(`  ${relPath} \u2192 ${basename6(bkPath)}`);
-        }
-      }
-    }
-    for (const relPath of [...distributable].sort()) {
-      if (projectSpecificFiles.has(relPath)) continue;
-      const sourceFile = join8(allhandsRoot, relPath);
-      const targetFile = join8(targetRoot, relPath);
-      if (!existsSync9(sourceFile)) continue;
-      mkdirSync3(dirname9(targetFile), { recursive: true });
-      if (existsSync9(targetFile)) {
-        if (filesAreDifferent(sourceFile, targetFile)) {
-          copyFileSync3(sourceFile, targetFile);
-          updated++;
-        }
-      } else {
-        copyFileSync3(sourceFile, targetFile);
-        created++;
-      }
-    }
-    restoreDotfiles(targetRoot);
-    if (deletedInSource.length > 0) {
+  }
+  if (conflicts.length > 0) {
+    if (autoYes) {
+      resolution = "overwrite";
       console.log(`
-${deletedInSource.length} files removed from allhands source:`);
-      for (const f of deletedInSource) {
-        console.log(`  - ${f}`);
+Auto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
+    } else {
+      resolution = await askConflictResolution(conflicts);
+      if (resolution === "cancel") {
+        console.log("Aborted. No changes made.");
+        return 1;
       }
-      const shouldDelete = autoYes || await confirm("Delete these from target?");
-      if (shouldDelete) {
-        for (const f of deletedInSource) {
-          const targetFile = join8(targetRoot, f);
-          if (existsSync9(targetFile)) {
-            unlinkSync(targetFile);
-            console.log(`  Deleted: ${f}`);
-          }
+    }
+    if (resolution === "backup") {
+      console.log("\nCreating backups...");
+      for (const relPath of conflicts) {
+        const targetFile = join7(targetRoot, relPath);
+        const bkPath = getNextBackupPath(targetFile);
+        copyFileSync2(targetFile, bkPath);
+        console.log(`  ${relPath} \u2192 ${basename5(bkPath)}`);
+      }
+    }
+  }
+  for (const relPath of [...distributable].sort()) {
+    const sourceFile = join7(allhandsRoot, relPath);
+    const targetFile = join7(targetRoot, relPath);
+    if (!existsSync9(sourceFile)) continue;
+    mkdirSync2(dirname8(targetFile), { recursive: true });
+    if (existsSync9(targetFile)) {
+      if (filesAreDifferent(sourceFile, targetFile)) {
+        copyFileSync2(sourceFile, targetFile);
+        updated++;
+      }
+    } else {
+      copyFileSync2(sourceFile, targetFile);
+      created++;
+    }
+  }
+  restoreDotfiles(targetRoot);
+  if (deletedInSource.length > 0) {
+    console.log(`
+${deletedInSource.length} files removed from allhands source:`);
+    for (const f of deletedInSource) {
+      console.log(`  - ${f}`);
+    }
+    const shouldDelete = autoYes || await confirm("Delete these from target?");
+    if (shouldDelete) {
+      for (const f of deletedInSource) {
+        const targetFile = join7(targetRoot, f);
+        if (existsSync9(targetFile)) {
+          unlinkSync(targetFile);
+          console.log(`  Deleted: ${f}`);
         }
       }
+    }
+  }
+  console.log("\nEnsuring CLAUDE.md has CORE.md reference...");
+  const claudeMdPath = join7(targetRoot, "CLAUDE.md");
+  const claudeMdUpdated = ensureLineInFile(claudeMdPath, CLAUDE_MD_REFERENCE2, true);
+  console.log("Syncing .gitignore...");
+  const sourceGitignore = join7(allhandsRoot, ".gitignore");
+  const targetGitignore = join7(targetRoot, ".gitignore");
+  syncMarkerSection(sourceGitignore, targetGitignore, true);
+  console.log("Syncing .tldrignore...");
+  const sourceTldrignore = join7(allhandsRoot, ".tldrignore");
+  const targetTldrignore = join7(targetRoot, ".tldrignore");
+  syncMarkerSection(sourceTldrignore, targetTldrignore, true);
+  const envExamples = [".env.example", ".env.ai.example"];
+  for (const envExample of envExamples) {
+    const sourceEnv = join7(allhandsRoot, envExample);
+    const targetEnv = join7(targetRoot, envExample);
+    if (existsSync9(sourceEnv)) {
+      console.log(`Copying ${envExample}`);
+      copyFileSync2(sourceEnv, targetEnv);
     }
   }
   console.log(`
 ${"=".repeat(60)}`);
-  if (useFullReplace) {
-    console.log("Done: full replacement complete");
-    if (backupPath) {
-      console.log(`Backup: ${basename6(backupPath)}`);
-    }
-  } else {
-    console.log(`Updated: ${updated}, Created: ${created}`);
-    if (resolution === "backup" && conflicts.length > 0) {
-      console.log(`Created ${conflicts.length} backup file(s)`);
-    }
+  console.log(`Updated: ${updated}, Created: ${created}`);
+  if (resolution === "backup" && conflicts.length > 0) {
+    console.log(`Created ${conflicts.length} backup file(s)`);
   }
-  if (claudeMdMigrated) {
-    console.log("Migrated CLAUDE.md \u2192 CLAUDE.project.md");
+  if (claudeMdUpdated) {
+    console.log("CLAUDE.md updated with CORE.md reference");
   }
-  console.log("\nProject-specific files preserved:");
-  console.log("  - CLAUDE.project.md");
-  console.log("  - .claude/settings.local.json");
   console.log(`${"=".repeat(60)}`);
   return 0;
 }
 
 // src/commands/pull-manifest.ts
 import { existsSync as existsSync10, writeFileSync as writeFileSync3 } from "fs";
-import { join as join9 } from "path";
+import { join as join8 } from "path";
 async function cmdPullManifest() {
   const cwd = process.cwd();
   if (!isGitRepo(cwd)) {
     console.error("Error: Not in a git repository");
     return 1;
   }
-  const configPath = join9(cwd, SYNC_CONFIG_FILENAME);
+  const configPath = join8(cwd, SYNC_CONFIG_FILENAME);
   if (existsSync10(configPath)) {
     console.error(`Error: ${SYNC_CONFIG_FILENAME} already exists`);
     console.error("Remove it first if you want to regenerate");
@@ -7272,9 +7185,9 @@ async function cmdPullManifest() {
 }
 
 // src/commands/push.ts
-import { copyFileSync as copyFileSync4, existsSync as existsSync11, mkdirSync as mkdirSync4, readFileSync as readFileSync8, rmSync as rmSync2 } from "fs";
+import { copyFileSync as copyFileSync3, existsSync as existsSync11, mkdirSync as mkdirSync3, readFileSync as readFileSync8, rmSync } from "fs";
 import { tmpdir } from "os";
-import { dirname as dirname10, join as join10 } from "path";
+import { dirname as dirname9, join as join9 } from "path";
 import * as readline2 from "readline";
 
 // src/lib/gh.ts
@@ -7310,7 +7223,7 @@ function getGhUser() {
 
 // src/commands/push.ts
 function loadSyncConfig(cwd) {
-  const configPath = join10(cwd, SYNC_CONFIG_FILENAME);
+  const configPath = join9(cwd, SYNC_CONFIG_FILENAME);
   if (!existsSync11(configPath)) {
     return null;
   }
@@ -7384,8 +7297,8 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
     if (!localGitFiles.has(relPath)) {
       continue;
     }
-    const localFile = join10(cwd, relPath);
-    const upstreamFile = join10(allhandsRoot, relPath);
+    const localFile = join9(cwd, relPath);
+    const upstreamFile = join9(allhandsRoot, relPath);
     if (existsSync11(localFile) && filesAreDifferent(localFile, upstreamFile)) {
       filesToPush.push({ path: relPath, type: "M" });
     }
@@ -7396,8 +7309,8 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
       if (PUSH_BLOCKLIST.includes(relPath)) continue;
       if (finalExcludes.some((p) => minimatch(relPath, p, { dot: true }))) continue;
       if (filesToPush.some((f) => f.path === relPath)) continue;
-      const localFile = join10(cwd, relPath);
-      const upstreamFile = join10(allhandsRoot, relPath);
+      const localFile = join9(cwd, relPath);
+      const upstreamFile = join9(allhandsRoot, relPath);
       if (existsSync11(upstreamFile) && !filesAreDifferent(localFile, upstreamFile)) {
         continue;
       }
@@ -7431,8 +7344,8 @@ async function createPullRequest(cwd, ghUser, filesToPush, title, body) {
       return 1;
     }
   }
-  const tempDir = join10(tmpdir(), `allhands-push-${Date.now()}`);
-  mkdirSync4(tempDir, { recursive: true });
+  const tempDir = join9(tmpdir(), `allhands-push-${Date.now()}`);
+  mkdirSync3(tempDir, { recursive: true });
   try {
     console.log("Cloning fork...");
     const cloneResult = gh(["repo", "clone", `${ghUser}/${repoName}`, tempDir, "--", "--depth=1"]);
@@ -7460,10 +7373,10 @@ async function createPullRequest(cwd, ghUser, filesToPush, title, body) {
     }
     console.log("Copying files...");
     for (const file of filesToPush) {
-      const src = join10(cwd, file.path);
-      const dest = join10(tempDir, file.path);
-      mkdirSync4(dirname10(dest), { recursive: true });
-      copyFileSync4(src, dest);
+      const src = join9(cwd, file.path);
+      const dest = join9(tempDir, file.path);
+      mkdirSync3(dirname9(dest), { recursive: true });
+      copyFileSync3(src, dest);
     }
     const addResult = git(["add", "."], tempDir);
     if (!addResult.success) {
@@ -7504,7 +7417,7 @@ async function createPullRequest(cwd, ghUser, filesToPush, title, body) {
     return 0;
   } finally {
     try {
-      rmSync2(tempDir, { recursive: true, force: true });
+      rmSync(tempDir, { recursive: true, force: true });
     } catch {
     }
   }
@@ -7585,15 +7498,10 @@ async function main() {
         type: "boolean",
         describe: "Skip confirmation prompts",
         default: false
-      }).option("full-replace", {
-        alias: "f",
-        type: "boolean",
-        describe: "Replace entire .allhands directory (backup created)",
-        default: false
       });
     },
     async (argv2) => {
-      const code = await cmdInit(argv2.target, argv2.yes, argv2.fullReplace);
+      const code = await cmdInit(argv2.target, argv2.yes);
       process.exit(code);
     }
   ).command(
@@ -7605,15 +7513,10 @@ async function main() {
         type: "boolean",
         describe: "Skip confirmation prompts",
         default: false
-      }).option("full-replace", {
-        alias: "f",
-        type: "boolean",
-        describe: "Replace entire .allhands directory (backup created)",
-        default: false
       });
     },
     async (argv2) => {
-      const code = await cmdUpdate(argv2.yes, argv2.fullReplace);
+      const code = await cmdUpdate(argv2.yes);
       process.exit(code);
     }
   ).command(

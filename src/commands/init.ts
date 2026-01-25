@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { basename, dirname, join, resolve } from 'path';
 import { isGitRepo } from '../lib/git.js';
@@ -7,21 +7,23 @@ import { getAllhandsRoot } from '../lib/paths.js';
 import { ConflictResolution, askConflictResolution, confirm, getNextBackupPath } from '../lib/ui.js';
 import { SYNC_CONFIG_FILENAME, SYNC_CONFIG_TEMPLATE } from '../lib/constants.js';
 import { restoreDotfiles } from '../lib/dotfiles.js';
-import { fullReplace } from '../lib/full-replace.js';
+import { syncMarkerSection, ensureLineInFile } from '../lib/marker-sync.js';
+
+const CLAUDE_MD_REFERENCE = '@.allhands/flows/CORE.md';
 
 const AH_SHIM_SCRIPT = `#!/bin/bash
-# AllHands CLI shim - finds and executes project-local .allhands/ah
+# AllHands CLI shim - finds and executes project-local .allhands/harness/ah
 # Installed by: npx all-hands init
 
 dir="$PWD"
 while [ "$dir" != "/" ]; do
-  if [ -x "$dir/.allhands/ah" ]; then
-    exec "$dir/.allhands/ah" "$@"
+  if [ -x "$dir/.allhands/harness/ah" ]; then
+    exec "$dir/.allhands/harness/ah" "$@"
   fi
   dir="$(dirname "$dir")"
 done
 
-echo "error: not in an all-hands project (no .allhands/ah found)" >&2
+echo "error: not in an all-hands project (no .allhands/harness/ah found)" >&2
 echo "hint: run 'npx all-hands init .' to initialize this project" >&2
 exit 1
 `;
@@ -39,7 +41,7 @@ function setupAhShim(): { installed: boolean; path: string | null; inPath: boole
   // Check if shim already exists and is current
   if (existsSync(shimPath)) {
     const existing = readFileSync(shimPath, 'utf-8');
-    if (existing.includes('.allhands/ah')) {
+    if (existing.includes('.allhands/harness/ah')) {
       return { installed: false, path: shimPath, inPath };
     }
   }
@@ -53,15 +55,12 @@ function setupAhShim(): { installed: boolean; path: string | null; inPath: boole
   return { installed: true, path: shimPath, inPath };
 }
 
-export async function cmdInit(target: string, autoYes: boolean = false, useFullReplace: boolean = false): Promise<number> {
+export async function cmdInit(target: string, autoYes: boolean = false): Promise<number> {
   const resolvedTarget = resolve(process.cwd(), target);
   const allhandsRoot = getAllhandsRoot();
 
   console.log(`Initializing allhands in: ${resolvedTarget}`);
   console.log(`Source: ${allhandsRoot}`);
-  if (useFullReplace) {
-    console.log('Mode: full-replace (wholesale directory replacement)');
-  }
 
   if (!existsSync(resolvedTarget)) {
     console.error(`Error: Target directory does not exist: ${resolvedTarget}`);
@@ -78,129 +77,104 @@ export async function cmdInit(target: string, autoYes: boolean = false, useFullR
     }
   }
 
-  // CLAUDE.md handling - migrate existing CLAUDE.md → CLAUDE.project.md
-  const targetClaudeMd = join(resolvedTarget, 'CLAUDE.md');
-  const targetProjectMd = join(resolvedTarget, 'CLAUDE.project.md');
-
-  let claudeMdMigrated = false;
-
-  if (existsSync(targetClaudeMd) && !existsSync(targetProjectMd)) {
-    console.log('\nMigrating CLAUDE.md → CLAUDE.project.md...');
-    renameSync(targetClaudeMd, targetProjectMd);
-    claudeMdMigrated = true;
-    console.log('  Done - your instructions preserved in CLAUDE.project.md');
-  }
+  // Load manifest for file-by-file sync
+  const manifest = new Manifest(allhandsRoot);
+  const distributable = manifest.getDistributableFiles();
 
   let copied = 0;
   let skipped = 0;
-  let backupPath: string | null = null;
   let resolution: ConflictResolution = 'overwrite';
   const conflicts: string[] = [];
 
-  if (useFullReplace) {
-    // ==================== FULL REPLACE MODE ====================
-    // Wholesale replacement of .allhands directory with backup
-    console.log('\nPerforming full replacement...');
+  // Detect conflicts (files that exist and differ)
+  for (const relPath of distributable) {
+    const sourceFile = join(allhandsRoot, relPath);
+    const targetFile = join(resolvedTarget, relPath);
 
-    const result = await fullReplace({
-      sourceRoot: allhandsRoot,
-      targetRoot: resolvedTarget,
-      verbose: true,
-    });
-
-    backupPath = result.backupPath;
-    if (result.backupPath) {
-      console.log(`  Backup created: ${basename(result.backupPath)}`);
+    if (existsSync(targetFile) && existsSync(sourceFile)) {
+      if (filesAreDifferent(sourceFile, targetFile)) {
+        conflicts.push(relPath);
+      }
     }
-    if (result.filesRestored.length > 0) {
-      console.log(`  Restored from backup: ${result.filesRestored.join(', ')}`);
-    }
-    if (result.claudeMdUpdated) {
-      console.log('  CLAUDE.md updated with CORE.md reference');
-    }
-    if (result.envExampleCopied) {
-      console.log('  .env example files copied');
-    }
+  }
 
-    console.log('\nFull replacement complete!');
-  } else {
-    // ==================== MANIFEST-BASED MODE ====================
-    // Per-file sync using manifest filtering
-    const manifest = new Manifest(allhandsRoot);
-    const distributable = manifest.getDistributableFiles();
-
-    // Project-specific files: never overwrite if they exist
-    const projectSpecificFiles = new Set(['CLAUDE.project.md', '.claude/settings.local.json']);
-
-    // Detect conflicts (files that exist and differ)
-    for (const relPath of distributable) {
-      if (relPath === 'CLAUDE.md' && claudeMdMigrated) continue;
-      if (projectSpecificFiles.has(relPath) && existsSync(join(resolvedTarget, relPath))) continue;
-
-      const sourceFile = join(allhandsRoot, relPath);
-      const targetFile = join(resolvedTarget, relPath);
-
-      if (existsSync(targetFile) && existsSync(sourceFile)) {
-        if (filesAreDifferent(sourceFile, targetFile)) {
-          conflicts.push(relPath);
-        }
+  // Handle conflicts
+  if (conflicts.length > 0) {
+    if (autoYes) {
+      resolution = 'overwrite';
+      console.log(`\nAuto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
+    } else {
+      resolution = await askConflictResolution(conflicts);
+      if (resolution === 'cancel') {
+        console.log('Aborted. No changes made.');
+        return 1;
       }
     }
 
-    // Handle conflicts
-    if (conflicts.length > 0) {
-      if (autoYes) {
-        resolution = 'overwrite';
-        console.log(`\nAuto-overwriting ${conflicts.length} conflicting files (--yes mode)`);
-      } else {
-        resolution = await askConflictResolution(conflicts);
-        if (resolution === 'cancel') {
-          console.log('Aborted. No changes made.');
-          return 1;
-        }
-      }
-
-      if (resolution === 'backup') {
-        console.log('\nCreating backups...');
-        for (const relPath of conflicts) {
-          const targetFile = join(resolvedTarget, relPath);
-          const bkPath = getNextBackupPath(targetFile);
-          copyFileSync(targetFile, bkPath);
-          console.log(`  ${relPath} → ${basename(bkPath)}`);
-        }
+    if (resolution === 'backup') {
+      console.log('\nCreating backups...');
+      for (const relPath of conflicts) {
+        const targetFile = join(resolvedTarget, relPath);
+        const bkPath = getNextBackupPath(targetFile);
+        copyFileSync(targetFile, bkPath);
+        console.log(`  ${relPath} → ${basename(bkPath)}`);
       }
     }
+  }
 
-    // Copy files
-    console.log('\nCopying allhands files...');
-    console.log(`Found ${distributable.size} files to distribute`);
+  // Copy files
+  console.log('\nCopying allhands files...');
+  console.log(`Found ${distributable.size} files to distribute`);
 
-    for (const relPath of [...distributable].sort()) {
-      const sourceFile = join(allhandsRoot, relPath);
-      const targetFile = join(resolvedTarget, relPath);
+  for (const relPath of [...distributable].sort()) {
+    const sourceFile = join(allhandsRoot, relPath);
+    const targetFile = join(resolvedTarget, relPath);
 
-      if (projectSpecificFiles.has(relPath) && existsSync(targetFile)) {
+    if (!existsSync(sourceFile)) continue;
+
+    mkdirSync(dirname(targetFile), { recursive: true });
+
+    if (existsSync(targetFile)) {
+      if (!filesAreDifferent(sourceFile, targetFile)) {
         skipped++;
         continue;
       }
-
-      if (!existsSync(sourceFile)) continue;
-
-      mkdirSync(dirname(targetFile), { recursive: true });
-
-      if (existsSync(targetFile)) {
-        if (!filesAreDifferent(sourceFile, targetFile)) {
-          skipped++;
-          continue;
-        }
-      }
-
-      copyFileSync(sourceFile, targetFile);
-      copied++;
     }
 
-    // Restore dotfiles (gitignore → .gitignore, etc.)
-    restoreDotfiles(resolvedTarget);
+    copyFileSync(sourceFile, targetFile);
+    copied++;
+  }
+
+  // Restore dotfiles (gitignore → .gitignore, etc.)
+  restoreDotfiles(resolvedTarget);
+
+  // Ensure CLAUDE.md has the reference line
+  console.log('\nEnsuring CLAUDE.md has CORE.md reference...');
+  const claudeMdPath = join(resolvedTarget, 'CLAUDE.md');
+  const claudeMdUpdated = ensureLineInFile(claudeMdPath, CLAUDE_MD_REFERENCE, true);
+
+  // Sync .gitignore (lines after # ALLHANDS_SYNC)
+  console.log('Syncing .gitignore...');
+  const sourceGitignore = join(allhandsRoot, '.gitignore');
+  const targetGitignore = join(resolvedTarget, '.gitignore');
+  syncMarkerSection(sourceGitignore, targetGitignore, true);
+
+  // Sync .tldrignore (lines after # ALLHANDS_SYNC)
+  console.log('Syncing .tldrignore...');
+  const sourceTldrignore = join(allhandsRoot, '.tldrignore');
+  const targetTldrignore = join(resolvedTarget, '.tldrignore');
+  syncMarkerSection(sourceTldrignore, targetTldrignore, true);
+
+  // Copy .env.ai.example
+  const envExamples = ['.env.example', '.env.ai.example'];
+  for (const envExample of envExamples) {
+    const sourceEnv = join(allhandsRoot, envExample);
+    const targetEnv = join(resolvedTarget, envExample);
+
+    if (existsSync(sourceEnv)) {
+      console.log(`Copying ${envExample}`);
+      copyFileSync(sourceEnv, targetEnv);
+    }
   }
 
   // Setup ah CLI shim in ~/.local/bin
@@ -212,7 +186,7 @@ export async function cmdInit(target: string, autoYes: boolean = false, useFullR
     console.log(`  Shim already installed at ${shimResult.path}`);
   }
   if (!shimResult.inPath) {
-    console.log('  ⚠️  ~/.local/bin is not in your PATH');
+    console.log('  Warning: ~/.local/bin is not in your PATH');
     console.log('  Add this to your shell config (.zshrc/.bashrc):');
     console.log('    export PATH="$HOME/.local/bin:$PATH"');
   }
@@ -234,31 +208,20 @@ export async function cmdInit(target: string, autoYes: boolean = false, useFullR
   }
 
   console.log(`\n${'='.repeat(60)}`);
-  if (useFullReplace) {
-    console.log('Done: full replacement complete');
-    if (backupPath) {
-      console.log(`Backup: ${basename(backupPath)}`);
-    }
-  } else {
-    console.log(`Done: ${copied} copied, ${skipped} unchanged`);
-    if (resolution === 'backup' && conflicts.length > 0) {
-      console.log(`Created ${conflicts.length} backup file(s)`);
-    }
+  console.log(`Done: ${copied} copied, ${skipped} unchanged`);
+  if (resolution === 'backup' && conflicts.length > 0) {
+    console.log(`Created ${conflicts.length} backup file(s)`);
   }
-  if (claudeMdMigrated) {
-    console.log('Migrated CLAUDE.md → CLAUDE.project.md');
+  if (claudeMdUpdated) {
+    console.log('CLAUDE.md updated with CORE.md reference');
   }
   if (syncConfigCreated) {
     console.log(`Created ${SYNC_CONFIG_FILENAME} for push customization`);
   }
-  console.log('\nProject-specific files preserved (never overwritten):');
-  console.log('  - CLAUDE.project.md');
-  console.log('  - .claude/settings.local.json');
   console.log(`${'='.repeat(60)}`);
 
   console.log('\nNext steps:');
-  console.log('  1. Review CLAUDE.project.md for your project-specific instructions');
-  console.log('  2. Commit the changes');
+  console.log('  1. Commit the changes');
 
   return 0;
 }

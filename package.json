@@ -17,7 +17,7 @@
     "agents",
     "agentic",
     "harness",
-    "cli"
+    "sync-cli"
   ],
   "author": "kalem-edlin",
   "license": "MIT",

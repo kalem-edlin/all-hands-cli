@@ -1,6 +1,7 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
-import { basename, dirname, join } from 'path';
+import { copyFileSync, cpSync, existsSync, renameSync, rmSync } from 'fs';
+import { join } from 'path';
 import { restoreDotfiles } from './dotfiles.js';
+import { syncMarkerSection, ensureLineInFile } from './marker-sync.js';
 
 const CLAUDE_MD_REFERENCE = '@.allhands/flows/CORE.md';
 
@@ -15,6 +16,8 @@ interface FullReplaceResult {
   filesRestored: string[];
   claudeMdUpdated: boolean;
   envExampleCopied: boolean;
+  gitignoreSynced: boolean;
+  tldrignoreSynced: boolean;
 }
 
 /**
@@ -29,7 +32,6 @@ const PRESERVE_IN_ALLHANDS = [
  * Files at project root to preserve (never overwritten)
  */
 const PRESERVE_AT_ROOT = [
-  'CLAUDE.project.md',
   '.claude/settings.local.json',
   '.env',
   '.env.ai',
@@ -66,6 +68,8 @@ export async function fullReplace(options: FullReplaceOptions): Promise<FullRepl
     filesRestored: [],
     claudeMdUpdated: false,
     envExampleCopied: false,
+    gitignoreSynced: false,
+    tldrignoreSynced: false,
   };
 
   // 1. Backup existing .allhands if it exists
@@ -102,9 +106,10 @@ export async function fullReplace(options: FullReplaceOptions): Promise<FullRepl
     }
   }
 
-  // 4. Handle CLAUDE.md - ensure it has the reference
+  // 4. Handle CLAUDE.md - ensure it has the reference line
   const claudeMdPath = join(targetRoot, 'CLAUDE.md');
-  result.claudeMdUpdated = ensureClaudeMdReference(claudeMdPath, verbose);
+  if (verbose) console.log('Ensuring CLAUDE.md has CORE.md reference...');
+  result.claudeMdUpdated = ensureLineInFile(claudeMdPath, CLAUDE_MD_REFERENCE, verbose);
 
   // 5. Copy .env.example files (but don't overwrite actual .env files)
   const envExamples = ['.env.example', '.env.ai.example'];
@@ -123,41 +128,19 @@ export async function fullReplace(options: FullReplaceOptions): Promise<FullRepl
   if (verbose) console.log('Restoring dotfiles...');
   restoreDotfiles(targetAllhands);
 
+  // 7. Sync .gitignore (lines after # ALLHANDS_SYNC)
+  const sourceGitignore = join(sourceRoot, '.gitignore');
+  const targetGitignore = join(targetRoot, '.gitignore');
+  if (verbose) console.log('Syncing .gitignore...');
+  result.gitignoreSynced = syncMarkerSection(sourceGitignore, targetGitignore, verbose);
+
+  // 8. Sync .tldrignore (lines after # ALLHANDS_SYNC)
+  const sourceTldrignore = join(sourceRoot, '.tldrignore');
+  const targetTldrignore = join(targetRoot, '.tldrignore');
+  if (verbose) console.log('Syncing .tldrignore...');
+  result.tldrignoreSynced = syncMarkerSection(sourceTldrignore, targetTldrignore, verbose);
+
   return result;
-}
-
-/**
- * Ensure CLAUDE.md exists and contains the reference to CORE.md
- */
-function ensureClaudeMdReference(claudeMdPath: string, verbose: boolean): boolean {
-  let content = '';
-  let existed = false;
-
-  if (existsSync(claudeMdPath)) {
-    content = readFileSync(claudeMdPath, 'utf-8');
-    existed = true;
-
-    // Already has the reference?
-    if (content.includes(CLAUDE_MD_REFERENCE)) {
-      if (verbose) console.log('CLAUDE.md already has CORE.md reference');
-      return false;
-    }
-  }
-
-  // Add the reference
-  const reference = `${CLAUDE_MD_REFERENCE}\n`;
-
-  if (existed && content.trim()) {
-    // Prepend to existing content
-    content = reference + '\n' + content;
-  } else {
-    content = reference;
-  }
-
-  writeFileSync(claudeMdPath, content);
-  if (verbose) console.log(existed ? 'Updated CLAUDE.md with CORE.md reference' : 'Created CLAUDE.md with CORE.md reference');
-
-  return true;
 }
 
 /**

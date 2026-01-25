@@ -1,19 +1,15 @@
 .env
-.claude/plans/**/*
 .trees/
 node_modules/
 .DS_Store
 .trees/**
 .swp
+docs/
 
-# Envoy observability files
+# ALLHANDS_SYNC
+# Lines below are synced to target repos
 .planning/
 .env.ai
 .tldr/
 .reposearch/
-
-# External repo research
-.reposearch/
-
-docs/
-test-repo/
+.allhands-*.backup/

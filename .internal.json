@@ -8,8 +8,10 @@
     ".internal.json",
     ".github/**",
     ".gitignore",
+    ".tldrignore",
     "docs/**",
     "README.md",
+    "CLAUDE.md",
     "package.json",
     "package-lock.json",
     ".env.ai.example",
@@ -21,5 +23,5 @@
     ".claude/envoy/**",
     ".claude/backup-skills/**"
   ],
-  "$distribution_comment": "What DOES get distributed: .allhands/, .claude/ (hooks, settings, commands, skills, agents), CLAUDE.md"
+  "$distribution_comment": "What DOES get distributed: .allhands/ (flows, harness, agents, skills, schemas, validation)"
 }
