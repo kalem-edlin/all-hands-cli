@@ -321,6 +321,26 @@ Where `hash` is the git commit hash (7 chars) of the file when the reference was
 
 ## Schema Architecture
 
+### Design Philosophy: Schema-Driven Discovery
+
+The ideal pattern for file discovery in the harness:
+
+```
+Schema (YAML)          → Defines frontmatter structure
+Generic list command   → Reads all matching files, extracts frontmatter
+Agent                  → Reasons about frontmatter, decides which files to read fully
+```
+
+**Benefits:**
+- Schema is single source of truth
+- No custom code per file type
+- Adding a field = update schema, list command automatically exposes it
+- Agents handle the reasoning (they're good at it)
+
+**Experimental:** Some file types (documentation, solutions) currently have custom search commands that tightly couple to programmatic harness logic. This tests the maintenance burden of custom approaches vs. the schema-driven pattern.
+
+### Schema Types
+
 Two types of schemas serve different purposes:
 
 ### Agent-Facing Schemas (`schemas/*.yaml`)
