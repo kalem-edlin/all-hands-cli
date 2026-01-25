@@ -118,16 +118,23 @@ export function register(program: Command): void {
   oracle
     .command('pr-build')
     .description('Create PR with generated description')
-    .option('--branch <branch>', 'Branch to create PR from')
+    .option('--spec <spec>', 'Spec to create PR for (defaults to active)')
     .option('--dry-run', 'Generate description without creating PR')
     .option('--json', 'Output as JSON')
     .action(async (options: {
-      branch?: string;
+      spec?: string;
       dryRun?: boolean;
       json?: boolean;
     }) => {
       try {
-        const result = await buildPR(options.branch, undefined, options.dryRun);
+        // Import getActiveSpec here to avoid circular dependency
+        const { getActiveSpec } = await import('../lib/planning.js');
+        const spec = options.spec || getActiveSpec();
+        if (!spec) {
+          console.error('Error: No active spec. Use "ah planning activate <spec>" to set one.');
+          return;
+        }
+        const result = await buildPR(spec, undefined, options.dryRun);
 
         if (options.json) {
           console.log(JSON.stringify({

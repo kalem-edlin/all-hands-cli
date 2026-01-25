@@ -10,7 +10,7 @@
  * [6] Create PR / Greptile Reviewing / Address PR Review
  * [7] Compound
  * [8] Mark Completed
- * [9] Switch Milestone
+ * [9] Switch Spec
  * ─ Toggles ─
  * [ ] Loop
  * [ ] Emergent
@@ -37,7 +37,7 @@ export interface ToggleState {
   loopEnabled: boolean;
   emergentEnabled: boolean;
   prActionState: PRActionState;
-  hasMilestone: boolean;
+  hasSpec: boolean;
   hasCompletedPrompts: boolean;
   compoundRun: boolean;
 }
@@ -135,17 +135,17 @@ function buildActionItems(toggleState: ToggleState): ActionItem[] {
   const prLabel = getPRActionLabel(toggleState.prActionState);
   const prDisabled = toggleState.prActionState === 'greptile-reviewing';
 
-  const { hasMilestone, hasCompletedPrompts, compoundRun } = toggleState;
+  const { hasSpec, hasCompletedPrompts, compoundRun } = toggleState;
 
-  // Dynamic label for switch/choose milestone
-  const milestoneLabel = hasMilestone ? 'Switch Milestone' : 'Choose Milestone';
+  // Dynamic label for switch/choose spec
+  const specLabel = hasSpec ? 'Switch Spec' : 'Choose Spec';
 
   return [
     // Agent spawners - coordinator and ideation always available
     { id: 'coordinator', label: 'Coordinator', key: '1', type: 'action' },
     { id: 'ideation', label: 'Ideation', key: '2', type: 'action' },
-    // Planner requires milestone
-    { id: 'planner', label: 'Planner', key: '3', type: 'action', disabled: !hasMilestone },
+    // Planner requires spec
+    { id: 'planner', label: 'Planner', key: '3', type: 'action', disabled: !hasSpec },
     // These require at least 1 completed prompt
     { id: 'e2e-test-planner', label: 'Build E2E Test', key: '4', type: 'action', hidden: !hasCompletedPrompts },
     { id: 'review-jury', label: 'Review Jury', key: '5', type: 'action', hidden: !hasCompletedPrompts },
@@ -153,8 +153,8 @@ function buildActionItems(toggleState: ToggleState): ActionItem[] {
     { id: 'compound', label: 'Compound', key: '7', type: 'action', hidden: !hasCompletedPrompts },
     // Mark completed - only visible if compound has been run
     { id: 'mark-completed', label: 'Mark Completed', key: '8', type: 'action', hidden: !compoundRun },
-    // Switch/Choose milestone - always visible, label changes
-    { id: 'switch-milestone', label: milestoneLabel, key: '9', type: 'action' },
+    // Switch/Choose spec - always visible, label changes
+    { id: 'switch-spec', label: specLabel, key: '9', type: 'action' },
     // Custom Flow - always visible, allows running any flow with custom message
     { id: 'custom-flow', label: 'Custom Flow', key: '0', type: 'action' },
     // Spacing before toggles

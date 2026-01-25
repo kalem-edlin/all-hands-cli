@@ -7,7 +7,7 @@
  * ```typescript
  * import {
  *   createFixture,
- *   createMilestoneFixture,
+ *   createSpecFixture,
  *   runInFixture,
  *   runHook,
  *   assertSuccess,
@@ -18,7 +18,7 @@
  *   let fixture: TestFixture;
  *
  *   beforeAll(() => {
- *     fixture = createMilestoneFixture('test-milestone');
+ *     fixture = createSpecFixture('test-spec');
  *   });
  *
  *   afterAll(() => {
@@ -36,7 +36,6 @@
 // Fixture creation and management
 export {
   createFixture,
-  createMilestoneFixture,
   createSpecFixture,
   getPooledFixture,
   cleanupPool,

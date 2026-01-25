@@ -86,10 +86,10 @@ skills: []
 
 /** Alignment doc template matching .allhands/schemas/alignment.yaml */
 export const ALIGNMENT_TEMPLATE = (
-  milestoneName: string = 'test-milestone',
+  specName: string = 'test-spec',
   specPath: string = 'specs/test.spec.md'
 ) => `---
-milestone_name: ${milestoneName}
+spec_name: ${specName}
 spec_path: ${specPath}
 planning_session: 1
 ---
@@ -242,7 +242,7 @@ export function createFixture(options: FixtureOptions = {}): TestFixture {
 
     writeFileSync(
       join(allhands, 'schemas', 'alignment.yaml'),
-      `# Alignment schema\nrequired:\n  - milestone\nproperties:\n  milestone:\n    type: string\n`
+      `# Alignment schema\nrequired:\n  - spec_name\nproperties:\n  spec_name:\n    type: string\n`
     );
 
     writeFileSync(
@@ -296,19 +296,19 @@ export function createFixture(options: FixtureOptions = {}): TestFixture {
 }
 
 /**
- * Create a fixture with a complete milestone structure.
+ * Create a fixture with a complete spec structure.
  */
-export function createMilestoneFixture(
-  milestoneName: string = 'test-milestone',
+export function createSpecFixture(
+  specName: string = 'test-spec',
   promptCount: number = 3
 ): TestFixture {
   const files: Record<string, string> = {
     // Spec file
-    [`specs/${milestoneName}.spec.md`]: SPEC_TEMPLATE(milestoneName, 'test-domain'),
+    [`specs/${specName}.spec.md`]: SPEC_TEMPLATE(specName, 'test-domain'),
     // Alignment doc
-    [`.planning/${milestoneName}/alignment.md`]: ALIGNMENT_TEMPLATE(
-      milestoneName,
-      `specs/${milestoneName}.spec.md`
+    [`.planning/${specName}/alignment.md`]: ALIGNMENT_TEMPLATE(
+      specName,
+      `specs/${specName}.spec.md`
     ),
     // Sample source files
     ['src/sample.py']: PYTHON_SAMPLE,
@@ -318,7 +318,7 @@ export function createMilestoneFixture(
   // Add prompts
   for (let i = 1; i <= promptCount; i++) {
     const num = i.toString().padStart(2, '0');
-    files[`.planning/${milestoneName}/prompts/${num}.md`] = PROMPT_TEMPLATE(
+    files[`.planning/${specName}/prompts/${num}.md`] = PROMPT_TEMPLATE(
       i === 1 ? 'in_progress' : 'pending',
       `Task ${i}: Implement feature ${i}`,
       i
@@ -326,10 +326,10 @@ export function createMilestoneFixture(
   }
 
   return createFixture({
-    name: `ah-milestone-${milestoneName}`,
+    name: `ah-spec-${specName}`,
     files,
     env: {
-      MILESTONE_NAME: milestoneName,
+      SPEC_NAME: specName,
     },
   });
 }

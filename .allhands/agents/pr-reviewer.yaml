@@ -3,9 +3,9 @@ flow: PR_REVIEWING.md
 prompt_scoped: false
 tui_action: address-pr
 tui_label: Address PR
-tui_requires_milestone: true
+tui_requires_spec: true
 non_coding: false
 message_template: |
-  Reviewing PR feedback for: ${MILESTONE_NAME}
+  Reviewing PR feedback for: ${SPEC_NAME}
 template_vars:
-  - MILESTONE_NAME
+  - SPEC_NAME

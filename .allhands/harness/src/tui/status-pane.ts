@@ -3,7 +3,7 @@
  *
  * Layout:
  * ┌─ Status ─────────────────────┐
- * │ [View Milestone] [Alignment] │  <- View buttons
+ * │ [View Spec] [Alignment]      │  <- View buttons
  * │ [E2E Test Plan]              │
  * │ ─────────────────────────────│
  * │  ┌────────┐  ┌────────┐      │  <- Agent grid
@@ -39,7 +39,7 @@ export interface StatusPaneOptions {
 }
 
 export interface StatusPaneData {
-  milestone?: string;
+  spec?: string;
   branch?: string;
   agents: AgentInfo[];
   logEntries?: string[];
@@ -54,7 +54,7 @@ export function createStatusPane(
   screen: blessed.Widgets.Screen,
   agents: AgentInfo[],
   selectedIndex?: number,
-  milestone?: string,
+  spec?: string,
   branch?: string,
   logEntries: string[] = [],
   fileStates?: FileStates,
@@ -80,19 +80,19 @@ export function createStatusPane(
 
   let currentY = 0;
 
-  // View buttons row (only show if milestone is selected)
-  if (milestone) {
+  // View buttons row (only show if spec is selected)
+  if (spec) {
     let buttonX = 1;
 
-    // View Milestone button (if spec exists)
+    // View Spec button (if spec exists)
     if (fileStates?.spec && options?.onViewSpec) {
       const specButton = blessed.button({
         parent: pane,
         top: currentY,
         left: buttonX,
-        width: truncate(`[View ${milestone}]`, 18).length,
+        width: truncate(`[View ${spec}]`, 18).length,
         height: 1,
-        content: `{cyan-fg}[View ${truncate(milestone, 12)}]{/cyan-fg}`,
+        content: `{cyan-fg}[View ${truncate(spec, 12)}]{/cyan-fg}`,
         tags: true,
         mouse: true,
         style: {
@@ -152,12 +152,12 @@ export function createStatusPane(
       currentY += 1;
     }
   } else {
-    // No milestone selected
+    // No spec selected
     blessed.text({
       parent: pane,
       top: currentY,
       left: 1,
-      content: '{gray-fg}No milestone selected{/gray-fg}',
+      content: '{gray-fg}No spec selected{/gray-fg}',
       tags: true,
     });
     currentY += 1;

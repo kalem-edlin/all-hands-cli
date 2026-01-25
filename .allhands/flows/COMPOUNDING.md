@@ -1,20 +1,20 @@
 <goal>
-Extract learnings from completed milestones to improve the harness, skills, and validation tooling. Per **Knowledge Compounding**, everything feeds forward - decisions, pivots, limitations, and realizations become persistent improvements.
+Extract learnings from completed specs to improve the harness, skills, and validation tooling. Per **Knowledge Compounding**, everything feeds forward - decisions, pivots, limitations, and realizations become persistent improvements.
 </goal>
 
 <constraints>
 - MUST ask the engineer before modifying harness files
-- MUST write compounding summary to `.planning/<milestone>/compounding_summary.md`
+- MUST write compounding summary to `.planning/<spec>/compounding_summary.md`
 - MUST write non-trivial solutions to `docs/solutions/<category>/`
 - NEVER modify harness without first principle justification
 </constraints>
 
 ## Context Gathering
 
-Read these milestone artifacts to understand what happened:
-- Read the alignment doc at `.planning/<milestone>/alignment.md`
-- Read the spec doc at `.planning/<milestone>/spec.md`
-- Read all prompt files in `.planning/<milestone>/prompts/`
+Read these spec artifacts to understand what happened:
+- Read the alignment doc at `.planning/<spec>/alignment.md`
+- Read the spec doc at `.planning/<spec>/spec.md`
+- Read all prompt files in `.planning/<spec>/prompts/`
 - Run `git log --oneline` to review commit history for this branch
 
 ## Signal Analysis
@@ -81,7 +81,7 @@ If similar solutions exist in `docs/solutions/`:
 
 ## Spec Finalization
 
-Update the milestone spec as a historical record:
+Update the spec as a historical record:
 - Amend expectations based on implementation reality
 - Document decisions and their rationale
 - Capture what changed and why
@@ -114,7 +114,7 @@ Interview engineer:
 
 ## Completion
 
-Write `.planning/<milestone>/compounding_summary.md`:
+Write `.planning/<spec>/compounding_summary.md`:
 ```markdown
 # Compounding Summary
 

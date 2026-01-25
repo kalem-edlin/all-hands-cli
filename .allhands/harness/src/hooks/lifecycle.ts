@@ -14,6 +14,7 @@ import { parseTranscript, buildCompactionMessage } from './transcript-parser.js'
 import { sendNotification } from '../lib/notification.js';
 import { killWindow, SESSION_NAME, windowExists } from '../lib/tmux.js'; // killWindow used in compact
 import { getPromptByNumber } from '../lib/prompts.js';
+import { getActiveSpec } from '../lib/planning.js';
 import { ask } from '../lib/llm.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -158,9 +159,20 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
     return;
   }
 
+  // Get the active spec for prompt lookup
+  const spec = process.env.SPEC_NAME || getActiveSpec();
+  if (!spec) {
+    // No spec, just kill the window
+    if (agentId && windowExists(SESSION_NAME, agentId)) {
+      killWindow(SESSION_NAME, agentId);
+    }
+    outputPreCompact();
+    return;
+  }
+
   // Get the prompt file
   const promptNum = parseInt(promptNumber, 10);
-  const prompt = getPromptByNumber(promptNum);
+  const prompt = getPromptByNumber(promptNum, spec);
 
   if (!prompt) {
     // Prompt file not found, just kill

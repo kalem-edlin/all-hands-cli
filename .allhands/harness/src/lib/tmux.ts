@@ -19,7 +19,7 @@
  * - AGENT_ID: Unique agent identifier (= window name, used for MCP daemon isolation)
  * - AGENT_TYPE: executor, coordinator, planner, judge, ideation, documentor, pr-reviewer
  * - PROMPT_NUMBER: Current prompt number (when applicable)
- * - MILESTONE_NAME: Current milestone name
+ * - SPEC_NAME: Current spec name
  * - BRANCH: Current git branch
  */
 
@@ -45,7 +45,7 @@ export interface AgentEnv {
   AGENT_ID: string;
   AGENT_TYPE: AgentType;
   PROMPT_NUMBER?: string;
-  MILESTONE_NAME?: string;
+  SPEC_NAME?: string;
   BRANCH: string;
 }
 
@@ -55,7 +55,7 @@ export interface SpawnConfig {
   flowPath: string;
   preamble?: string;
   promptNumber?: number;
-  milestoneName?: string;
+  specName?: string;
   nonCoding?: boolean;
   /** If true, switch focus to the new window after spawning (default: true for TUI actions) */
   focusWindow?: boolean;
@@ -463,8 +463,8 @@ export function buildAgentEnv(config: SpawnConfig, branch: string, windowName: s
     env.PROMPT_NUMBER = String(config.promptNumber).padStart(2, '0');
   }
 
-  if (config.milestoneName) {
-    env.MILESTONE_NAME = config.milestoneName;
+  if (config.specName) {
+    env.SPEC_NAME = config.specName;
   }
 
   return env;
@@ -635,7 +635,7 @@ export function spawnAgentFromProfile(
     flowPath: invocation.flowPath,
     preamble: invocation.preamble,
     promptNumber: config.promptNumber,
-    milestoneName: config.context.MILESTONE_NAME,
+    specName: config.context.SPEC_NAME,
     nonCoding: profile.nonCoding,
     focusWindow: config.focusWindow,
     promptScoped: profile.promptScoped,
@@ -656,8 +656,8 @@ export interface CustomFlowConfig {
   windowName: string;
   /** If true, switch focus to the new window (default: true) */
   focusWindow?: boolean;
-  /** Current milestone name (optional, for context) */
-  milestoneName?: string;
+  /** Current spec name (optional, for context) */
+  specName?: string;
 }
 
 /**
@@ -700,8 +700,8 @@ export function spawnCustomFlow(
     BASE_BRANCH: getBaseBranch(),
   };
 
-  if (config.milestoneName) {
-    env.MILESTONE_NAME = config.milestoneName;
+  if (config.specName) {
+    env.SPEC_NAME = config.specName;
   }
 
   // Read the flow file content
@@ -770,15 +770,23 @@ export function spawnCustomFlow(
  *
  * This constructs the context object needed for agent spawning
  * by reading the current planning state.
+ *
+ * @param spec - The spec name (used for planning paths)
+ * @param specName - Optional display name for spec
+ * @param promptNumber - Optional prompt number
+ * @param promptPath - Optional prompt file path
+ * @param cwd - Working directory
  */
 export function buildTemplateContext(
-  branch: string,
-  milestoneName?: string,
+  spec: string,
+  specName?: string,
   promptNumber?: number,
   promptPath?: string,
   cwd?: string
 ): TemplateContext {
-  const paths = getPlanningPaths(branch, cwd);
+  // Use spec for planning paths (directory key)
+  const paths = getPlanningPaths(spec, cwd);
+  const branch = getCurrentBranch(cwd);
 
   const context: TemplateContext = {
     BRANCH: branch,
@@ -787,9 +795,8 @@ export function buildTemplateContext(
     ALIGNMENT_PATH: paths.alignment,
   };
 
-  if (milestoneName) {
-    context.MILESTONE_NAME = milestoneName;
-  }
+  // Set spec name (use the display name if provided, else the directory name)
+  context.SPEC_NAME = specName || spec;
 
   if (promptNumber !== undefined) {
     context.PROMPT_NUMBER = String(promptNumber).padStart(2, '0');

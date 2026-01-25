@@ -2,7 +2,7 @@
  * Modal - Overlay modal component for TUI
  *
  * Used for:
- * - Switch Milestone selection
+ * - Switch Spec selection
  * - Activity Log view
  * - Custom Flow selection
  *

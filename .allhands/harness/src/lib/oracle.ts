@@ -14,12 +14,11 @@
  * - buildPR() - Create PR via gh CLI with generated description
  */
 
-import { ask } from './llm.js';
 import { execSync } from 'child_process';
+import { ask } from './llm.js';
 import {
   readAlignment,
-  updatePRStatus,
-  getCurrentBranch,
+  updatePRStatus
 } from './planning.js';
 import { loadAllPrompts, type PromptFile } from './prompts.js';
 
@@ -74,7 +73,7 @@ export interface BuildPRResult {
  * Suggest a branch name based on a spec file
  *
  * INTERNAL ONLY - Not exposed via CLI to agents.
- * Used by TUI for switch-milestone functionality.
+ * Used by TUI for switch-spec functionality.
  *
  * Branch prefixes:
  * - feat/   - New features
@@ -88,7 +87,7 @@ export async function suggestBranchName(
   specContent: string,
   specFilename: string
 ): Promise<BranchSuggestion> {
-  const prompt = `You are a git branch naming assistant. Given a milestone spec, suggest an appropriate branch name.
+  const prompt = `You are a git branch naming assistant. Given a spec, suggest an appropriate branch name.
 
 ## Branch Prefix Rules:
 - feat/ - New features or functionality
@@ -226,7 +225,7 @@ function getGitDiffFromBase(cwd?: string, maxLines: number = 300): string {
 export async function generatePRDescription(
   prompts: Array<{ number: number; title: string; status: string }>,
   alignmentContent: string,
-  milestoneName: string,
+  specName: string,
   cwd?: string
 ): Promise<PRContent> {
   const promptSummary = prompts
@@ -235,9 +234,9 @@ export async function generatePRDescription(
 
   const gitDiff = getGitDiffFromBase(cwd);
 
-  const prompt = `Generate a pull request title and description for this milestone.
+  const prompt = `Generate a pull request title and description for this spec.
 
-## Milestone: ${milestoneName}
+## Milestone: ${specName}
 
 ## Prompts Completed:
 ${promptSummary}
@@ -290,8 +289,8 @@ ${gitDiff}
   } catch {
     // Fallback
     return {
-      title: `[${milestoneName}] Implementation complete`,
-      body: `## Summary\nImplementation of ${milestoneName} milestone.\n\n## Prompts\n${promptSummary}`,
+      title: `[${specName}] Implementation complete`,
+      body: `## Summary\nImplementation of ${specName} spec.\n\n## Prompts\n${promptSummary}`,
       reviewSteps: `## Review Steps\n\nReview all changed files in the diff.`,
     };
   }
@@ -447,29 +446,32 @@ ${gitDiff}
  *
  * INTERNAL ONLY - Called by pr-build command.
  * Uses generatePRDescription and gh CLI to create PR.
+ *
+ * @param spec - The spec name to build PR for
+ * @param cwd - Working directory
+ * @param dryRun - If true, don't actually create the PR
  */
 export async function buildPR(
-  branch?: string,
+  spec: string,
   cwd?: string,
   dryRun: boolean = false
 ): Promise<BuildPRResult> {
   const workingDir = cwd || process.cwd();
-  const currentBranch = branch || getCurrentBranch(workingDir);
 
-  // Load prompts and alignment
-  const prompts = loadAllPrompts(currentBranch, workingDir);
-  const alignmentContent = readAlignment(currentBranch, workingDir);
+  // Load prompts and alignment from spec
+  const prompts = loadAllPrompts(spec, workingDir);
+  const alignmentContent = readAlignment(spec, workingDir);
 
   if (prompts.length === 0) {
     return {
       success: false,
       title: '',
-      body: 'No prompts found for this branch',
+      body: 'No prompts found for this spec',
     };
   }
 
-  // Extract milestone name from first prompt or alignment
-  const milestoneName = currentBranch;
+  // Use spec name for PR generation
+  const specName = spec;
 
   // Generate PR content
   const promptSummary = prompts.map((p: PromptFile) => ({
@@ -481,7 +483,7 @@ export async function buildPR(
   const prContent = await generatePRDescription(
     promptSummary,
     alignmentContent || '',
-    milestoneName,
+    specName,
     workingDir
   );
 
@@ -515,7 +517,7 @@ export async function buildPR(
 
     // Update status.yaml with PR info
     if (prUrl && prNumber) {
-      updatePRStatus(prUrl, prNumber, currentBranch, workingDir);
+      updatePRStatus(prUrl, prNumber, spec, workingDir);
 
       // Post review steps as the first comment
       if (prContent.reviewSteps) {

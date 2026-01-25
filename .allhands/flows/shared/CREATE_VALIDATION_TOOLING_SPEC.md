@@ -53,4 +53,10 @@ Body sections: Context, Acceptance Criteria (setup, coverage, meta-testing, CICD
 
 ## Handoff
 
-Inform engineer spec is created, original spec is blocked, recommend switching focus to tooling milestone.
+Ask engineer: "This validation tooling spec is ready and blocks your original work. Would you like to switch focus to it now?"
+
+If yes (enable now):
+- Follow `.allhands/flows/shared/ENABLE_SPEC.md` with `spec_path` set to the newly created spec
+
+If no:
+- Inform engineer spec is saved in `specs/roadmap/` and original spec is blocked until this is complete

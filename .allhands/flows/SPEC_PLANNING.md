@@ -1,9 +1,9 @@
 <goal>
-Transform the milestone spec into executable prompts with validated approaches. Per **Quality Engineering**, present approach variants for engineer selection - cheap software means multiple variants can be tested in parallel behind feature flags.
+Transform the spec into executable prompts with validated approaches. Per **Quality Engineering**, present approach variants for engineer selection - cheap software means multiple variants can be tested in parallel behind feature flags.
 </goal>
 
 <inputs>
-- Milestone spec doc path
+- Spec doc path
 - Alignment doc path
 - Prompts folder path
 </inputs>
@@ -19,7 +19,7 @@ Transform the milestone spec into executable prompts with validated approaches. 
 ## Context Gathering
 
 - Read the alignment doc for existing prompts that may impact planning
-- Read the milestone spec doc (high-level engineer intent)
+- Read the spec doc (high-level engineer intent)
 - Read codebase files referenced in spec for initial grounding
 - Search documented solutions with `ah solutions search "<keywords>"` for relevant past learnings in this domain
 
@@ -33,7 +33,7 @@ For each implementation approach area identified from spec, spawn parallel subta
 
 Per **Agentic Validation Tooling**, implementation cannot be planned without knowing what deterministic validation is available.
 
-Spawn sub-agent with `.allhands/flows/shared/ASSESS_VALIDATION_TOOLING.md`:
+Spaw sub-agent with `.allhands/flows/shared/ASSESS_VALIDATION_TOOLING.md`:
 - Provide: spec path, acceptance criteria
 - Receive: coverage report with gaps
 
@@ -133,7 +133,7 @@ This is recommended for:
 - Complex architectural decisions
 - High-risk domains (security, payments, data migrations)
 - Novel technologies not yet in codebase
-- Large milestones with many unknowns
+- Large specs with many unknowns
 
 ## Completion
 

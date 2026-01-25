@@ -50,4 +50,10 @@ Body sections: Problem Statement, Proposed Solution, Acceptance Criteria, Affect
 
 ## Handoff
 
-Inform engineer spec is created, non-blocking, prioritize at discretion.
+Ask engineer: "This harness improvement spec is ready. Would you like to enable it now, or save it for later?"
+
+If yes (enable now):
+- Follow `.allhands/flows/shared/ENABLE_SPEC.md` with `spec_path` set to the newly created spec
+
+If no:
+- Inform engineer spec is saved in `specs/roadmap/` for later activation via TUI

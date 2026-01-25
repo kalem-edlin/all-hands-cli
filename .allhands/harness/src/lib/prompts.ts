@@ -83,10 +83,10 @@ export function parsePromptFile(filePath: string): PromptFile | null {
 }
 
 /**
- * Load all prompt files from the planning directory
+ * Load all prompt files from the planning directory for a spec
  */
-export function loadAllPrompts(branch?: string, cwd?: string): PromptFile[] {
-  const paths = getPlanningPaths(branch, cwd);
+export function loadAllPrompts(spec: string, cwd?: string): PromptFile[] {
+  const paths = getPlanningPaths(spec, cwd);
 
   if (!existsSync(paths.prompts)) {
     return [];
@@ -127,7 +127,7 @@ export function dependenciesSatisfied(
 }
 
 /**
- * Pick the next prompt to execute
+ * Pick the next prompt to execute for a spec
  *
  * Algorithm:
  * 1. Filter to pending/in_progress prompts with satisfied dependencies
@@ -135,8 +135,8 @@ export function dependenciesSatisfied(
  * 3. Sort by priority (high > medium > low)
  * 4. Within same priority, sort by number (lower first)
  */
-export function pickNextPrompt(branch?: string, cwd?: string): PickerResult {
-  const prompts = loadAllPrompts(branch, cwd);
+export function pickNextPrompt(spec: string, cwd?: string): PickerResult {
+  const prompts = loadAllPrompts(spec, cwd);
 
   const stats = {
     total: prompts.length,
@@ -281,7 +281,7 @@ export function incrementPromptAttempts(filePath: string): PromptFile | null {
 }
 
 /**
- * Create a new prompt file
+ * Create a new prompt file for a spec
  */
 export function createPrompt(
   number: number,
@@ -292,10 +292,10 @@ export function createPrompt(
     priority?: PromptPriority;
     acceptanceCriteria?: string[];
   } = {},
-  branch?: string,
+  spec: string,
   cwd?: string
 ): string {
-  const paths = getPlanningPaths(branch, cwd);
+  const paths = getPlanningPaths(spec, cwd);
   const now = new Date().toISOString();
 
   const frontmatter: PromptFrontmatter = {
@@ -338,14 +338,14 @@ ${criteriaSection}
 }
 
 /**
- * Get prompt by number
+ * Get prompt by number for a spec
  */
 export function getPromptByNumber(
   number: number,
-  branch?: string,
+  spec: string,
   cwd?: string
 ): PromptFile | null {
-  const prompts = loadAllPrompts(branch, cwd);
+  const prompts = loadAllPrompts(spec, cwd);
   return prompts.find((p) => p.frontmatter.number === number) || null;
 }
 

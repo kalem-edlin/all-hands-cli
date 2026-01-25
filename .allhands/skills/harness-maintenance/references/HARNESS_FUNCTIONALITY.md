@@ -125,7 +125,7 @@ Per **Knowledge Compounding**, `agent-compact` preserves work:
 Exposed via `ah schema <type>`. Define frontmatter for harness-managed files:
 - `prompt.yaml` - Prompt file structure
 - `alignment.yaml` - Alignment doc structure
-- `spec.yaml` - Milestone spec structure
+- `spec.yaml` - Spec structure
 - `skill.yaml` - Skill manifest
 - `validation-suite.yaml` - Validation tooling
 
@@ -160,7 +160,7 @@ flow: PROMPT_TASK_EXECUTION.md  # Flow file in flows/
 prompt_scoped: true         # Multiple instances (one per prompt)
 tui_action: executor        # TUI button trigger
 tui_label: Executor         # Display label
-tui_requires_milestone: true
+tui_requires_spec: true
 non_coding: false           # Can write code
 message_template: |         # Preamble injected before flow
   Your prompt file: ${PROMPT_PATH}

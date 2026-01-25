@@ -3,7 +3,7 @@ flow: IDEATION_SESSION.md
 prompt_scoped: false
 tui_action: ideation
 tui_label: Ideation
-tui_requires_milestone: false
+tui_requires_spec: false
 non_coding: false
 message_template: ""
 template_vars: []

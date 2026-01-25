@@ -13,7 +13,7 @@ import { z } from 'zod';
  */
 export const TemplateVars = {
   // Path variables
-  SPEC_PATH: z.string().describe('Path to milestone spec file'),
+  SPEC_PATH: z.string().describe('Path to spec file'),
   ALIGNMENT_PATH: z.string().describe('Path to alignment doc'),
   PROMPTS_FOLDER: z.string().describe('Path to prompts directory'),
   PROMPT_PATH: z.string().describe('Path to specific prompt file'),
@@ -21,7 +21,7 @@ export const TemplateVars = {
   PLANNING_FOLDER: z.string().describe('Path to .planning/{branch} directory'),
 
   // Identifier variables
-  MILESTONE_NAME: z.string().describe('Current milestone name'),
+  SPEC_NAME: z.string().describe('Current spec name'),
   PROMPT_NUMBER: z
     .string()
     .regex(/^\d{2}$/)

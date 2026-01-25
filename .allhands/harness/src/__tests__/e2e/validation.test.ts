@@ -144,7 +144,7 @@ This file has no YAML frontmatter.
 
 // Valid alignment matching .allhands/schemas/alignment.yaml
 const VALID_ALIGNMENT = `---
-milestone_name: test-milestone
+spec_name: test-spec
 spec_path: specs/test.spec.md
 planning_session: 1
 ---
@@ -158,13 +158,13 @@ Build the feature.
 - Follow existing patterns
 `;
 
-const INVALID_ALIGNMENT_MISSING_MILESTONE = `---
+const INVALID_ALIGNMENT_MISSING_SPEC = `---
 planning_session: 1
 ---
 
 # Overview
 
-Missing milestone_name field.
+Missing spec_name field.
 
 # Hard User Requirements
 
@@ -286,7 +286,7 @@ describe('Alignment Validation E2E', () => {
   describe('valid alignment docs', () => {
     it('accepts alignment with required fields', async () => {
       fixture.writeFile('.planning/m1/alignment.md', VALID_ALIGNMENT);
-      assertValidFrontmatter(fixture, '.planning/m1/alignment.md', ['milestone_name', 'spec_path']);
+      assertValidFrontmatter(fixture, '.planning/m1/alignment.md', ['spec_name', 'spec_path']);
 
       const result = await validateFile(fixture,'.planning/m1/alignment.md');
       assertSuccess(result);
@@ -294,8 +294,8 @@ describe('Alignment Validation E2E', () => {
   });
 
   describe('invalid alignment docs', () => {
-    it('rejects alignment missing milestone field', async () => {
-      fixture.writeFile('.planning/m2/alignment.md', INVALID_ALIGNMENT_MISSING_MILESTONE);
+    it('rejects alignment missing spec field', async () => {
+      fixture.writeFile('.planning/m2/alignment.md', INVALID_ALIGNMENT_MISSING_SPEC);
       const result = await validateFile(fixture,'.planning/m2/alignment.md');
       expect(result.combined).toBeDefined();
     });
@@ -352,11 +352,11 @@ describe('File Type Detection E2E', () => {
   });
 
   it('detects prompt files by path pattern', async () => {
-    fixture.writeFile('.planning/milestone/prompts/01.md', VALID_PROMPT);
-    fixture.writeFile('.planning/milestone/prompts/99.md', VALID_PROMPT);
+    fixture.writeFile('.planning/spec/prompts/01.md', VALID_PROMPT);
+    fixture.writeFile('.planning/spec/prompts/99.md', VALID_PROMPT);
 
-    const r1 = await validateFile(fixture,'.planning/milestone/prompts/01.md');
-    const r2 = await validateFile(fixture,'.planning/milestone/prompts/99.md');
+    const r1 = await validateFile(fixture,'.planning/spec/prompts/01.md');
+    const r2 = await validateFile(fixture,'.planning/spec/prompts/99.md');
 
     assertSuccess(r1);
     assertSuccess(r2);

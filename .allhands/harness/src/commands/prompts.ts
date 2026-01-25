@@ -2,7 +2,7 @@
  * Prompts Command (Agent-Facing)
  *
  * Lists and analyzes prompt files with their frontmatter status.
- * Used by coordination agents to understand prompt state.
+ * Uses the active spec to determine which prompts to show.
  *
  * Usage:
  * - ah prompts status              - List all prompts with status summaries
@@ -10,6 +10,7 @@
  * - ah prompts status --in-progress - Only show in-progress prompts
  * - ah prompts status --done       - Only show completed prompts
  * - ah prompts status --type <type> - Filter by type (planned, emergent, user-patch, review-fix)
+ * - ah prompts status --spec <name> - Use specific spec (defaults to active)
  */
 
 import { Command } from 'commander';
@@ -17,11 +18,10 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
 import {
-  getCurrentBranch,
+  getActiveSpec,
   getPlanningPaths,
   listPromptFiles,
-  hasPlanningForBranch,
-  isLockedBranch,
+  planningDirExists,
 } from '../lib/planning.js';
 
 interface PromptFrontmatter {
@@ -106,26 +106,20 @@ function parsePromptFile(filePath: string, relativePath: string): PromptSummary 
 }
 
 /**
- * Load all prompts for the current branch
+ * Load all prompts for a spec
  */
-function loadPrompts(branch?: string): PromptSummary[] {
-  const currentBranch = branch || getCurrentBranch();
-
-  if (isLockedBranch(currentBranch)) {
+function loadPrompts(spec: string, cwd?: string): PromptSummary[] {
+  if (!planningDirExists(spec, cwd)) {
     return [];
   }
 
-  if (!hasPlanningForBranch(currentBranch)) {
-    return [];
-  }
-
-  const paths = getPlanningPaths(currentBranch);
-  const files = listPromptFiles(currentBranch);
+  const paths = getPlanningPaths(spec, cwd);
+  const files = listPromptFiles(spec, cwd);
   const prompts: PromptSummary[] = [];
 
   for (const file of files) {
     const filePath = join(paths.prompts, file);
-    const relativePath = `.planning/${currentBranch}/prompts/${file}`;
+    const relativePath = `.planning/${spec}/prompts/${file}`;
     const summary = parsePromptFile(filePath, relativePath);
 
     if (summary) {
@@ -146,7 +140,7 @@ export function register(program: Command): void {
     .command('status')
     .description('List all prompts with their frontmatter status')
     .option('--json', 'Output as JSON (default)')
-    .option('--branch <branch>', 'Branch to check (defaults to current)')
+    .option('--spec <name>', 'Spec to check (defaults to active)')
     .option('--pending', 'Only show pending prompts')
     .option('--in-progress', 'Only show in-progress prompts')
     .option('--done', 'Only show completed prompts')
@@ -155,7 +149,7 @@ export function register(program: Command): void {
     .option('--user-patch', 'Shorthand for --type user-patch')
     .action(async (options: {
       json?: boolean;
-      branch?: string;
+      spec?: string;
       pending?: boolean;
       inProgress?: boolean;
       done?: boolean;
@@ -163,26 +157,31 @@ export function register(program: Command): void {
       emergent?: boolean;
       userPatch?: boolean;
     }) => {
-      const branch = options.branch || getCurrentBranch();
+      const cwd = process.cwd();
 
-      // Check if branch has planning
-      if (isLockedBranch(branch)) {
+      // Determine which spec to use
+      let spec: string | null = options.spec ?? null;
+      if (!spec) {
+        spec = getActiveSpec(cwd);
+        if (!spec) {
+          console.log(JSON.stringify({
+            success: false,
+            error: 'No active spec. Use "ah planning activate <spec>" to set one.',
+          }, null, 2));
+          return;
+        }
+      }
+
+      // Check if spec has planning
+      if (!planningDirExists(spec, cwd)) {
         console.log(JSON.stringify({
           success: false,
-          error: `Branch "${branch}" is a locked branch and does not have planning.`,
+          error: `No planning directory found for spec "${spec}". Initialize with \`ah planning setup --spec <path>\`.`,
         }, null, 2));
         return;
       }
 
-      if (!hasPlanningForBranch(branch)) {
-        console.log(JSON.stringify({
-          success: false,
-          error: `No planning directory found for branch "${branch}". Initialize with \`ah planning init\`.`,
-        }, null, 2));
-        return;
-      }
-
-      let prompts = loadPrompts(branch);
+      let prompts = loadPrompts(spec, cwd);
 
       // Apply status filters
       if (options.pending) {
@@ -218,7 +217,7 @@ export function register(program: Command): void {
 
       console.log(JSON.stringify({
         success: true,
-        branch,
+        spec,
         stats,
         prompts,
       }, null, 2));
@@ -227,27 +226,32 @@ export function register(program: Command): void {
   cmd
     .command('unblocked')
     .description('List prompts that are ready to execute (pending with all dependencies done)')
-    .option('--branch <branch>', 'Branch to check (defaults to current)')
-    .action(async (options: { branch?: string }) => {
-      const branch = options.branch || getCurrentBranch();
+    .option('--spec <name>', 'Spec to check (defaults to active)')
+    .action(async (options: { spec?: string }) => {
+      const cwd = process.cwd();
 
-      if (isLockedBranch(branch)) {
+      // Determine which spec to use
+      let spec: string | null = options.spec ?? null;
+      if (!spec) {
+        spec = getActiveSpec(cwd);
+        if (!spec) {
+          console.log(JSON.stringify({
+            success: false,
+            error: 'No active spec.',
+          }, null, 2));
+          return;
+        }
+      }
+
+      if (!planningDirExists(spec, cwd)) {
         console.log(JSON.stringify({
           success: false,
-          error: `Branch "${branch}" is a locked branch.`,
+          error: `No planning directory found for spec "${spec}".`,
         }, null, 2));
         return;
       }
 
-      if (!hasPlanningForBranch(branch)) {
-        console.log(JSON.stringify({
-          success: false,
-          error: `No planning directory found for branch "${branch}".`,
-        }, null, 2));
-        return;
-      }
-
-      const allPrompts = loadPrompts(branch);
+      const allPrompts = loadPrompts(spec, cwd);
 
       // Get set of done prompt numbers
       const doneNumbers = new Set(
@@ -266,7 +270,7 @@ export function register(program: Command): void {
 
       console.log(JSON.stringify({
         success: true,
-        branch,
+        spec,
         count: unblocked.length,
         prompts: unblocked,
       }, null, 2));
@@ -275,23 +279,36 @@ export function register(program: Command): void {
   cmd
     .command('summaries')
     .description('List prompts that have success/failure summaries (completed executions)')
-    .option('--branch <branch>', 'Branch to check (defaults to current)')
-    .action(async (options: { branch?: string }) => {
-      const branch = options.branch || getCurrentBranch();
+    .option('--spec <name>', 'Spec to check (defaults to active)')
+    .action(async (options: { spec?: string }) => {
+      const cwd = process.cwd();
 
-      if (!hasPlanningForBranch(branch)) {
+      // Determine which spec to use
+      let spec: string | null = options.spec ?? null;
+      if (!spec) {
+        spec = getActiveSpec(cwd);
+        if (!spec) {
+          console.log(JSON.stringify({
+            success: false,
+            error: 'No active spec.',
+          }, null, 2));
+          return;
+        }
+      }
+
+      if (!planningDirExists(spec, cwd)) {
         console.log(JSON.stringify({
           success: false,
-          error: `No planning directory found for branch "${branch}".`,
+          error: `No planning directory found for spec "${spec}".`,
         }, null, 2));
         return;
       }
 
-      const prompts = loadPrompts(branch).filter((p) => p.hasSummary);
+      const prompts = loadPrompts(spec, cwd).filter((p) => p.hasSummary);
 
       console.log(JSON.stringify({
         success: true,
-        branch,
+        spec,
         count: prompts.length,
         prompts,
       }, null, 2));

@@ -3,7 +3,7 @@ flow: PROMPT_TASK_EXECUTION.md
 prompt_scoped: true
 tui_action: executor
 tui_label: Executor
-tui_requires_milestone: true
+tui_requires_spec: true
 non_coding: false
 message_template: |
   DO NOT ask for any user input for this task.

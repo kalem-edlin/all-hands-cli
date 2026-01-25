@@ -27,7 +27,7 @@ const getSolutionsDir = (): string => {
 interface SolutionFrontmatter {
   title: string;
   date: string;
-  milestone?: string;
+  spec?: string;
   problem_type: string;
   component: string;
   symptoms: string[];

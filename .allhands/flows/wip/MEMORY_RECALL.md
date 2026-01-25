@@ -40,7 +40,7 @@ The memory file uses a simple table format:
 
 | Caller Flow | Query Focus |
 |-------------|-------------|
-| `MILESTONE_PLANNING.md` | Planning patterns, past decisions |
+| `SPEC_PLANNING.md` | Planning patterns, past decisions |
 | `PROMPT_TASK_EXECUTION.md` | Implementation approaches, solutions |
 | `IDEATION_SESSION.md` | Similar initiatives, prior engineer preferences |
 | `COMPOUNDING.md` | Verify memory doesn't already exist before adding |

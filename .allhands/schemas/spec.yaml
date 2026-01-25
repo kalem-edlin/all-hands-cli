@@ -1,35 +1,35 @@
-# Milestone Spec Schema
-# Single source of truth for milestone specification files
+# Spec Schema
+# Single source of truth for specification files
 
 frontmatter:
   name:
     type: string
     required: true
-    description: "Milestone name (used for branch naming, directory creation)"
+    description: "Spec name (used for branch naming, directory creation)"
 
   domain_name: 
     type: string
     required: true
-    description: "Domain name (used to group milestones into initiatives)"
+    description: "Domain name (used to group specs into initiatives)"
 
   status:
     type: enum
     values: [roadmap, in_progress, completed]
     default: roadmap
-    description: "Milestone implementation status"
+    description: "Spec implementation status"
 
   dependencies:
     type: array
     items: string
     default: []
-    description: "Other milestone names this depends on"
+    description: "Other spec names this depends on"
 
 body:
-  description: "Markdown document capturing the milestone vision"
+  description: "Markdown document capturing the spec vision"
   sections:
     - name: "Motivation"
       required: true
-      description: "Why this milestone matters. User goals and pain points."
+      description: "Why this spec matters. User goals and pain points."
 
     - name: "Goals"
       required: true

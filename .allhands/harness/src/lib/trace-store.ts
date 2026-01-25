@@ -7,7 +7,7 @@
  * - Payload trimming to prevent log bloat
  *
  * All events include agent context from environment variables:
- * - AGENT_ID, AGENT_TYPE, PROMPT_NUMBER, MILESTONE_NAME, BRANCH
+ * - AGENT_ID, AGENT_TYPE, PROMPT_NUMBER, SPEC_NAME, BRANCH
  */
 
 import { mkdirSync, appendFileSync, existsSync } from 'fs';
@@ -58,7 +58,7 @@ export interface TraceEvent {
   agentId: string | null;
   agentType: string | null;
   promptNumber: string | null;
-  milestoneName: string | null;
+  specName: string | null;
   branch: string | null;
   toolName: string | null;
   payload: Record<string, unknown>;
@@ -176,12 +176,12 @@ export function sanitizePayload(payload: unknown): Record<string, unknown> {
 /**
  * Get agent context from environment variables
  */
-export function getAgentContext(): Pick<TraceEvent, 'agentId' | 'agentType' | 'promptNumber' | 'milestoneName' | 'branch'> {
+export function getAgentContext(): Pick<TraceEvent, 'agentId' | 'agentType' | 'promptNumber' | 'specName' | 'branch'> {
   return {
     agentId: process.env.AGENT_ID || null,
     agentType: process.env.AGENT_TYPE || null,
     promptNumber: process.env.PROMPT_NUMBER || null,
-    milestoneName: process.env.MILESTONE_NAME || null,
+    specName: process.env.SPEC_NAME || null,
     branch: process.env.BRANCH || null,
   };
 }
@@ -231,7 +231,7 @@ function getDb(cwd?: string): Database.Database {
       agent_id TEXT,
       agent_type TEXT,
       prompt_number TEXT,
-      milestone_name TEXT,
+      spec_name TEXT,
       branch TEXT,
       tool_name TEXT,
       is_error INTEGER DEFAULT 0,
@@ -286,7 +286,7 @@ export function logEvent(
   try {
     const database = getDb(cwd);
     const stmt = database.prepare(`
-      INSERT INTO events (timestamp, event_type, agent_id, agent_type, prompt_number, milestone_name, branch, tool_name, is_error, payload)
+      INSERT INTO events (timestamp, event_type, agent_id, agent_type, prompt_number, spec_name, branch, tool_name, is_error, payload)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
@@ -295,7 +295,7 @@ export function logEvent(
       event.agentId,
       event.agentType,
       event.promptNumber,
-      event.milestoneName,
+      event.specName,
       event.branch,
       event.toolName,
       isError,
@@ -443,7 +443,7 @@ export function queryEvents(options: TraceQueryOptions = {}, cwd?: string): (Tra
     agent_id: string | null;
     agent_type: string | null;
     prompt_number: string | null;
-    milestone_name: string | null;
+    spec_name: string | null;
     branch: string | null;
     tool_name: string | null;
     is_error: number;
@@ -457,7 +457,7 @@ export function queryEvents(options: TraceQueryOptions = {}, cwd?: string): (Tra
     agentId: row.agent_id,
     agentType: row.agent_type,
     promptNumber: row.prompt_number,
-    milestoneName: row.milestone_name,
+    specName: row.spec_name,
     branch: row.branch,
     toolName: row.tool_name,
     isError: row.is_error === 1,

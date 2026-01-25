@@ -3,7 +3,7 @@ flow: E2E_TEST_PLAN_BUILDING.md
 prompt_scoped: false
 tui_action: e2e-test-planner
 tui_label: E2E Tests
-tui_requires_milestone: true
+tui_requires_spec: true
 non_coding: false
 message_template: |
   Planning folder: ${PLANNING_FOLDER}

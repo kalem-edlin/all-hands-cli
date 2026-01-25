@@ -42,10 +42,10 @@ export const RawAgentProfileSchema = z.object({
     .optional()
     .describe('Display label in TUI (defaults to capitalized name)'),
 
-  tui_requires_milestone: z
+  tui_requires_spec: z
     .boolean()
     .default(false)
-    .describe('If true, TUI action requires an active milestone'),
+    .describe('If true, TUI action requires an active spec'),
 
   non_coding: z
     .boolean()
@@ -66,7 +66,7 @@ export interface AgentProfile {
   templateVars: TemplateVarName[];
   tuiAction?: string;
   tuiLabel?: string;
-  tuiRequiresMilestone: boolean;
+  tuiRequiresSpec: boolean;
   nonCoding: boolean;
 }
 
@@ -82,7 +82,7 @@ export function normalizeProfile(raw: RawAgentProfile): AgentProfile {
     templateVars: (raw.template_vars ?? []) as TemplateVarName[],
     tuiAction: raw.tui_action,
     tuiLabel: raw.tui_label,
-    tuiRequiresMilestone: raw.tui_requires_milestone,
+    tuiRequiresSpec: raw.tui_requires_spec,
     nonCoding: raw.non_coding,
   };
 }

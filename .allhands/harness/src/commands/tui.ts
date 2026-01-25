@@ -5,9 +5,9 @@
  * - Starting/stopping the execution loop
  * - Spawning agent sessions (ideate, coordinator, planner, etc.)
  * - Monitoring loop progress and agent activity
- * - Managing milestones and PR workflows
+ * - Managing specs and PR workflows
  *
- * Usage: ah [--branch <branch>]
+ * Usage: ah [--spec <spec>]
  */
 
 import { Command } from 'commander';
@@ -16,7 +16,19 @@ import { existsSync, readFileSync, mkdirSync, renameSync } from 'fs';
 import { execSync } from 'child_process';
 import { TUI } from '../tui/index.js';
 import type { TUIState, PRActionState, PromptItem, AgentInfo } from '../tui/index.js';
-import { readStatus, getCurrentBranch, updateStatus, initializeStatus } from '../lib/planning.js';
+import {
+  readStatus,
+  getCurrentBranch,
+  updateStatus,
+  initializeStatus,
+  getActiveSpec,
+  setActiveSpec,
+  clearActiveSpec,
+  updateLastKnownBranch,
+  getPlanningPaths,
+  ensurePlanningDir,
+} from '../lib/planning.js';
+import { findSpecForPath, extractSpecNameFromFile } from '../lib/planning-utils.js';
 import { getBaseBranch } from '../lib/git.js';
 import { loadAllPrompts } from '../lib/prompts.js';
 import {
@@ -27,7 +39,7 @@ import {
   renameCurrentWindow,
 } from '../lib/tmux.js';
 import { getProfilesByTuiAction } from '../lib/opencode/index.js';
-import { suggestBranchName, buildPR } from '../lib/oracle.js';
+import { buildPR } from '../lib/oracle.js';
 import type { PromptFile } from '../lib/prompts.js';
 import { findSpecById } from '../lib/specs.js';
 import { isTldrInstalled, hasSemanticIndex, buildSemanticIndex, needsSemanticRebuild } from '../lib/tldr.js';
@@ -35,9 +47,12 @@ import { isTldrInstalled, hasSemanticIndex, buildSemanticIndex, needsSemanticReb
 /**
  * Launch the TUI - can be called directly or via command
  */
-export async function launchTUI(options: { branch?: string } = {}): Promise<void> {
-  const branch = options.branch || getCurrentBranch();
+export async function launchTUI(options: { spec?: string } = {}): Promise<void> {
   const cwd = process.cwd();
+  const branch = getCurrentBranch();
+
+  // Determine active spec (from option or .active file)
+  const activeSpecName = options.spec || getActiveSpec(cwd);
 
   // Build semantic index if missing or stale (branch switch)
   if (isTldrInstalled()) {
@@ -50,9 +65,9 @@ export async function launchTUI(options: { branch?: string } = {}): Promise<void
     }
   }
 
-  // Load initial state
-  const status = readStatus(branch);
-  const prompts = loadAllPrompts(branch);
+  // Load initial state from active spec
+  const status = activeSpecName ? readStatus(activeSpecName, cwd) : null;
+  const prompts = activeSpecName ? loadAllPrompts(activeSpecName, cwd) : [];
 
   // Convert prompts to PromptItem format
   const promptItems: PromptItem[] = prompts.map((p) => ({
@@ -74,7 +89,7 @@ export async function launchTUI(options: { branch?: string } = {}): Promise<void
     emergentEnabled: status?.loop.emergent ?? false,
     prompts: promptItems,
     activeAgents,
-    milestone: status?.milestone,
+    spec: activeSpecName ?? undefined,
     branch,
     prActionState: 'create-pr' as PRActionState,
     compoundRun: status?.compound_run ?? false,
@@ -86,7 +101,8 @@ export async function launchTUI(options: { branch?: string } = {}): Promise<void
 
   const tui = new TUI({
     onAction: (action: string, data) => {
-      handleAction(tui, action, branch, data);
+      // Pass active spec for spec-based operations
+      handleAction(tui, action, activeSpecName, branch, data);
     },
     onExit: () => {
       console.log('\nExiting All Hands TUI...');
@@ -100,11 +116,11 @@ export async function launchTUI(options: { branch?: string } = {}): Promise<void
 
   // Set initial state
   tui.updateState(initialState);
-  tui.log(`Loaded branch: ${branch}`);
-  if (status) {
-    tui.log(`Milestone: ${status.milestone} (${status.stage})`);
+  tui.log(`Branch: ${branch}`);
+  if (activeSpecName && status) {
+    tui.log(`Active spec: ${status.name} (${status.stage})`);
   } else {
-    tui.log('No active milestone. Use Switch Milestone to begin.');
+    tui.log('No active spec. Use Switch Spec to select one.');
   }
 
   // Start TUI
@@ -122,6 +138,7 @@ export async function launchTUI(options: { branch?: string } = {}): Promise<void
 async function spawnAgentsForAction(
   tui: TUI,
   action: string,
+  spec: string | null,
   branch: string,
   status: ReturnType<typeof readStatus>,
   cwd?: string
@@ -133,10 +150,10 @@ async function spawnAgentsForAction(
     return false; // No profiles for this action
   }
 
-  // Check if any profile requires milestone
-  const requiresMilestone = profiles.some((p) => p.tuiRequiresMilestone);
-  if (requiresMilestone && !status?.milestone) {
-    tui.log('Error: No milestone initialized. Use Switch Milestone first.');
+  // Check if any profile requires spec
+  const requiresSpec = profiles.some((p) => p.tuiRequiresSpec);
+  if (requiresSpec && !spec) {
+    tui.log('Error: No spec initialized. Use Switch Spec first.');
     return true; // Handled, but with error
   }
 
@@ -148,8 +165,8 @@ async function spawnAgentsForAction(
 
   // Build template context once for all agents
   const context = buildTemplateContext(
-    branch,
-    status?.milestone,
+    spec || 'default', // Use spec for paths, fallback for when no spec
+    status?.name,
     undefined, // promptNumber - not applicable for TUI actions
     undefined, // promptPath - not applicable for TUI actions
     cwd
@@ -178,8 +195,8 @@ async function spawnAgentsForAction(
   }
 
   // Track compound_run in status when compound action is triggered
-  if (action === 'compound' && status) {
-    updateStatus({ compound_run: true }, branch, cwd);
+  if (action === 'compound' && spec && status) {
+    updateStatus({ compound_run: true }, spec, cwd);
     tui.updateState({ compoundRun: true });
   }
 
@@ -190,14 +207,16 @@ async function spawnAgentsForAction(
 async function handleAction(
   tui: TUI,
   action: string,
+  spec: string | null,
   branch: string,
   data?: Record<string, unknown>
 ): Promise<void> {
-  const status = readStatus(branch);
   const cwd = process.cwd();
+  // Read status from spec, not branch
+  const status = spec ? readStatus(spec, cwd) : null;
 
   // Try to handle as a profile-based agent spawn
-  const handledByProfile = await spawnAgentsForAction(tui, action, branch, status, cwd);
+  const handledByProfile = await spawnAgentsForAction(tui, action, spec, branch, status, cwd);
   if (handledByProfile) {
     return;
   }
@@ -205,15 +224,16 @@ async function handleAction(
   // Handle non-agent actions
   switch (action) {
     case 'create-pr': {
-      if (!status?.milestone) {
-        tui.log('Error: No milestone initialized. Use Switch Milestone first.');
+      if (!spec || !status?.name) {
+        tui.log('Error: No spec initialized. Use Switch Spec first.');
         return;
       }
 
       tui.log('Creating PR via oracle...');
 
       try {
-        const result = await buildPR(branch);
+        // buildPR uses spec for reading prompts/alignment
+        const result = await buildPR(spec, cwd);
 
         if (result.success && result.prUrl) {
           tui.log(`PR created: ${result.prUrl}`);
@@ -229,18 +249,18 @@ async function handleAction(
     }
 
     case 'mark-completed': {
-      if (!status?.milestone) {
-        tui.log('Error: No milestone initialized. Use Switch Milestone first.');
+      if (!spec || !status?.name) {
+        tui.log('Error: No spec initialized. Use Switch Spec first.');
         return;
       }
 
-      tui.log(`Marking milestone as completed: ${status.milestone}`);
+      tui.log(`Marking spec as completed: ${status.name}`);
 
       try {
         // Find the current spec file
-        const spec = findSpecById(status.milestone, cwd);
-        if (!spec) {
-          tui.log(`Error: Spec file not found: ${status.milestone}`);
+        const specFile = findSpecById(status.name, cwd);
+        if (!specFile) {
+          tui.log(`Error: Spec file not found: ${status.name}`);
           break;
         }
 
@@ -250,14 +270,17 @@ async function handleAction(
           mkdirSync(completedDir, { recursive: true });
         }
 
-        const destPath = join(completedDir, spec.filename);
+        const destPath = join(completedDir, specFile.filename);
         if (existsSync(destPath)) {
           tui.log(`Error: Destination already exists: ${destPath}`);
           break;
         }
 
-        renameSync(spec.path, destPath);
-        tui.log(`Moved spec to: specs/completed/${spec.filename}`);
+        renameSync(specFile.path, destPath);
+        tui.log(`Moved spec to: specs/completed/${specFile.filename}`);
+
+        // Clear active spec
+        clearActiveSpec(cwd);
 
         // Checkout base branch
         const baseBranch = getBaseBranch();
@@ -266,61 +289,60 @@ async function handleAction(
 
         // Update TUI state
         tui.updateState({
-          milestone: undefined,
+          spec: undefined,
           branch: baseBranch,
           prompts: [],
         });
 
-        tui.log(`Milestone completed. Now on branch: ${baseBranch}`);
+        tui.log(`Spec completed. Now on branch: ${baseBranch}`);
       } catch (e) {
         tui.log(`Error: ${e instanceof Error ? e.message : String(e)}`);
       }
       break;
     }
 
-    case 'switch-milestone': {
+    case 'switch-spec': {
       const specId = data?.specId as string | undefined;
       if (!specId || specId.startsWith('header-') || specId === 'info') {
         // Header or info item selected, ignore
         break;
       }
 
-      tui.log(`Switching to milestone: ${specId}`);
+      tui.log(`Switching to spec: ${specId}`);
 
       try {
         // Find spec file using specs library
-        const cwd = process.cwd();
-        let spec = findSpecById(specId, cwd);
+        let specFile = findSpecById(specId, cwd);
 
-        if (!spec) {
+        if (!specFile) {
           tui.log(`Error: Spec file not found: ${specId}`);
           break;
         }
 
         // Check if spec is completed - if so, warn and offer to resurrect
-        if (spec.status === 'completed') {
+        if (specFile.status === 'completed') {
           const confirmed = await tui.showConfirmation(
-            'Resurrect Completed Milestone?',
-            `Milestone "${spec.title}" is marked as completed.\n\n` +
+            'Resurrect Completed Spec?',
+            `Spec "${specFile.title}" is marked as completed.\n\n` +
             'Selecting it will move the spec back to the roadmap\n' +
             'and you will need to mark it completed again when done.\n\n' +
             'Both docs and roadmap indexes will be updated.'
           );
 
           if (!confirmed) {
-            tui.log('Milestone selection cancelled');
+            tui.log('Spec selection cancelled');
             break;
           }
 
           // Resurrect the spec using the ah command (handles reindexing)
-          tui.log('Resurrecting milestone to roadmap...');
+          tui.log('Resurrecting spec to roadmap...');
           try {
-            execSync(`ah specs resurrect "${spec.id}"`, { stdio: 'pipe', cwd });
-            tui.log('Milestone resurrected and indexes updated ✓');
+            execSync(`ah specs resurrect "${specFile.id}"`, { stdio: 'pipe', cwd });
+            tui.log('Spec resurrected and indexes updated ✓');
 
             // Re-find the spec since its path has changed
-            spec = findSpecById(specId, cwd);
-            if (!spec) {
+            specFile = findSpecById(specId, cwd);
+            if (!specFile) {
               tui.log(`Error: Spec file not found after resurrection: ${specId}`);
               break;
             }
@@ -330,65 +352,37 @@ async function handleAction(
           }
         }
 
-        const specPath = spec.path;
-        const specContent = readFileSync(specPath, 'utf-8');
-        const milestoneName = spec.id;
+        const specPath = specFile.path;
+        const specName = extractSpecNameFromFile(specPath) || specFile.id;
 
-        // Check if we have existing status for this milestone
-        // Look for any branch that has this milestone in its status
-        let targetBranch: string | null = null;
+        // Check if this spec already has a planning directory
+        const existingSpec = findSpecForPath(specPath, cwd);
 
-        // For now, we'll check if there's a .planning/{branch} that matches
-        // In a full implementation, we'd scan all branches
-
-        // Suggest branch name via oracle if we need a new branch
-        tui.log('Determining branch name...');
-        const branchSuggestion = await suggestBranchName(specContent, basename(specPath));
-        targetBranch = branchSuggestion.fullName;
-
-        tui.log(`Suggested branch: ${targetBranch} (${branchSuggestion.reasoning})`);
-
-        // Check if branch already exists
-        let branchExists = false;
-        try {
-          execSync(`git rev-parse --verify ${targetBranch}`, {
-            stdio: 'pipe',
-            cwd,
-          });
-          branchExists = true;
-          tui.log(`Branch ${targetBranch} exists, checking out...`);
-        } catch {
-          tui.log(`Creating new branch: ${targetBranch}`);
-        }
-
-        // Checkout or create branch
-        if (branchExists) {
-          execSync(`git checkout ${targetBranch}`, { stdio: 'pipe', cwd });
+        if (existingSpec) {
+          tui.log(`Found existing planning for spec: ${existingSpec}`);
         } else {
-          execSync(`git checkout -b ${targetBranch}`, { stdio: 'pipe', cwd });
+          // Create planning directory for this spec
+          tui.log(`Creating .planning/${specName}/`);
+          const paths = getPlanningPaths(specName, cwd);
+          ensurePlanningDir(specName, cwd);
+
+          // Initialize status with null branch (agent flows handle branching)
+          const gitRoot = require('path').dirname(specPath).replace(/\/specs\/.*$/, '');
+          const relativeSpecPath = specPath.replace(gitRoot + '/', '');
+          initializeStatus(specName, relativeSpecPath, null, cwd);
         }
 
-        // Ensure .planning directory exists for this branch
-        const planningDir = join(cwd, '.planning', targetBranch);
-        const promptsDir = join(planningDir, 'prompts');
+        // Set as active spec
+        setActiveSpec(specName, cwd);
 
-        if (!existsSync(planningDir)) {
-          mkdirSync(planningDir, { recursive: true });
-          mkdirSync(promptsDir, { recursive: true });
-          tui.log(`Created .planning/${targetBranch}/`);
-        }
-
-        // Initialize or update status
-        initializeStatus(milestoneName, specPath, targetBranch);
-
-        tui.log(`Switched to milestone: ${milestoneName} on branch ${targetBranch}`);
+        tui.log(`Activated spec: ${specName}`);
+        tui.log(`Note: Branch management is handled by agent flows, not the TUI.`);
 
         // Update TUI state
-        const newStatus = readStatus(targetBranch);
-        const newPrompts = loadAllPrompts(targetBranch);
+        const newStatus = readStatus(specName, cwd);
+        const newPrompts = loadAllPrompts(specName, cwd);
         tui.updateState({
-          milestone: newStatus?.milestone,
-          branch: targetBranch,
+          spec: specName,
           prompts: newPrompts.map((p) => ({
             number: p.frontmatter.number,
             title: p.frontmatter.title,
@@ -403,8 +397,8 @@ async function handleAction(
 
     case 'toggle-loop': {
       const enabled = data?.enabled as boolean;
-      if (status) {
-        updateStatus({ loop: { ...status.loop, enabled } }, branch);
+      if (spec && status) {
+        updateStatus({ loop: { ...status.loop, enabled } }, spec, cwd);
       }
       tui.log(`Loop: ${enabled ? 'Started' : 'Stopped'}`);
       break;
@@ -412,8 +406,8 @@ async function handleAction(
 
     case 'toggle-emergent': {
       const enabled = data?.enabled as boolean;
-      if (status) {
-        updateStatus({ loop: { ...status.loop, emergent: enabled } }, branch);
+      if (spec && status) {
+        updateStatus({ loop: { ...status.loop, emergent: enabled } }, spec, cwd);
       }
       tui.log(`Emergent: ${enabled ? 'Enabled' : 'Disabled'}`);
       break;
@@ -429,39 +423,22 @@ async function handleAction(
     }
 
     case 'branch-changed': {
-      // Reload state for the new branch
+      // Branch changes are informational only in the new model
+      // The active spec is independent of the git branch
       const newBranch = data?.branch as string;
       if (!newBranch) break;
 
-      tui.log(`Reloading state for branch: ${newBranch}`);
+      tui.log(`Branch changed to: ${newBranch}`);
 
-      try {
-        const newStatus = readStatus(newBranch, cwd);
-        const newPrompts = loadAllPrompts(newBranch);
-
-        const promptItems: PromptItem[] = newPrompts.map((p) => ({
-          number: p.frontmatter.number,
-          title: p.frontmatter.title,
-          status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
-        }));
-
-        tui.updateState({
-          milestone: newStatus?.milestone,
-          branch: newBranch,
-          prompts: promptItems,
-          loopEnabled: newStatus?.loop.enabled ?? false,
-          emergentEnabled: newStatus?.loop.emergent ?? false,
-          compoundRun: newStatus?.compound_run ?? false,
-        });
-
-        if (newStatus?.milestone) {
-          tui.log(`Milestone: ${newStatus.milestone} (${newStatus.stage})`);
-        } else {
-          tui.log('No milestone on this branch.');
-        }
-      } catch (e) {
-        tui.log(`Error reloading state: ${e instanceof Error ? e.message : String(e)}`);
+      // Optionally update last_known_branch hint if we have an active spec
+      const activeSpec = getActiveSpec(cwd);
+      if (activeSpec) {
+        updateLastKnownBranch(activeSpec, newBranch, cwd);
+        tui.log(`Updated last_known_branch for ${activeSpec}`);
       }
+
+      // Update branch in TUI state (but don't reload prompts - they're spec-based)
+      tui.updateState({ branch: newBranch });
       break;
     }
 

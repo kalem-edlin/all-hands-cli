@@ -160,20 +160,20 @@ export function createFileViewer(
 }
 
 /**
- * Check if a planning file exists for the given branch and file type
+ * Check if a planning file exists for the given spec and file type
  */
 export function getPlanningFilePath(
   cwd: string,
-  branch: string,
+  spec: string,
   fileType: 'alignment' | 'e2e_test_plan'
 ): string | null {
   const filename = fileType === 'alignment' ? 'alignment.md' : 'e2e_test_plan.md';
-  const filePath = join(cwd, '.planning', branch, filename);
+  const filePath = join(cwd, '.planning', spec, filename);
   return existsSync(filePath) ? filePath : null;
 }
 
 /**
- * Get the spec file path for a milestone
+ * Get the spec file path for a spec
  */
 export function getSpecFilePath(cwd: string, specId: string): string | null {
   // Check common spec locations

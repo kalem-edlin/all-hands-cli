@@ -51,7 +51,7 @@ export const STOCK_ENV_VARS = [
   'AGENT_ID',
   'AGENT_NAME',
   'AGENT_TYPE',
-  'MILESTONE_NAME',
+  'SPEC_NAME',
   'BRANCH',
   'PROMPT_NUMBER',
 ] as const;
@@ -207,7 +207,7 @@ export function buildAgentInvocation(
   };
 
   // Add context values that map to env vars
-  if (context.MILESTONE_NAME) env.MILESTONE_NAME = context.MILESTONE_NAME;
+  if (context.SPEC_NAME) env.SPEC_NAME = context.SPEC_NAME;
   if (context.BRANCH) env.BRANCH = context.BRANCH;
   if (context.PROMPT_NUMBER) env.PROMPT_NUMBER = context.PROMPT_NUMBER;
 

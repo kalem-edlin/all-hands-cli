@@ -3,7 +3,7 @@
  *
  * Provides:
  * - Structured logging with pino
- * - Agent context tracking (AGENT_TYPE, PROMPT_NUMBER, MILESTONE_NAME)
+ * - Agent context tracking (AGENT_TYPE, PROMPT_NUMBER, SPEC_NAME)
  * - JSON vs human-friendly output modes
  * - Standard error handling
  */
@@ -15,8 +15,8 @@ export interface CommandContext {
   agentType?: string;
   /** Current prompt number (e.g., "01") */
   promptNumber?: string;
-  /** Current milestone name */
-  milestoneName?: string;
+  /** Current spec name */
+  specName?: string;
   /** Output format */
   json: boolean;
   /** Verbose logging */
@@ -37,7 +37,7 @@ export function getEnvContext(): Partial<CommandContext> {
   return {
     agentType: process.env.AGENT_TYPE,
     promptNumber: process.env.PROMPT_NUMBER,
-    milestoneName: process.env.MILESTONE_NAME,
+    specName: process.env.SPEC_NAME,
   };
 }
 
@@ -62,7 +62,7 @@ export function createLogger(name: string, context: Partial<CommandContext> = {}
       base: {
         ...(context.agentType && { agent: context.agentType }),
         ...(context.promptNumber && { prompt: context.promptNumber }),
-        ...(context.milestoneName && { milestone: context.milestoneName }),
+        ...(context.specName && { spec: context.specName }),
       },
     },
     transport
@@ -106,7 +106,7 @@ export function parseContext(options: {
   return {
     agentType: options.agent || envContext.agentType,
     promptNumber: envContext.promptNumber,
-    milestoneName: envContext.milestoneName,
+    specName: envContext.specName,
     json: options.json ?? false,
     verbose: options.verbose ?? false,
   };

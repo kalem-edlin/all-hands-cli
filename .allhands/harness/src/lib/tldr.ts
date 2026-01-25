@@ -433,9 +433,9 @@ export async function notifyFileChanged(
 
 
 /**
- * Initialize TLDR on milestone start.
+ * Initialize TLDR on spec start.
  */
-export async function onMilestoneInit(projectDir: string): Promise<void> {
+export async function onSpecInit(projectDir: string): Promise<void> {
   if (!isTldrInstalled()) {
     return;
   }

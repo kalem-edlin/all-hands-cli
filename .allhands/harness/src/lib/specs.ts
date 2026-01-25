@@ -1,8 +1,8 @@
 /**
  * Spec File Management
  *
- * Handles discovery and loading of spec files for milestone selection.
- * Scans specs/roadmap/ for planned milestones and specs/ for others.
+ * Handles discovery and loading of spec files for spec selection.
+ * Scans specs/roadmap/ for planned specs and specs/ for others.
  * Parses YAML frontmatter for domain_name and status fields.
  */
 

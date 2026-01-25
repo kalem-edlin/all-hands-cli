@@ -2,15 +2,15 @@
 # Single source of truth for alignment document structure
 
 frontmatter:
-  milestone_name:
+  spec_name:
     type: string
     required: true
-    description: "Name of the milestone this alignment doc serves"
+    description: "Name of the spec this alignment doc serves"
 
   spec_path:
     type: string
     required: true
-    description: "Path to the milestone spec file"
+    description: "Path to the spec file"
 
   planning_session:
     type: integer
@@ -29,7 +29,7 @@ body:
   sections:
     - name: "Overview"
       required: true
-      description: "High-level overview of milestone motivations and goals"
+      description: "High-level overview of spec motivations and goals"
 
     - name: "Hard User Requirements"
       required: true
