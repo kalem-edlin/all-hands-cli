@@ -12,9 +12,7 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 <constraints>
 - MUST research implementation approaches deeply before presenting options
 - MUST present recommended approach for each decision point
-- MUST verify validation tooling coverage before creating prompts
 - MUST spawn plan review jury before finalizing
-- NEVER create prompts without validation tooling analysis
 - NEVER work directly on `$BASE_BRANCH`
 </constraints>
 
@@ -31,20 +29,6 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 For each implementation approach area identified from spec, spawn parallel subtasks:
 - Read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` for codebase grounding
 - Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` for solution exploration
-
-## Validation Tooling Assessment
-
-Per **Agentic Validation Tooling**, implementation cannot be planned without knowing what deterministic validation is available.
-
-Spaw sub-agent with `.allhands/flows/shared/ASSESS_VALIDATION_TOOLING.md`:
-- Provide: spec path, acceptance criteria
-- Receive: coverage report with gaps
-
-**If blocking gaps exist**, present options to engineer:
-- **(A) Create tooling spec** → Invoke `.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md`, feature spec gets `dependencies: [tooling-spec]`, exit planning
-- **(B) Proceed without** → Document in alignment doc `validation_gaps_accepted`, note fallback in prompts, continue
-
-**If no blocking gaps**: Assign `validation_suites` to prompts in Prompt Creation phase.
 
 ## External Technology Research
 
@@ -77,7 +61,7 @@ When engineer selects multiple approaches:
 
 - Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt creation guidance
 - Transform researched approaches into executable prompts
-- Include validation tooling references in acceptance criteria
+- Read `.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md` to discover and assign existing validation suites to prompts
 - For high-risk domains (auth, payments, data), note TDD approach requirement in prompt
   - Reference `.allhands/flows/shared/TDD_WORKFLOW.md` for TDD execution guidance
 
@@ -97,7 +81,7 @@ Before spawning jury, self-verify plans can achieve goals:
 | Task Completeness | Every prompt has clear acceptance criteria? |
 | Key Links Planned | Components wire together (API → UI)? |
 | Scope Sanity | 2-3 tasks per prompt? <7 files per prompt? |
-| Validation Coverage | Each prompt has validation tooling reference? |
+| Validation Coverage | Prompts reference available validation suites where applicable? |
 
 If issues found, fix before jury review.
 
