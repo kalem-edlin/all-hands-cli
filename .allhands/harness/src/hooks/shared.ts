@@ -263,9 +263,15 @@ export interface ValidationSettings {
   format?: FormatConfig;
 }
 
+/** Git settings */
+export interface GitSettings {
+  baseBranch?: string;
+}
+
 /** Project settings structure (.allhands/settings.json) */
 export interface ProjectSettings {
   validation?: ValidationSettings;
+  git?: GitSettings;
 }
 
 /**
@@ -284,6 +290,15 @@ export function loadProjectSettings(): ProjectSettings | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Get base branch from settings, env, or default.
+ * Priority: settings.json > BASE_BRANCH env > "main"
+ */
+export function getBaseBranch(): string {
+  const settings = loadProjectSettings();
+  return settings?.git?.baseBranch || process.env.BASE_BRANCH || 'main';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

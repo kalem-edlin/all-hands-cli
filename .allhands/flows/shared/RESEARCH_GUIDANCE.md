@@ -4,9 +4,8 @@ Pick the right research tool and depth for the need. Per **Context is Precious**
 
 <constraints>
 - MUST determine discovery level before researching
-- MUST parse JSON results from all research tools
 - MUST use `gh` CLI for GitHub content, not research tools
-- NEVER use a single tool when combination would give better results
+- NEVER use WebSearch or WebFetch tools since the tooling here is much better
 </constraints>
 
 ## Discovery Levels

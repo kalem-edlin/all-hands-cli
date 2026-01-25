@@ -27,6 +27,7 @@ import {
   type IndexName,
 } from "../lib/knowledge.js";
 import { BaseCommand, CommandResult } from "../lib/base-command.js";
+import { getBaseBranch } from "../lib/git.js";
 
 const getProjectRoot = (): string => {
   return process.env.PROJECT_ROOT || process.cwd();
@@ -41,13 +42,6 @@ const getAggregatorPrompt = (): string => {
 };
 
 const DEFAULT_TOKEN_THRESHOLD = 3500;
-
-/**
- * Get base branch from environment or default to main.
- */
-function getBaseBranch(): string {
-  return process.env.BASE_BRANCH || "main";
-}
 
 /**
  * Auto-detect file changes since branch diverged from base for a specific index.

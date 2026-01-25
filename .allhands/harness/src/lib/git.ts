@@ -6,6 +6,10 @@
 
 import { execSync, spawnSync } from "child_process";
 import { basename } from "path";
+import { getBaseBranch } from '../hooks/shared.js';
+
+// Re-export getBaseBranch for consumers
+export { getBaseBranch };
 
 // Protected branches - no planning required
 const PROTECTED_BRANCHES = new Set([
@@ -55,14 +59,6 @@ export function isDirectModeBranch(branch: string): boolean {
     return true;
   }
   return DIRECT_MODE_PREFIXES.some((prefix) => branch.startsWith(prefix));
-}
-
-/**
- * Get base branch from environment or default to main.
- * Set BASE_BRANCH in .env.ai to configure.
- */
-export function getBaseBranch(): string {
-  return process.env.BASE_BRANCH || "main";
 }
 
 /**

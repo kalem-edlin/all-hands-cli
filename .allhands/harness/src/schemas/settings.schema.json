@@ -9,6 +9,17 @@
       "type": "string",
       "description": "JSON Schema reference"
     },
+    "git": {
+      "type": "object",
+      "description": "Git-related settings",
+      "properties": {
+        "baseBranch": {
+          "type": "string",
+          "default": "main",
+          "description": "Base branch for diff comparisons (main, master, develop, etc.)"
+        }
+      }
+    },
     "validation": {
       "type": "object",
       "description": "Validation and quality settings",
