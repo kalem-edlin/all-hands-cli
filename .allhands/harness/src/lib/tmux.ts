@@ -496,11 +496,11 @@ export function buildWindowName(config: SpawnConfig): string {
  * Build environment variables for agent
  */
 export function buildAgentEnv(config: SpawnConfig, branch: string, windowName: string): Record<string, string> {
+  // Note: BASE_BRANCH is communicated via the initial prompt, not env vars
   const env: Record<string, string> = {
     AGENT_ID: windowName, // Window name = AGENT_ID (used for MCP daemon isolation)
     AGENT_TYPE: config.agentType,
     BRANCH: branch,
-    BASE_BRANCH: getBaseBranch(),
   };
 
   if (config.promptNumber !== undefined) {
@@ -579,17 +579,25 @@ export function spawnAgent(
 
   const launcherScript = join(tempDir, `${windowName}-launcher.sh`);
   const promptFile = join(tempDir, `${windowName}-prompt.txt`);
-  const systemPromptFile = join(tempDir, `${windowName}-system.txt`);
 
-  // Write flow content as the main prompt
+  // Build combined prompt: flow content + preamble + base branch info
+  // NO system prompt - everything goes into the initial user prompt
+  const baseBranch = getBaseBranch();
+  const promptParts: string[] = [];
+
   if (flowContent) {
-    writeFileSync(promptFile, flowContent, 'utf-8');
+    promptParts.push(flowContent);
   }
 
-  // Write system prompt if provided
   if (config.preamble && config.preamble.trim()) {
-    writeFileSync(systemPromptFile, config.preamble, 'utf-8');
+    promptParts.push(config.preamble);
   }
+
+  // Always append base branch info
+  promptParts.push(`The base branch name is "${baseBranch}".`);
+
+  const combinedPrompt = promptParts.join('\n\n');
+  writeFileSync(promptFile, combinedPrompt, 'utf-8');
 
   // Build the launcher script
   const scriptLines: string[] = ['#!/bin/bash', ''];
@@ -600,18 +608,11 @@ export function spawnAgent(
   }
   scriptLines.push('');
 
-  // Build claude command
+  // Build claude command - NO system prompt, everything in initial prompt
   const cmdParts: string[] = ['claude'];
   cmdParts.push('--settings .allhands/harness/src/platforms/claude/settings.json');
   cmdParts.push('--dangerously-skip-permissions');
-
-  if (config.preamble && config.preamble.trim()) {
-    cmdParts.push(`--system-prompt "$(cat '${systemPromptFile}')"`);
-  }
-
-  if (flowContent) {
-    cmdParts.push(`"$(cat '${promptFile}')"`);
-  }
+  cmdParts.push(`"$(cat '${promptFile}')"`)
 
   scriptLines.push(cmdParts.join(' \\\n  '));
 
@@ -737,11 +738,11 @@ export function spawnCustomFlow(
   registerSpawnedAgent(windowName);
 
   // Build environment variables for the custom flow agent
+  // Note: BASE_BRANCH is communicated via the initial prompt, not env vars
   const env: Record<string, string> = {
     AGENT_ID: windowName,
     AGENT_TYPE: 'custom-flow',
     BRANCH: currentBranch,
-    BASE_BRANCH: getBaseBranch(),
   };
 
   if (config.specName) {
@@ -760,17 +761,25 @@ export function spawnCustomFlow(
 
   const launcherScript = join(tempDir, `${windowName}-launcher.sh`);
   const promptFile = join(tempDir, `${windowName}-prompt.txt`);
-  const systemPromptFile = join(tempDir, `${windowName}-system.txt`);
 
-  // Write flow content as the main prompt
+  // Build combined prompt: flow content + custom message + base branch info
+  // NO system prompt - everything goes into the initial user prompt
+  const baseBranch = getBaseBranch();
+  const promptParts: string[] = [];
+
   if (flowContent) {
-    writeFileSync(promptFile, flowContent, 'utf-8');
+    promptParts.push(flowContent);
   }
 
-  // Write custom message as system prompt if provided
   if (config.customMessage && config.customMessage.trim()) {
-    writeFileSync(systemPromptFile, config.customMessage, 'utf-8');
+    promptParts.push(config.customMessage);
   }
+
+  // Always append base branch info
+  promptParts.push(`The base branch name is "${baseBranch}".`);
+
+  const combinedPrompt = promptParts.join('\n\n');
+  writeFileSync(promptFile, combinedPrompt, 'utf-8');
 
   // Build the launcher script
   const scriptLines: string[] = ['#!/bin/bash', ''];
@@ -781,18 +790,11 @@ export function spawnCustomFlow(
   }
   scriptLines.push('');
 
-  // Build claude command
+  // Build claude command - NO system prompt, everything in initial prompt
   const cmdParts: string[] = ['claude'];
   cmdParts.push('--settings .allhands/harness/src/platforms/claude/settings.json');
   cmdParts.push('--dangerously-skip-permissions');
-
-  if (config.customMessage && config.customMessage.trim()) {
-    cmdParts.push(`--system-prompt "$(cat '${systemPromptFile}')"`);
-  }
-
-  if (flowContent) {
-    cmdParts.push(`"$(cat '${promptFile}')"`);
-  }
+  cmdParts.push(`"$(cat '${promptFile}')"`)
 
   scriptLines.push(cmdParts.join(' \\\n  '));
 
