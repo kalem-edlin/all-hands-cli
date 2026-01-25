@@ -140,12 +140,15 @@ export function getProfilesByTuiAction(): Map<string, AgentProfile[]> {
  * Resolve template variables in a string
  *
  * Replaces ${VAR_NAME} with values from context.
+ * Null values are rendered as "null" string.
  * Unresolved variables are left as-is (for debugging visibility).
  */
 export function resolveTemplate(template: string, context: TemplateContext): string {
   return template.replace(/\$\{([^}]+)\}/g, (match, varName) => {
     const value = context[varName as TemplateVarName];
-    return value !== undefined ? value : match;
+    if (value === undefined) return match;
+    if (value === null) return 'null';
+    return value;
   });
 }
 

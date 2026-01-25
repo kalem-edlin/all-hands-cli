@@ -45,8 +45,9 @@ export const TEMPLATE_VAR_NAMES = Object.keys(TemplateVars) as TemplateVarName[]
 /**
  * Context object passed to template resolution.
  * All variables are optional - validation happens against profile requirements.
+ * Values can be string or null (for nullable variables like LAST_KNOWN_BRANCH).
  */
-export type TemplateContext = Partial<Record<TemplateVarName, string>>;
+export type TemplateContext = Partial<Record<TemplateVarName, string | null>>;
 
 /**
  * Zod schema for validating a single template variable name
