@@ -39,6 +39,7 @@ export interface BranchSuggestion {
 export interface PRContent {
   title: string;
   body: string;
+  reviewSteps: string;
 }
 
 export interface ConversationAnalysis {
@@ -62,6 +63,7 @@ export interface BuildPRResult {
   prNumber?: number;
   title: string;
   body: string;
+  reviewSteps?: string;
 }
 
 // ============================================================================
@@ -251,11 +253,25 @@ ${gitDiff}
 - Summarize the key changes based on the git diff
 - Reference the prompts that were completed
 - Include a Test Plan section
+- Generate a step-by-step file review guide for manual reviewers
+
+## Review Steps Guide Requirements:
+- List all changed files, grouping related files (e.g., component + test, interface + implementation)
+- Order steps by review priority:
+  1. Core logic changes first
+  2. API/interface changes
+  3. Supporting utilities
+  4. Tests and validation
+  5. Configuration and documentation
+- For each step, describe what to look for (breaking changes, edge cases, consistency)
+- Include key questions the reviewer should answer
+- Note cross-file concerns (data flow, state changes across boundaries)
 
 ## Response Format (JSON only):
 {
   "title": "Short PR title (max 72 chars)",
-  "body": "Markdown PR body with Summary and Test Plan sections"
+  "body": "Markdown PR body with Summary and Test Plan sections",
+  "reviewSteps": "Markdown guide with numbered steps for manual file review"
 }`;
 
   try {
@@ -276,6 +292,7 @@ ${gitDiff}
     return {
       title: `[${milestoneName}] Implementation complete`,
       body: `## Summary\nImplementation of ${milestoneName} milestone.\n\n## Prompts\n${promptSummary}`,
+      reviewSteps: `## Review Steps\n\nReview all changed files in the diff.`,
     };
   }
 }
@@ -473,6 +490,7 @@ export async function buildPR(
       success: true,
       title: prContent.title,
       body: prContent.body,
+      reviewSteps: prContent.reviewSteps,
     };
   }
 
@@ -498,6 +516,25 @@ export async function buildPR(
     // Update status.yaml with PR info
     if (prUrl && prNumber) {
       updatePRStatus(prUrl, prNumber, currentBranch, workingDir);
+
+      // Post review steps as the first comment
+      if (prContent.reviewSteps) {
+        try {
+          const escapedReviewSteps = prContent.reviewSteps
+            .replace(/"/g, '\\"')
+            .replace(/\$/g, '\\$');
+          execSync(
+            `gh pr comment ${prNumber} --body "${escapedReviewSteps}"`,
+            {
+              encoding: 'utf-8',
+              cwd: workingDir,
+            }
+          );
+        } catch {
+          // Non-fatal: PR was created, just couldn't add the comment
+          console.error('Warning: Could not add review steps comment to PR');
+        }
+      }
     }
 
     return {
@@ -506,6 +543,7 @@ export async function buildPR(
       prNumber,
       title: prContent.title,
       body: prContent.body,
+      reviewSteps: prContent.reviewSteps,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);

@@ -136,6 +136,7 @@ export function register(program: Command): void {
             pr_number: result.prNumber,
             title: result.title,
             body: result.body,
+            review_steps: result.reviewSteps,
             dry_run: options.dryRun || false,
           }, null, 2));
           return;
@@ -145,6 +146,8 @@ export function register(program: Command): void {
           console.log(`\n=== PR Preview (Dry Run) ===\n`);
           console.log(`Title: ${result.title}`);
           console.log(`\nBody:\n${result.body}`);
+          console.log(`\n=== Review Steps (Posted as Comment) ===\n`);
+          console.log(result.reviewSteps);
           return;
         }
 
