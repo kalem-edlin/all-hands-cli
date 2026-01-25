@@ -10,12 +10,11 @@
  */
 
 import { Command } from 'commander';
-import { existsSync, readFileSync, writeFileSync, renameSync, readdirSync, mkdirSync, copyFileSync, rmSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, readdirSync, mkdirSync } from 'fs';
 import { join, dirname, relative, basename } from 'path';
-import { execSync } from 'child_process';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { getGitRoot } from '../lib/planning.js';
-import { getBaseBranch, getBranch } from '../lib/git.js';
+import { getBaseBranch, commitFilesToBranch } from '../lib/git.js';
 import { KnowledgeService } from '../lib/knowledge.js';
 
 interface SpecFrontmatter {
@@ -413,10 +412,9 @@ export function register(program: Command): void {
     .command('persist <path>')
     .description('Commit spec file to base branch without switching branches')
     .option('--json', 'Output as JSON')
-    .action(async (specPath: string, options: { json?: boolean }) => {
+    .action((specPath: string, options: { json?: boolean }) => {
       const gitRoot = getGitRoot();
       const baseBranch = getBaseBranch();
-      const currentBranch = getBranch();
 
       // Resolve spec path
       const absolutePath = specPath.startsWith('/') ? specPath : join(process.cwd(), specPath);
@@ -441,121 +439,37 @@ export function register(program: Command): void {
         process.exit(1);
       }
 
-      // If already on base branch, just commit directly
-      if (currentBranch === baseBranch) {
-        try {
-          execSync(`git add "${relativePath}"`, { cwd: gitRoot, stdio: 'pipe' });
-          const specName = basename(absolutePath, '.spec.md');
-          execSync(`git commit -m "spec: ${specName}"`, { cwd: gitRoot, stdio: 'pipe' });
+      // Use generic git utility to commit to base branch
+      const specName = basename(absolutePath, '.spec.md');
+      const result = commitFilesToBranch({
+        files: [absolutePath],
+        branch: baseBranch,
+        message: `spec: ${specName}`,
+        cwd: gitRoot,
+      });
 
-          if (options.json) {
-            console.log(JSON.stringify({
-              success: true,
-              path: relativePath,
-              branch: baseBranch,
-              method: 'direct',
-            }, null, 2));
-          } else {
-            console.log(`Committed spec to ${baseBranch}: ${relativePath}`);
-          }
-          return;
-        } catch (e) {
-          const message = e instanceof Error ? e.message : String(e);
-          if (options.json) {
-            console.log(JSON.stringify({ success: false, error: message }));
-          } else {
-            console.error(`Failed to commit: ${message}`);
-          }
-          process.exit(1);
-        }
-      }
-
-      // Check if base branch is already checked out in an existing worktree
-      let existingWorktree: string | null = null;
-      try {
-        const worktreeList = execSync('git worktree list --porcelain', { cwd: gitRoot, encoding: 'utf-8' });
-        const lines = worktreeList.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].startsWith('worktree ')) {
-            const wtPath = lines[i].substring('worktree '.length);
-            // Check next lines for branch info
-            for (let j = i + 1; j < lines.length && !lines[j].startsWith('worktree '); j++) {
-              if (lines[j] === `branch refs/heads/${baseBranch}`) {
-                existingWorktree = wtPath;
-                break;
-              }
-            }
-            if (existingWorktree) break;
-          }
-        }
-      } catch {
-        // Ignore errors checking worktrees
-      }
-
-      // Use existing worktree or create a temporary one
-      const needsCleanup = !existingWorktree;
-      const worktreePath = existingWorktree || join(gitRoot, '.git', 'worktrees-tmp', `persist-${Date.now()}`);
-
-      try {
-        if (!existingWorktree) {
-          // Create temporary worktree for base branch
-          mkdirSync(dirname(worktreePath), { recursive: true });
-          execSync(`git worktree add "${worktreePath}" "${baseBranch}"`, { cwd: gitRoot, stdio: 'pipe' });
-        }
-
-        // Ensure target directory exists in worktree
-        const targetDir = join(worktreePath, dirname(relativePath));
-        mkdirSync(targetDir, { recursive: true });
-
-        // Copy spec file to worktree
-        const targetPath = join(worktreePath, relativePath);
-        copyFileSync(absolutePath, targetPath);
-
-        // Commit in worktree
-        const specName = basename(absolutePath, '.spec.md');
-        execSync(`git add "${relativePath}"`, { cwd: worktreePath, stdio: 'pipe' });
-        execSync(`git commit -m "spec: ${specName}"`, { cwd: worktreePath, stdio: 'pipe' });
-
-        // Clean up temporary worktree (don't remove existing ones)
-        if (needsCleanup) {
-          execSync(`git worktree remove "${worktreePath}" --force`, { cwd: gitRoot, stdio: 'pipe' });
-        }
-
+      if (!result.success) {
         if (options.json) {
-          console.log(JSON.stringify({
-            success: true,
-            path: relativePath,
-            branch: baseBranch,
-            currentBranch,
-            method: existingWorktree ? 'existing-worktree' : 'worktree',
-          }, null, 2));
+          console.log(JSON.stringify({ success: false, error: result.error }));
         } else {
-          console.log(`Committed spec to ${baseBranch}: ${relativePath}`);
-          console.log(`  (You remain on ${currentBranch}, spec file stays as local change)`);
-        }
-      } catch (e) {
-        // Clean up temporary worktree on error (don't remove existing ones)
-        if (needsCleanup) {
-          try {
-            execSync(`git worktree remove "${worktreePath}" --force`, { cwd: gitRoot, stdio: 'pipe' });
-          } catch {
-            // Try manual cleanup
-            try {
-              rmSync(worktreePath, { recursive: true, force: true });
-              execSync(`git worktree prune`, { cwd: gitRoot, stdio: 'pipe' });
-            } catch {
-              // Ignore cleanup errors
-            }
-          }
-        }
-
-        const message = e instanceof Error ? e.message : String(e);
-        if (options.json) {
-          console.log(JSON.stringify({ success: false, error: message }));
-        } else {
-          console.error(`Failed to persist spec: ${message}`);
+          console.error(`Failed to persist spec: ${result.error}`);
         }
         process.exit(1);
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify({
+          success: true,
+          path: relativePath,
+          branch: baseBranch,
+          currentBranch: result.currentBranch,
+          method: result.method,
+        }, null, 2));
+      } else {
+        console.log(`Committed spec to ${baseBranch}: ${relativePath}`);
+        if (result.currentBranch) {
+          console.log(`  (You remain on ${result.currentBranch}, spec file stays as local change)`);
+        }
       }
     });
 }
