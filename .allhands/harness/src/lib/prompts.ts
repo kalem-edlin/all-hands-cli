@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { lockSync, unlockSync } from 'proper-lockfile';
 import { getPlanningPaths } from './planning.js';
 
 export type PromptStatus = 'pending' | 'in_progress' | 'done';
@@ -50,6 +51,27 @@ const PRIORITY_ORDER: Record<PromptPriority, number> = {
   medium: 1,
   low: 2,
 };
+
+/**
+ * Execute a function with file locking to prevent race conditions.
+ */
+function withFileLock<T>(filePath: string, fn: () => T): T {
+  if (!existsSync(filePath)) {
+    // File doesn't exist yet, no locking needed
+    return fn();
+  }
+
+  lockSync(filePath);
+  try {
+    return fn();
+  } finally {
+    try {
+      unlockSync(filePath);
+    } catch {
+      // Ignore unlock errors
+    }
+  }
+}
 
 /**
  * Parse a prompt file
@@ -236,22 +258,24 @@ export function updatePromptFrontmatter(
   filePath: string,
   updates: Partial<PromptFrontmatter>
 ): PromptFile | null {
-  const prompt = parsePromptFile(filePath);
-  if (!prompt) return null;
+  return withFileLock(filePath, () => {
+    const prompt = parsePromptFile(filePath);
+    if (!prompt) return null;
 
-  const updatedFrontmatter = {
-    ...prompt.frontmatter,
-    ...updates,
-    updated: new Date().toISOString(),
-  };
+    const updatedFrontmatter = {
+      ...prompt.frontmatter,
+      ...updates,
+      updated: new Date().toISOString(),
+    };
 
-  const newContent = `---
+    const newContent = `---
 ${stringifyYaml(updatedFrontmatter).trim()}
 ---
 ${prompt.body}`;
 
-  writeFileSync(filePath, newContent);
-  return parsePromptFile(filePath);
+    writeFileSync(filePath, newContent);
+    return parsePromptFile(filePath);
+  });
 }
 
 /**
@@ -368,52 +392,54 @@ export function appendToProgressSection(
   filePath: string,
   content: string
 ): PromptFile | null {
-  const prompt = parsePromptFile(filePath);
-  if (!prompt) return null;
+  return withFileLock(filePath, () => {
+    const prompt = parsePromptFile(filePath);
+    if (!prompt) return null;
 
-  // Find the Progress section
-  const progressMarker = '## Progress';
-  const progressIndex = prompt.body.indexOf(progressMarker);
+    // Find the Progress section
+    const progressMarker = '## Progress';
+    const progressIndex = prompt.body.indexOf(progressMarker);
 
-  if (progressIndex === -1) {
-    // No Progress section found - append to end
-    const newBody = prompt.body + '\n## Progress\n\n' + content + '\n';
+    if (progressIndex === -1) {
+      // No Progress section found - append to end
+      const newBody = prompt.body + '\n## Progress\n\n' + content + '\n';
+      const newContent = `---
+${stringifyYaml(prompt.frontmatter).trim()}
+---
+${newBody}`;
+      writeFileSync(filePath, newContent);
+      return parsePromptFile(filePath);
+    }
+
+    // Insert content after Progress section header and any existing content
+    // Find the next section (## header) or end of file
+    const afterProgress = prompt.body.substring(progressIndex + progressMarker.length);
+    const nextSectionMatch = afterProgress.match(/\n## [^\n]+/);
+
+    let insertPoint: number;
+    if (nextSectionMatch && nextSectionMatch.index !== undefined) {
+      // Insert before the next section
+      insertPoint = progressIndex + progressMarker.length + nextSectionMatch.index;
+    } else {
+      // No next section - append to end
+      insertPoint = prompt.body.length;
+    }
+
+    const newBody =
+      prompt.body.substring(0, insertPoint).trimEnd() +
+      '\n\n' +
+      content +
+      '\n' +
+      prompt.body.substring(insertPoint);
+
     const newContent = `---
 ${stringifyYaml(prompt.frontmatter).trim()}
 ---
 ${newBody}`;
+
     writeFileSync(filePath, newContent);
     return parsePromptFile(filePath);
-  }
-
-  // Insert content after Progress section header and any existing content
-  // Find the next section (## header) or end of file
-  const afterProgress = prompt.body.substring(progressIndex + progressMarker.length);
-  const nextSectionMatch = afterProgress.match(/\n## [^\n]+/);
-
-  let insertPoint: number;
-  if (nextSectionMatch && nextSectionMatch.index !== undefined) {
-    // Insert before the next section
-    insertPoint = progressIndex + progressMarker.length + nextSectionMatch.index;
-  } else {
-    // No next section - append to end
-    insertPoint = prompt.body.length;
-  }
-
-  const newBody =
-    prompt.body.substring(0, insertPoint).trimEnd() +
-    '\n\n' +
-    content +
-    '\n' +
-    prompt.body.substring(insertPoint);
-
-  const newContent = `---
-${stringifyYaml(prompt.frontmatter).trim()}
----
-${newBody}`;
-
-  writeFileSync(filePath, newContent);
-  return parsePromptFile(filePath);
+  });
 }
 
 /**
