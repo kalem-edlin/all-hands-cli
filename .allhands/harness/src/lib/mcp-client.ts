@@ -16,7 +16,7 @@
  */
 
 import { connect, type Socket } from 'net';
-import { spawn, execSync } from 'child_process';
+import { spawn } from 'child_process';
 import { existsSync, readFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -75,9 +75,16 @@ export function isDaemonRunning(agentId?: string): boolean {
 }
 
 /**
+ * Sleep helper for async waiting.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Start the daemon for an agent (if not already running).
  */
-export function startDaemon(agentId?: string): void {
+export async function startDaemon(agentId?: string): Promise<void> {
   const aid = agentId ?? getAgentId();
 
   if (isDaemonRunning(aid)) {
@@ -108,7 +115,7 @@ export function startDaemon(agentId?: string): void {
     if (Date.now() - startTime > timeout) {
       throw new Error(`Daemon failed to start for agent ${aid}`);
     }
-    execSync('sleep 0.1');
+    await sleep(100);
   }
 }
 
@@ -199,7 +206,7 @@ export async function restartServer(
   const aid = agentId ?? getAgentId();
 
   // Ensure daemon is running
-  startDaemon(aid);
+  await startDaemon(aid);
 
   return sendToDaemon(aid, {
     cmd: 'restart',
@@ -252,7 +259,7 @@ export async function discoverTools(
 
   if (config.stateful) {
     // Ensure daemon is running, then discover via daemon
-    startDaemon(aid);
+    await startDaemon(aid);
 
     const result = await sendToDaemon<{
       success: boolean;
@@ -306,7 +313,7 @@ export async function callTool(
 
   if (config.stateful) {
     // Ensure daemon is running, then call via daemon
-    startDaemon(aid);
+    await startDaemon(aid);
 
     const result = await sendToDaemon<{
       success: boolean;
