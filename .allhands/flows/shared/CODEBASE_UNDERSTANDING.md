@@ -8,7 +8,19 @@ Enable context-efficient codebase exploration using intentional tooling. Per **C
 - NEVER read full files unless LSP/search exploration proves insufficient
 </constraints>
 
-## Search Flow
+## Search Tool Selection
+
+Choose the right tool for the query type:
+
+| Need | Tool | When |
+|------|------|------|
+| **Conceptual understanding w/ quick access file references** | `ah knowledge search` | "How does X work?", "Why is Y designed this way?" |
+| **Find relevant codebase patterns** | `tldr semantic search` or grep | Known string, error message, literal pattern |
+| **Find symbol definition** | LSP | Class, function, type by name |
+| **Find file by name** | Glob | Filename pattern known |
+| **Past solutions** | `ah solutions search` | Similar problem solved before |
+
+### Search Flow
 
 ```
 Engineer Task → Knowledge Search → LSP on Referenced Symbols → Full Reads only when Needed
@@ -37,13 +49,25 @@ Knowledge search returns:
 
 ```
 Need codebase context?
-├─ Know exact file/symbol? → LSP directly, skip knowledge search
+├─ Know exact file? → Read directly
+├─ Know exact symbol? → LSP directly
+├─ Know exact string? → tldr semantic search / grep
+├─ Similar problem before? → ah solutions search first
 └─ Conceptual/discovery question? → ah knowledge search
     ├─ Aggregated result? → Follow lsp_entry_points (why field = priority)
     └─ Direct result? → relevant_files + [ref:...] blocks → LSP on symbols
         └─ Use ah knowledge search for deeper understanding
             └─ ast-grep if still struggling
 ```
+
+### Failure Recovery
+
+| Situation | Next Step |
+|-----------|-----------|
+| Knowledge search returns nothing | Try different semantic phrasing |
+| grep returns nothing | Try alternative names (error/exception/failure) |
+| LSP can't find symbol | Check import statements, search file contents |
+| Pattern not found | Widen search directory, check file extensions |
 
 ## Full File Reads
 

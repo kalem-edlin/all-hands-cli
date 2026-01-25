@@ -10,5 +10,15 @@ Core harness integration for all agents. Per **Context is Precious**, this flow 
 </constraints>
 
 ## Git Base Branch
- 
+
 For git commands, you can reference the base branch with `$BASE_BRANCH`
+
+## Proactive Delegation
+
+Per **Context is Precious**, delegate work to subtasks. Here are some, but not all flows that you can tell the subtask to read:
+
+- `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md`
+- `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md` 
+- `.allhands/flows/shared/RESEARCH_GUIDANCE.md`
+- `.allhands/flows/shared/SKILL_EXTRACTION.md`
+- 

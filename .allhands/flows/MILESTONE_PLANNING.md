@@ -70,6 +70,8 @@ When engineer selects multiple approaches:
 - Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt creation guidance
 - Transform researched approaches into executable prompts
 - Include validation tooling references in acceptance criteria
+- For high-risk domains (auth, payments, data), note TDD approach requirement in prompt
+  - Reference `.allhands/flows/shared/TDD_WORKFLOW.md` for TDD execution guidance
 
 ## Alignment Doc Setup
 
@@ -100,12 +102,14 @@ Spawn parallel review subtasks (provide alignment doc, spec doc, prompts folder 
 | Expectations Fit | `.allhands/flows/shared/jury/PROMPTS_EXPECTATIONS_FIT.md` | Alignment + prompts fit spec expectations |
 | Flow Analysis | `.allhands/flows/shared/jury/PROMPTS_FLOW_ANALYSIS.md` | Prompt dependencies, variant ordering, importance |
 | YAGNI | `.allhands/flows/shared/jury/PROMPTS_YAGNI.md` | Holistic over-engineering check |
+| Premortem | `.allhands/flows/shared/jury/PROMPT_PREMORTEM.md` | Risk analysis - Tigers, Elephants, failure modes |
 
 After jury returns:
 - Read `.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md` for feedback synthesis
-- Present actionable options to engineer
+- Premortem Tigers become P1/P2 review items; Elephants become discussion points
+- Present actionable options to engineer (including risk acceptance decisions)
 - Amend alignment doc / prompts based on engineer choices
-- Document engineer decisions (critical for compounding)
+- Document engineer decisions including accepted risks (critical for compounding)
 
 ## Plan Deepening (Optional)
 

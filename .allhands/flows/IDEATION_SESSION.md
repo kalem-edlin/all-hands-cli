@@ -32,6 +32,8 @@ Spawn parallel exploration subtasks:
 
 Interview to elicit: goals, motivations, concerns, desires, capabilities, expectations
 
+### Core Dimensions
+
 | Dimension | Elicit via | Infer from |
 |-----------|------------|------------|
 | Goals | "What are you trying to accomplish?" | Problem description |
@@ -41,12 +43,53 @@ Interview to elicit: goals, motivations, concerns, desires, capabilities, expect
 | Capabilities | "What can you handle vs need automated?" | Technical language |
 | Expectations | "What would success look like?" | Examples given |
 
+### Category Deep Dives
+
+Work through relevant categories based on milestone scope:
+
+| Category | Key Questions | Knowledge Gap Signals |
+|----------|---------------|----------------------|
+| **User Experience** | "Walk through: user opens this first time - what happens?" | Describes features instead of journeys |
+| **Data & State** | "What needs to be stored? Where does data come from/go?" | Says "just a database" without schema thinking |
+| **Technical** | "What systems must this work with? Constraints?" | Picks tech without understanding tradeoffs |
+| **Scale** | "How many users/requests? Now vs future?" | Says "millions" without infrastructure thinking |
+| **Integrations** | "External services? APIs consumed/created?" | Assumes integrations are simple |
+| **Security** | "Who should do what? Sensitive data?" | Says "just basic login" |
+
+### Knowledge Gap Detection
+
+Watch for these signals requiring deeper probing:
+
+| Signal | Action |
+|--------|--------|
+| "I think..." or "Maybe..." | Probe deeper, offer research |
+| "That sounds good" (to your suggestion) | Verify they understand implications |
+| "Just simple/basic X" | Challenge - define what simple means |
+| Technology buzzwords without context | Ask what they think it does |
+| Conflicting requirements | Surface the conflict explicitly and ask for Disposable Variants Approach |
+
+
 Per **Ideation First**:
 - One question at a time - reflect back understanding, probe vague answers
-- If engineer wants to go deep on solutions, read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` and entertain their research needs
+- As often as necessary to keep ideas fresh and potential solutions well grounded in reality, spawn subtask to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` with specific research goals as new concepts are discussed / uncovered.
+
 - Present feasibility feedback grounded in exploration results
 - Synthesize guiding principles from engineer's philosophy - validate with them
 - Continue until engineer signals to move to spec writing
+
+## Completeness Check
+
+Before writing spec, verify coverage:
+
+| Area | Verified |
+|------|----------|
+| Problem statement clear | [ ] |
+| Technical constraints understood | [ ] |
+| User Expectations deeply understood | [ ] |
+| All discernable milestone elements either have a user expectation, or an open question for downstream agents | [ ] |
+| No "To Be Discussed" items remaining | [ ] |
+
+If gaps exist, return to Surveying for specific categories.
 
 ## Spec Output
 

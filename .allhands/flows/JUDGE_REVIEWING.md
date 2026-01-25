@@ -51,6 +51,10 @@ For each domain touched by implementation:
 - Spawn subtask to read `.allhands/flows/shared/jury/ARCHITECTURE_REVIEW.md`
 - Verifies SOLID principles, component boundaries, pattern compliance
 
+### Claim Verification
+- Spawn subtask to read `.allhands/flows/shared/jury/CLAIM_VERIFICATION_REVIEW.md`
+- Verifies factual claims in prompts/alignment against actual codebase state
+
 ## Feedback Synthesis
 
 After all jury subtasks complete:

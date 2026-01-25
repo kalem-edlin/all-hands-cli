@@ -18,11 +18,22 @@ Create a hypothesis of implementation that iteratively solves, improves, or conv
   - Check recently changed files on this branch
 - If more context is needed, run `ah solutions search "<keywords>"` for relevant past solutions
 
+## Quick Risk Check (Optional)
+
+Run a quick premortem on your idea:
+- Read `.allhands/flows/shared/QUICK_PREMORTEM.md` for 5-question risk assessment
+- If Tigers identified, adjust implementation before validation
+
+
+
 ## Implementation
 
 - Create a new prompt file following `.allhands/flows/shared/PROMPT_TASKS_CURATION.md`
   - Use next available number
   - Set `type: emergent` in frontmatter
+- For high-risk domains (auth, payments, data mutations):
+  - Read `.allhands/flows/shared/TDD_WORKFLOW.md` for test-first approach
+  - Write failing tests before implementation
 - Follow tasks and break into Todos if necessary
 - Use validation tooling to acquire test data meeting acceptance criteria
 
