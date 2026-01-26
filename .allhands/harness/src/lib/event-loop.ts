@@ -15,7 +15,7 @@
 
 import { getCurrentBranch, updateGreptileStatus, readStatus, sanitizeBranchForDir } from './planning.js';
 import { listWindows, SESSION_NAME, sessionExists, getCurrentSession, getSpawnedAgentRegistry, unregisterSpawnedAgent } from './tmux.js';
-import { pickNextPrompt, markPromptInProgress, type PromptFile } from './prompts.js';
+import { pickNextPrompt, markPromptInProgress, loadAllPrompts, type PromptFile } from './prompts.js';
 import { shutdownDaemon } from './mcp-client.js';
 import { getSpecForBranch, type SpecFile } from './specs.js';
 import {
@@ -24,6 +24,15 @@ import {
   parsePRUrl,
   type GreptileReviewState,
 } from './greptile.js';
+
+export interface PromptSnapshot {
+  count: number;
+  pending: number;
+  inProgress: number;
+  done: number;
+  /** Hash of prompt filenames + statuses for change detection */
+  hash: string;
+}
 
 export interface EventLoopState {
   currentBranch: string;
@@ -35,7 +44,12 @@ export interface EventLoopState {
   activeAgents: string[];
   lastCheckTime: number;
   loopEnabled: boolean;
+  emergentEnabled: boolean;
   currentExecutorPrompt: number | null;
+  /** Timestamp of last executor spawn (for race condition protection) */
+  lastExecutorSpawnTime: number | null;
+  /** Last known prompt state for change detection */
+  promptSnapshot: PromptSnapshot | null;
 }
 
 export interface EventLoopCallbacks {
@@ -43,7 +57,11 @@ export interface EventLoopCallbacks {
   onBranchChange?: (newBranch: string, spec: SpecFile | null) => void;
   onAgentsChange?: (agents: string[]) => void;
   onSpawnExecutor?: (prompt: PromptFile) => void;
+  /** Called when emergent agent should be spawned (prompts done + emergent enabled) */
+  onSpawnEmergent?: (donePrompt: PromptFile) => void;
   onLoopStatus?: (message: string) => void;
+  /** Called when prompts are added, removed, or their status changes */
+  onPromptsChange?: (prompts: PromptFile[], snapshot: PromptSnapshot) => void;
 }
 
 // Note: Use isLockedBranch() from planning.ts for consistent branch checks
@@ -90,7 +108,10 @@ export class EventLoop {
       activeAgents: [],
       lastCheckTime: Date.now(),
       loopEnabled: false,
+      emergentEnabled: false,
       currentExecutorPrompt: null,
+      lastExecutorSpawnTime: null,
+      promptSnapshot: null,
     };
   }
 
@@ -139,7 +160,15 @@ export class EventLoop {
     this.state.loopEnabled = enabled;
     if (!enabled) {
       this.state.currentExecutorPrompt = null;
+      this.state.lastExecutorSpawnTime = null;
     }
+  }
+
+  /**
+   * Enable or disable emergent refinement
+   */
+  setEmergentEnabled(enabled: boolean): void {
+    this.state.emergentEnabled = enabled;
   }
 
   /**
@@ -173,6 +202,7 @@ export class EventLoop {
       this.checkGreptileFeedback(),
       this.checkGitBranch(),
       this.checkAgentWindows(),
+      this.checkPromptFiles(),
     ]);
 
     // Check prompt loop after agent windows (needs to know active agents)
@@ -276,6 +306,65 @@ export class EventLoop {
   }
 
   /**
+   * Check for changes in prompt files
+   *
+   * The harness is the coordinator and watcher - it detects when agents
+   * create, modify, or delete prompt files and notifies the TUI.
+   * This enables reactive UI updates without agents needing to know about the harness.
+   */
+  private async checkPromptFiles(): Promise<void> {
+    // Need planning directory to check prompts
+    if (!this.state.planningKey) {
+      return;
+    }
+
+    try {
+      const prompts = loadAllPrompts(this.state.planningKey, this.cwd);
+      const snapshot = this.computePromptSnapshot(prompts);
+
+      // Check if prompts have changed
+      const hasChanged = !this.state.promptSnapshot ||
+        snapshot.hash !== this.state.promptSnapshot.hash;
+
+      if (hasChanged) {
+        this.state.promptSnapshot = snapshot;
+        this.callbacks.onPromptsChange?.(prompts, snapshot);
+      }
+    } catch (err) {
+      console.error('[EventLoop] checkPromptFiles failed:', err);
+    }
+  }
+
+  /**
+   * Compute a snapshot of prompt state for change detection
+   */
+  private computePromptSnapshot(prompts: PromptFile[]): PromptSnapshot {
+    let pending = 0;
+    let inProgress = 0;
+    let done = 0;
+
+    // Build hash from filenames + statuses + numbers
+    const parts: string[] = [];
+    for (const p of prompts) {
+      parts.push(`${p.filename}:${p.frontmatter.status}:${p.frontmatter.number}`);
+      switch (p.frontmatter.status) {
+        case 'pending': pending++; break;
+        case 'in_progress': inProgress++; break;
+        case 'done': done++; break;
+      }
+    }
+    parts.sort(); // Consistent ordering
+
+    return {
+      count: prompts.length,
+      pending,
+      inProgress,
+      done,
+      hash: parts.join('|'),
+    };
+  }
+
+  /**
    * Check for changes in agent windows
    *
    * Only tracks agents that were spawned by ALL HANDS (in the registry)
@@ -328,6 +417,15 @@ export class EventLoop {
           for (const name of disappeared) {
             unregisterSpawnedAgent(name);
           }
+
+          // If an executor exited, clear spawn tracking so a new one can be spawned
+          const executorExited = disappeared.some(
+            (name) => name.startsWith('executor') || name.startsWith('emergent')
+          );
+          if (executorExited) {
+            this.state.currentExecutorPrompt = null;
+            this.state.lastExecutorSpawnTime = null;
+          }
         }
 
         this.state.activeAgents = agentWindows;
@@ -370,7 +468,7 @@ export class EventLoop {
     try {
       // Check if there's already an executor running
       const hasExecutor = this.state.activeAgents.some(
-        (name) => name.startsWith('prompt-') || name === 'executor'
+        (name) => name.startsWith('executor') || name.startsWith('emergent')
       );
 
       if (hasExecutor) {
@@ -378,11 +476,52 @@ export class EventLoop {
         return;
       }
 
+      // Time-based guard: don't spawn if we spawned recently (within 10 seconds)
+      // This protects against race conditions where the tmux registry hasn't caught up
+      const SPAWN_COOLDOWN_MS = 10000;
+      if (
+        this.state.lastExecutorSpawnTime &&
+        Date.now() - this.state.lastExecutorSpawnTime < SPAWN_COOLDOWN_MS
+      ) {
+        // Recently spawned, wait for it to appear in activeAgents or exit
+        return;
+      }
+
       // No executor running - pick next prompt from planning directory
       const result = pickNextPrompt(this.state.planningKey, this.cwd);
 
+      // Guard against race condition: if we recently spawned an executor for this prompt
+      // but it hasn't appeared in activeAgents yet (tmux registry lag), don't spawn again
+      if (
+        result.prompt &&
+        result.prompt.frontmatter.status === 'in_progress' &&
+        this.state.currentExecutorPrompt === result.prompt.frontmatter.number
+      ) {
+        // We already spawned for this prompt, wait for it to appear in activeAgents
+        return;
+      }
+
       if (!result.prompt) {
-        // No actionable prompts
+        // No actionable prompts - check if we should spawn emergent instead
+        // Conditions: loop enabled + emergent enabled + at least 1 done prompt
+        if (this.state.emergentEnabled && result.stats && result.stats.done > 0) {
+          // Get all prompts and find a done one to refine
+          const allPrompts = loadAllPrompts(this.state.planningKey, this.cwd);
+          const donePrompt = allPrompts.find(p => p.frontmatter.status === 'done');
+
+          if (donePrompt) {
+            this.state.currentExecutorPrompt = donePrompt.frontmatter.number;
+            this.state.lastExecutorSpawnTime = Date.now();
+
+            this.callbacks.onLoopStatus?.(
+              `Spawning emergent for prompt ${donePrompt.frontmatter.number}: ${donePrompt.frontmatter.title}`
+            );
+            this.callbacks.onSpawnEmergent?.(donePrompt);
+            return;
+          }
+        }
+
+        // No actionable prompts and no emergent to spawn
         this.callbacks.onLoopStatus?.(result.reason);
         return;
       }
@@ -390,6 +529,7 @@ export class EventLoop {
       // Mark prompt as in_progress and spawn executor
       markPromptInProgress(result.prompt.path);
       this.state.currentExecutorPrompt = result.prompt.frontmatter.number;
+      this.state.lastExecutorSpawnTime = Date.now();
 
       this.callbacks.onLoopStatus?.(
         `Spawning executor for prompt ${result.prompt.frontmatter.number}: ${result.prompt.frontmatter.title}`

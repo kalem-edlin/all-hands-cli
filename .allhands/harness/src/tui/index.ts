@@ -43,6 +43,7 @@ export interface TUIOptions {
   onAction: (action: string, data?: Record<string, unknown>) => void;
   onExit: () => void;
   onSpawnExecutor?: (prompt: PromptFile, branch: string) => void;
+  onSpawnEmergent?: (prompt: PromptFile, branch: string) => void;
   cwd?: string;
 }
 
@@ -227,7 +228,7 @@ export class TUI {
                   title: p.frontmatter.title,
                   status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
                 }));
-                this.state.loopEnabled = status?.loop?.enabled ?? false;
+                // Don't restore loopEnabled from status - always requires manual enable
                 this.state.emergentEnabled = status?.loop?.emergent ?? false;
                 this.state.compoundRun = status?.compound_run ?? false;
               } else {
@@ -236,6 +237,9 @@ export class TUI {
                 this.state.emergentEnabled = false;
                 this.state.compoundRun = false;
               }
+
+              // Sync emergent state to event loop
+              this.eventLoop?.setEmergentEnabled(this.state.emergentEnabled);
             }
 
             this.buildActionItems();
@@ -258,8 +262,31 @@ export class TUI {
             this.options.onSpawnExecutor(prompt, this.state.branch);
           }
         },
+        onSpawnEmergent: (prompt) => {
+          this.log(`Loop: Spawning emergent for prompt ${prompt.frontmatter.number}`);
+          if (this.state.branch && this.options.onSpawnEmergent) {
+            this.options.onSpawnEmergent(prompt, this.state.branch);
+          }
+        },
         onLoopStatus: (message) => {
           this.log(`Loop: ${message}`);
+        },
+        onPromptsChange: (prompts, snapshot) => {
+          // Update TUI state when prompts are added, removed, or status changes
+          const prevCount = this.state.prompts.length;
+          this.state.prompts = prompts.map((p) => ({
+            number: p.frontmatter.number,
+            title: p.frontmatter.title,
+            status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+          }));
+
+          // Log meaningful changes
+          if (snapshot.count !== prevCount) {
+            this.log(`Prompts: ${snapshot.count} (${snapshot.pending} pending, ${snapshot.inProgress} in progress, ${snapshot.done} done)`);
+          }
+
+          this.buildActionItems();
+          this.render();
         },
       });
       this.eventLoop.start();
@@ -654,6 +681,9 @@ export class TUI {
       case 'toggle-emergent':
         this.state.emergentEnabled = !this.state.emergentEnabled;
         this.buildActionItems();
+        if (this.eventLoop) {
+          this.eventLoop.setEmergentEnabled(this.state.emergentEnabled);
+        }
         this.options.onAction('toggle-emergent', { enabled: this.state.emergentEnabled });
         this.render();
         break;
@@ -1035,6 +1065,12 @@ export class TUI {
 
   public updateState(updates: Partial<TUIState>): void {
     this.state = { ...this.state, ...updates };
+
+    // Sync emergent state to event loop if it was updated
+    if ('emergentEnabled' in updates && this.eventLoop) {
+      this.eventLoop.setEmergentEnabled(this.state.emergentEnabled);
+    }
+
     this.buildActionItems();
     this.render();
   }

@@ -72,6 +72,12 @@ Acceptance criteria must be:
 
 If no suite matches: note gap, flag for CREATE_VALIDATION_TOOLING follow-up, use basic validation.
 
+**Testing is validation, not prompts**:
+- Do NOT create standalone "E2E testing" or "write tests" prompts
+- Tests are created as part of feature prompts OR via validation suite setup
+- Validation suites (Playwright, pytest, etc.) are attached to prompts via `validation_suites` field
+- If no validation suite exists, prompt should create test infrastructure as part of feature work
+
 ## Context Budget (Critical)
 
 Per **Context is Precious**, agents degrade with context. Hard limits:

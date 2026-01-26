@@ -12,6 +12,8 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 - MUST research / gather implementation approaches deeply before presenting options
 - MUST present recommended approach for each decision point
 - MUST spawn plan review jury before finalizing
+- Prompts MUST be fully autonomous - no human intervention during execution
+- Testing is NOT a prompt - validation happens via validation_suites attached to prompts
 </constraints>
 
 ## Context Gathering
@@ -25,8 +27,8 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 ## Deep Research
 
 Spawn parallel general subtasks to ground yourself with information that will help you be confident making recommendations in the upcoming interview and subsequent writing of this implementation:
-- 1-4 Tasks: Read `.allhands/flows/shared/CODEBASE_GROUNDING.md` with understanding relevant implementation approaches in the codebase
-- 0-3 Tasks: Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` with search goals for isolating optimal solutions to the problem (if necessary)
+- 1-4 Tasks: Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` in order to understand relevant implementation approaches in the codebase
+- 0-3 Tasks: Tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` in order to isolate optimal solutions to the problem (if necessary)
 
 ## Engineer Interview
 
@@ -34,8 +36,8 @@ Per **Quality Engineering**, present researched approaches as options using the 
 - Ask ONE decision point at a time - do not batch all questions together
 - Each implementation approach becomes a set of options (2-4 per question)
 - Engineer can choose one OR many (disposable variants)
-- When selecting many, create parallel variant prompts behind feature flags
-- Engineer MUST choose a **convention** when selecting multiple approaches
+- When selecting many, create parallel variant prompts behind feature flags if they cant work together at the same time
+- If we use variant prompts, engineer MUST choose a **convention** when selecting multiple approaches
 - Each option MUST have a recommended approach (mark with "(Recommended)" suffix)
 - Adapt subsequent questions based on previous answers when logical dependencies exist
 
@@ -69,8 +71,12 @@ Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
 ## Alignment Doc Setup
 
 - Run `ah schema alignment` for format
-- Create alignment doc with top-level goal + objectives
-- Document engineer decisions from interview
+- Create alignment doc with Overview + Hard User Requirements sections
+- Document engineer decisions ONLY when they deviate from recommendations:
+  - Record: what you recommended, what they chose instead, their stated reasoning
+  - Do NOT record when engineer accepts the recommended approach
+  - Purpose: future agents need to know where human judgment overrode AI suggestions
+- Do NOT write prompt summaries - those are appended by executor after prompt completion
 
 ## Plan Verification
 
@@ -101,8 +107,11 @@ After jury returns:
 - Read `.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md` for feedback synthesis
 - Premortem Tigers become P1/P2 review items; Elephants become discussion points
 - Present actionable options to engineer (including risk acceptance decisions)
-- Amend alignment doc / prompts based on engineer choices
-- Document engineer decisions including accepted risks (critical for compounding)
+- Amend prompts based on engineer choices, respecting PROMPT_TASKS_CURATION limits:
+  - Do NOT pack substantial refinements into existing prompts
+  - Create NEW prompts for additions that exceed scope limits (tasks, files)
+  - Update prompt dependencies when inserting new prompts
+- Document only deviations from recommendations (including accepted risks that were flagged)
 
 ## Plan Deepening (Optional)
 

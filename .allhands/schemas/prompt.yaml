@@ -19,12 +19,6 @@ frontmatter:
     default: planned
     description: "Type of prompt (planned, emergent, user-patch, review-fix)"
 
-  planning_session:
-    type: integer
-    required: true
-    default: 1
-    description: "The planning session number (1, 2, etc.) this prompt was created in"
-    
   status:
     type: enum
     required: true

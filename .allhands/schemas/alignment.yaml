@@ -12,12 +12,6 @@ frontmatter:
     required: true
     description: "Path to the spec file"
 
-  planning_session:
-    type: integer
-    required: true
-    default: 1
-    description: "The current planning session number (1, 2, etc.) incremented each time a planning session is successfully used to change / add prompts"
-
   validation_gaps_accepted:
     type: array
     items: string
@@ -35,9 +29,17 @@ body:
       required: true
       description: "Concise, immutable user requirements. Guidelines for emergent mode."
 
-    - append_format: |
+    - name: "Engineer Decisions"
+      required: false
+      description: "ONLY deviations - do NOT record when engineer accepts recommendations. Captures: recommended → chosen instead → reasoning."
+
+    - name: "Prompt Summaries"
+      required: false
+      appended_by: "executor"
+      description: "Appended after prompt execution, not during planning."
+      format: |
         ### [Prompt ##: Title]
-        **Decision**: What was decided
-        **Files**: List of key files affected
-        **Summary**: Brief explanation
+        **Decision**: The most important decisions that were made during implementation
+        **Files**: List of key files of interest from the commit
+        **Summary**: Very brief explanation of implementation
         **Link**: `./prompts/##-title.md`

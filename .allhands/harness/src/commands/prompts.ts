@@ -24,7 +24,6 @@ import {
   listPromptFiles,
   planningDirExists,
 } from '../lib/planning.js';
-import { getSpecForBranch } from '../lib/specs.js';
 import { tracedAction } from '../lib/base-command.js';
 
 interface PromptFrontmatter {
@@ -163,17 +162,10 @@ export function register(program: Command): void {
       const cwd = process.cwd();
 
       // Determine which planning key to use (from option or current branch)
+      // The planning key is the sanitized branch name, not the spec ID
       let spec: string | null = options.spec ?? null;
       if (!spec) {
         const branch = getCurrentBranch(cwd);
-        const currentSpec = getSpecForBranch(branch, cwd);
-        if (!currentSpec) {
-          console.log(JSON.stringify({
-            success: false,
-            error: 'No spec for current branch. Checkout a spec branch first.',
-          }, null, 2));
-          return;
-        }
         spec = sanitizeBranchForDir(branch);
       }
 
@@ -239,14 +231,6 @@ export function register(program: Command): void {
       let spec: string | null = options.spec ?? null;
       if (!spec) {
         const branch = getCurrentBranch(cwd);
-        const currentSpec = getSpecForBranch(branch, cwd);
-        if (!currentSpec) {
-          console.log(JSON.stringify({
-            success: false,
-            error: 'No spec for current branch.',
-          }, null, 2));
-          return;
-        }
         spec = sanitizeBranchForDir(branch);
       }
 
@@ -294,14 +278,6 @@ export function register(program: Command): void {
       let spec: string | null = options.spec ?? null;
       if (!spec) {
         const branch = getCurrentBranch(cwd);
-        const currentSpec = getSpecForBranch(branch, cwd);
-        if (!currentSpec) {
-          console.log(JSON.stringify({
-            success: false,
-            error: 'No spec for current branch.',
-          }, null, 2));
-          return;
-        }
         spec = sanitizeBranchForDir(branch);
       }
 

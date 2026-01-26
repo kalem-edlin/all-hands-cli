@@ -27,8 +27,8 @@ After initial ideation prompt, prepare for interview:
 - Read dependent milestone specs
 
 Spawn parallel general subtasks:
-- 1-3 Tasks: Read `.allhands/flows/shared/IDEATION_CODEBASE_GROUNDING.md` with verbose search goals for codebase reality (yields hard dependencies)
-- 0-2 Tasks: Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` with search goals for high-level solution approaches (if necessary)
+- 1-3 Tasks: Tell them to read `.allhands/flows/shared/IDEATION_CODEBASE_GROUNDING.md` in order search an array of queries to get a deep understanding of the codebase reality (yields hard dependencies)
+- 0-2 Tasks: Tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` in order to find high-level tech solution approaches (if necessary)
 
 ## Surveying
 

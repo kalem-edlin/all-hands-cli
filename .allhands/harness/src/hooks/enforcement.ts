@@ -8,8 +8,8 @@
  */
 
 import type { Command } from 'commander';
-import { HookInput, denyTool, allowTool, readHookInput } from './shared.js';
 import { logHookStart } from '../lib/trace-store.js';
+import { HookInput, allowTool, denyTool, readHookInput } from './shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -84,7 +84,7 @@ export function enforceResearchFetch(input: HookInput): void {
   }
 
   denyTool(
-    'WebFetch blocked. Main agent: delegate to researcher agent. Subagent: use `ah tavily extract "<url>"` instead.',
+    'WebFetch blocked. Use `ah tavily extract "<url>"` instead.',
     HOOK_RESEARCH_FETCH
   );
 }
@@ -102,7 +102,7 @@ const HOOK_RESEARCH_SEARCH = 'enforcement research-search';
  */
 export function enforceResearchSearch(_input: HookInput): void {
   denyTool(
-    'WebSearch blocked. Main agent: delegate to researcher agent. Subagent: respond to main agent requesting researcher delegation.',
+    'WebSearch blocked. Use `ah perplexity research "<query>"` instead.',
     HOOK_RESEARCH_SEARCH
   );
 }
@@ -134,7 +134,7 @@ export function register(parent: Command): void {
 
   enforcement
     .command('research-fetch')
-    .description('Block WebFetch and suggest research tools')
+    .description('Block WebFetch and suggest `ah tavily extract "<url>"` instead')
     .action(async () => {
       try {
         const input = await readHookInput();
@@ -147,7 +147,7 @@ export function register(parent: Command): void {
 
   enforcement
     .command('research-search')
-    .description('Block WebSearch and suggest research delegation')
+    .description('Block WebSearch and suggest `ah perplexity research "<query>"` instead')
     .action(async () => {
       try {
         const input = await readHookInput();

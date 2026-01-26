@@ -69,8 +69,9 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
   // TLDR semantic indexing now runs in background after TUI launches (see TUI.startBackgroundIndexing)
 
   // Load initial state from current branch's planning directory
+  // Load prompts if planning directory exists, regardless of status file
   const status = planningDirExists(planningKey, cwd) ? readStatus(planningKey, cwd) : null;
-  const prompts = status ? loadAllPrompts(planningKey, cwd) : [];
+  const prompts = planningDirExists(planningKey, cwd) ? loadAllPrompts(planningKey, cwd) : [];
 
   // Convert prompts to PromptItem format
   const promptItems: PromptItem[] = prompts.map((p) => ({
@@ -90,7 +91,7 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
   const baseBranch = getBaseBranch();
 
   const initialState: Partial<TUIState> = {
-    loopEnabled: status?.loop.enabled ?? false,
+    loopEnabled: false, // Always start disabled, regardless of saved status
     emergentEnabled: status?.loop.emergent ?? false,
     prompts: promptItems,
     activeAgents,
@@ -119,6 +120,9 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
     },
     onSpawnExecutor: (prompt, executorBranch) => {
       spawnExecutorForPrompt(tui, prompt, executorBranch);
+    },
+    onSpawnEmergent: (prompt, emergentBranch) => {
+      spawnEmergentForPrompt(tui, prompt, emergentBranch);
     },
     cwd: process.cwd(),
   });
@@ -465,9 +469,7 @@ async function handleAction(
 
     case 'toggle-loop': {
       const enabled = data?.enabled as boolean;
-      if (planningKey && status) {
-        updateStatus({ loop: { ...status.loop, enabled } }, planningKey, cwd);
-      }
+      // Don't persist enabled state - loop always starts disabled
       tui.log(`Loop: ${enabled ? 'Started' : 'Stopped'}`);
       break;
     }
@@ -518,6 +520,24 @@ async function handleAction(
         tui.log(`Spec: ${newSpec.id}`);
       } else {
         tui.log('No spec for this branch');
+      }
+      break;
+    }
+
+    case 'refresh': {
+      // Reload prompts from filesystem
+      if (planningKey && planningDirExists(planningKey, cwd)) {
+        const refreshedPrompts = loadAllPrompts(planningKey, cwd);
+        tui.updateState({
+          prompts: refreshedPrompts.map((p) => ({
+            number: p.frontmatter.number,
+            title: p.frontmatter.title,
+            status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+          })),
+        });
+        tui.log(`Refreshed: ${refreshedPrompts.length} prompts`);
+      } else {
+        tui.log('No planning directory for this branch');
       }
       break;
     }
@@ -597,6 +617,46 @@ function spawnExecutorForPrompt(tui: TUI, prompt: PromptFile, branch: string): v
     const message = e instanceof Error ? e.message : String(e);
     tui.log(`Error spawning executor: ${message}`);
     logTuiError('spawn-executor', e instanceof Error ? e : message, {
+      promptNumber,
+      promptTitle: prompt.frontmatter.title,
+      branch,
+    }, cwd);
+  }
+}
+
+function spawnEmergentForPrompt(tui: TUI, prompt: PromptFile, branch: string): void {
+  const promptNumber = prompt.frontmatter.number;
+  const cwd = process.cwd();
+
+  tui.log(`Spawning emergent for: ${prompt.frontmatter.title}`);
+
+  try {
+    // Build context with prompt-specific info
+    const context = buildTemplateContext(
+      branch,
+      prompt.frontmatter.title,
+      promptNumber,
+      prompt.path,
+      cwd
+    );
+
+    const result = spawnAgentFromProfile(
+      {
+        agentName: 'emergent',
+        context,
+        promptNumber,
+        focusWindow: false, // Don't steal focus from TUI
+      },
+      branch,
+      cwd
+    );
+
+    tui.log(`Spawned emergent in ${result.sessionName}:${result.windowName}`);
+    updateRunningAgents(tui, branch);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    tui.log(`Error spawning emergent: ${message}`);
+    logTuiError('spawn-emergent', e instanceof Error ? e : message, {
       promptNumber,
       promptTitle: prompt.frontmatter.title,
       branch,
