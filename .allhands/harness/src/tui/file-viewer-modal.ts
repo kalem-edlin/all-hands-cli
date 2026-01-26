@@ -76,7 +76,7 @@ export function createFileViewer(
     scrollbar: {
       ch: '┃',
       track: {
-        bg: '#22263C',
+        bg: 'black',
       },
       style: {
         fg: '#4A34C5',
@@ -86,7 +86,6 @@ export function createFileViewer(
       border: {
         fg: '#a78bfa',
       },
-      bg: '#1e2235',
       fg: '#e0e7ff',
     },
   });

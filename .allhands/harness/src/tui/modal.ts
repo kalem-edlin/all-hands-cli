@@ -64,7 +64,6 @@ export function createModal(
       border: {
         fg: '#a78bfa',
       },
-      bg: '#1e2235',
     },
   });
 
@@ -85,7 +84,7 @@ export function createModal(
       ? {
           ch: '┃',
           track: {
-            bg: '#22263C',
+            bg: 'black',
           },
           style: {
             fg: '#4A34C5',
@@ -95,9 +94,8 @@ export function createModal(
           ch: ' ',
         },
     style: {
-      bg: '#1e2235',
       selected: {
-        bg: '#1e2235',
+        inverse: true,
       },
     },
     keys: false, // We handle keys ourselves

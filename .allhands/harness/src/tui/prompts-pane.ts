@@ -42,7 +42,7 @@ export function createPromptsPane(
     scrollbar: {
       ch: '┃',
       track: {
-        bg: '#22263C',
+        bg: 'black',
       },
       style: {
         fg: '#4A34C5',
@@ -52,7 +52,6 @@ export function createPromptsPane(
       border: {
         fg: '#4A34C5',
       },
-      bg: '#22263C',
     },
   });
 

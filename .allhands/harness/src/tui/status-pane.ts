@@ -79,7 +79,6 @@ export function createStatusPane(
       border: {
         fg: '#4A34C5',
       },
-      bg: '#22263C',
     },
   });
 

@@ -463,7 +463,6 @@ export class TUI {
       tags: true,
       style: {
         fg: '#e0e7ff',
-        bg: '#22263C',
         border: {
           fg: '#4A34C5',
         },
@@ -872,7 +871,6 @@ export class TUI {
         border: {
           fg: '#a78bfa',
         },
-        bg: '#1e2235',
       },
     });
 
@@ -899,7 +897,6 @@ export class TUI {
         border: {
           fg: '#4A34C5',
         },
-        bg: '#22263C',
         focus: {
           border: {
             fg: '#a78bfa',
@@ -1040,7 +1037,6 @@ export class TUI {
           border: {
             fg: '#a78bfa',
           },
-          bg: '#1e2235',
         },
       });
 
