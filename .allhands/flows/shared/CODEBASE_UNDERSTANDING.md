@@ -3,10 +3,11 @@ Enable context-efficient codebase exploration using intentional tooling. Per **C
 </goal>
 
 <constraints>
+
 - MUST use `ah knowledge docs search` FIRST for ANY DISCOVERY TASKS
-- MUST use complete sentences for knowledge search queries (RAG performs better with semantic content)
-- NEVER read full files unless LSP/search exploration proves insufficient
-- TLDR semantic search is your backup weapon
+- MUST use `tldr` or LSP tool to get context from code files!
+- NEVER use the Read tool - unless absolutely necessary
+
 </constraints>
 
 ## Search Tool Selection

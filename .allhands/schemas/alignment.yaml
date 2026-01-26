@@ -38,8 +38,7 @@ body:
       appended_by: "executor"
       description: "Appended after prompt execution, not during planning."
       format: |
-        ### [Prompt ##: Title]
+        ### ##-prompt-file-name.prompt.md
         **Decision**: The most important decisions that were made during implementation
         **Files**: List of key files of interest from the commit
         **Summary**: Very brief explanation of implementation
-        **Link**: `./prompts/##-title.md`

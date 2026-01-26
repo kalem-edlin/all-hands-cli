@@ -62,6 +62,10 @@ Handle deviations automatically:
 - Append summary to prompt file
   - Include deviations handled during implementation
   - If blockers required engineer steering, document as learnings to prevent recurrence
+- Run `ah schema alignment body` for alignment doc summary format
+- Append prompt summary to alignment doc's "## Prompt Summaries" section
+  - Per **Knowledge Compounding**, this enables other agents to see completed work without reading each prompt
+  - If section doesn't exist, create it
 - Set frontmatter `status: done`
 - Rename prompt file to include `-DONE` suffix
 - Stop
