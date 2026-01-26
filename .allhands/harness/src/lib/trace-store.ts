@@ -10,7 +10,7 @@
  * - AGENT_ID, AGENT_TYPE, PROMPT_NUMBER, SPEC_NAME, BRANCH
  */
 
-import { mkdirSync, appendFileSync, existsSync } from 'fs';
+import { mkdirSync, appendFileSync, existsSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import Database from 'better-sqlite3';
 
@@ -680,4 +680,28 @@ export function closeDb(): void {
     db.close();
   }
   dbCache.clear();
+}
+
+/**
+ * Clear all trace logs (both SQLite database and JSONL file)
+ */
+export function clearLogs(cwd?: string): void {
+  const { jsonlPath } = getStoragePaths(cwd);
+
+  // Clear SQLite database
+  try {
+    const database = getDb(cwd);
+    database.exec('DELETE FROM events');
+  } catch (err) {
+    console.error(`[trace-store] SQLite clear error: ${err}`);
+  }
+
+  // Clear JSONL file by truncating it
+  try {
+    if (existsSync(jsonlPath)) {
+      writeFileSync(jsonlPath, '');
+    }
+  } catch (err) {
+    console.error(`[trace-store] JSONL clear error: ${err}`);
+  }
 }

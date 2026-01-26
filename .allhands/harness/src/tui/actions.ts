@@ -11,12 +11,15 @@
  * [7] Compound
  * [8] Mark Completed
  * [9] Switch Spec
+ * [0] Custom Flow
  * ─ Toggles ─
  * [ ] Loop
  * [ ] Emergent
- * ─────────
- * [Q] Quit
+ * ─ Controls ─
+ * [L] View Logs
+ * [C] Clear Logs
  * [R] Refresh
+ * [Q] Quit
  */
 
 import blessed from 'blessed';
@@ -165,8 +168,10 @@ function buildActionItems(toggleState: ToggleState): ActionItem[] {
     // Spacing before controls
     { id: 'spacer-2', label: '', type: 'separator' },
     { id: 'separator-bottom', label: '─── Controls ───', type: 'separator' },
-    { id: 'quit', label: 'Quit', key: 'Q', type: 'action' },
+    { id: 'view-logs', label: 'View Logs', key: 'L', type: 'action' },
+    { id: 'clear-logs', label: 'Clear Logs', key: 'C', type: 'action' },
     { id: 'refresh', label: 'Refresh', key: 'R', type: 'action' },
+    { id: 'quit', label: 'Quit', key: 'Q', type: 'action' },
   ];
 }
 
