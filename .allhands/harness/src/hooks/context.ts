@@ -759,7 +759,8 @@ function tldrReadEnforcer(input: HookInput): void {
   parts.push('---');
   parts.push('To read specific sections, use: `Read(file_path, offset=LINE, limit=COUNT)`');
 
-  // Deny the raw read and provide TLDR summary
+  // Put full TLDR summary in permissionDecisionReason so it's reliably shown
+  // (systemMessage isn't consistently displayed for denied tools)
   denyTool(parts.join('\n'), HOOK_READ_ENFORCER);
 }
 
