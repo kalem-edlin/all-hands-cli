@@ -55,7 +55,7 @@ Candidate subdomain if:
 Before creating subdomain structure, identify cross-cutting features:
 
 1. **Detect feature clusters**
-   - Run `ah knowledge search "<feature-name>"` to find all related files
+   - Run `ah knowledge docs search "<feature-name>"` to find all related files
    - A feature often spans: `commands/` (CLI surface) + `lib/` (implementation) + `hooks/` (lifecycle)
    - These should become ONE subdomain, not three
 

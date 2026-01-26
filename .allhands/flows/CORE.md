@@ -3,8 +3,8 @@ Core harness integration for all agents. Per **Context is Precious**, this flow 
 </goal>
 
 <constraints>
-- MUST use `ah knowledge search <query>` for code search tied to crucial project knowledge
-- MUST use `tldr semantic search <query>` for quick and intelligent code search
+- MUST use `ah knowledge docs search <descriptive_query>` for code search tied to crucial project knowledge for any codebase discovery needs
+- MUST use `tldr semantic search <descriptive_query>` for code search when a specific piece of functionality is required to be found
 - MUST read `.allhands/principles.md` when making architectural decisions
 - NEVER repeat instructions found in sub-flows; reference them instead
 </constraints>

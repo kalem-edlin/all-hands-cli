@@ -14,7 +14,7 @@ Create a hypothesis of implementation that iteratively solves, improves, or conv
 - Formulate a non-overlapping hypothesis of implementation → intended outcome
 - Verify hypothesis doesn't conflict with prior work:
   - Read relevant prompt files and check their code references if relevant
-  - Run `ah knowledge search <query>` for documented features
+  - Run `ah knowledge docs search <descriptive_query>` for documented features
   - Check recently changed files on this branch
 - If more context is needed, run `ah solutions search "<keywords>"` for relevant past solutions
 

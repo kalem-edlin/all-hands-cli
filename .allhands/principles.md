@@ -53,20 +53,6 @@
 - The harness implementation itself improves with use
 - Future tasks benefit from all past work
 
-### 8. Harness as Coordinator, Not Participant
-**The harness watches, agents work**:
-- Agents don't need to know about the harness internals
-- Agents write ephemeral files (prompts, specs, planning artifacts) - harness detects and reacts
-- The harness polls/watches the filesystem for changes to coordination files
-- Whenever pending prompts exist and loop is enabled, execute them (simple rule)
-- The harness is the single source of truth for workflow state
-- No explicit "notify harness" calls needed - discovery is automatic
-
-**What the harness watches**:
-- `.planning/` directories for prompt files (add, remove, status changes)
-- `specs/` for spec file changes
-- Git branch changes (triggers context switching)
-- Agent windows (detects when agents start/stop)
 
 ---
 
