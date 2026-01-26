@@ -12,7 +12,7 @@ import type { Command } from 'commander';
 import { HookInput, outputStopHook, outputPreCompact, readHookInput } from './shared.js';
 import { parseTranscript, buildCompactionMessage } from './transcript-parser.js';
 import { sendNotification } from '../lib/notification.js';
-import { killWindow, SESSION_NAME, windowExists } from '../lib/tmux.js'; // killWindow used in compact
+import { killWindow, SESSION_NAME, windowExists, getCurrentSession } from '../lib/tmux.js';
 import { getPromptByNumber } from '../lib/prompts.js';
 import { getCurrentBranch, sanitizeBranchForDir } from '../lib/planning.js';
 import { getSpecForBranch } from '../lib/specs.js';
@@ -51,8 +51,11 @@ export function handleAgentStop(_input: HookInput): void {
 
   // Explicitly kill the tmux window to ensure cleanup
   // (prompt-scoped agents may not close naturally even with exec)
-  if (agentId && windowExists(SESSION_NAME, agentId)) {
-    killWindow(SESSION_NAME, agentId);
+  // Use current session (not hardcoded SESSION_NAME) since agents may be
+  // spawned in whatever session is active, not necessarily 'ah-hub'
+  const sessionName = getCurrentSession() || SESSION_NAME;
+  if (agentId && windowExists(sessionName, agentId)) {
+    killWindow(sessionName, agentId);
   }
 
   // Approve stop
@@ -154,6 +157,10 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
   const promptNumber = process.env.PROMPT_NUMBER;
   const transcriptPath = input.transcript_path;
 
+  // Use current session (not hardcoded SESSION_NAME) since agents may be
+  // spawned in whatever session is active, not necessarily 'ah-hub'
+  const sessionName = getCurrentSession() || SESSION_NAME;
+
   // If no prompt number, just kill the window (not a managed prompt execution)
   if (!promptNumber) {
     sendNotification({
@@ -162,8 +169,8 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
       type: 'banner',
     });
 
-    if (agentId && windowExists(SESSION_NAME, agentId)) {
-      killWindow(SESSION_NAME, agentId);
+    if (agentId && windowExists(sessionName, agentId)) {
+      killWindow(sessionName, agentId);
     }
 
     outputPreCompact(undefined, HOOK_AGENT_COMPACT);
@@ -181,8 +188,8 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
   }
   if (!spec) {
     // No spec, just kill the window
-    if (agentId && windowExists(SESSION_NAME, agentId)) {
-      killWindow(SESSION_NAME, agentId);
+    if (agentId && windowExists(sessionName, agentId)) {
+      killWindow(sessionName, agentId);
     }
     outputPreCompact(undefined, HOOK_AGENT_COMPACT);
     return;
@@ -194,8 +201,8 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
 
   if (!prompt) {
     // Prompt file not found, just kill
-    if (agentId && windowExists(SESSION_NAME, agentId)) {
-      killWindow(SESSION_NAME, agentId);
+    if (agentId && windowExists(sessionName, agentId)) {
+      killWindow(sessionName, agentId);
     }
     outputPreCompact(undefined, HOOK_AGENT_COMPACT);
     return;
@@ -239,8 +246,8 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
   }
 
   // Kill the tmux window
-  if (agentId && windowExists(SESSION_NAME, agentId)) {
-    killWindow(SESSION_NAME, agentId);
+  if (agentId && windowExists(sessionName, agentId)) {
+    killWindow(sessionName, agentId);
   }
 
   outputPreCompact(undefined, HOOK_AGENT_COMPACT);
