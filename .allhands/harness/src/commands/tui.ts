@@ -78,6 +78,7 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
     number: p.frontmatter.number,
     title: p.frontmatter.title,
     status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+    path: p.path,
   }));
 
   // Get active agents from tmux
@@ -449,6 +450,7 @@ async function handleAction(
             number: p.frontmatter.number,
             title: p.frontmatter.title,
             status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+            path: p.path,
           })),
         });
 
@@ -523,6 +525,7 @@ async function handleAction(
           number: p.frontmatter.number,
           title: p.frontmatter.title,
           status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+          path: p.path,
         })),
       });
 
@@ -543,6 +546,7 @@ async function handleAction(
             number: p.frontmatter.number,
             title: p.frontmatter.title,
             status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+            path: p.path,
           })),
         });
         tui.log(`Refreshed: ${refreshedPrompts.length} prompts`);

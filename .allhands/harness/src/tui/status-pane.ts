@@ -77,8 +77,9 @@ export function createStatusPane(
     tags: true,
     style: {
       border: {
-        fg: 'cyan',
+        fg: '#4A34C5',
       },
+      bg: '#22263C',
     },
   });
 
@@ -90,7 +91,7 @@ export function createStatusPane(
       parent: pane,
       top: currentY,
       left: 1,
-      content: `{bold}{green-fg}Spec: ${truncate(spec, 25)}{/green-fg}{/bold}`,
+      content: `{bold}{#a78bfa-fg}Spec:{/#a78bfa-fg} {#e0e7ff-fg}${truncate(spec, 25)}{/#e0e7ff-fg}{/bold}`,
       tags: true,
     });
   } else {
@@ -98,7 +99,7 @@ export function createStatusPane(
       parent: pane,
       top: currentY,
       left: 1,
-      content: '{bold}{yellow-fg}No spec selected{/yellow-fg}{/bold}',
+      content: '{bold}{#f59e0b-fg}No spec selected{/#f59e0b-fg}{/bold}',
       tags: true,
     });
   }
@@ -110,7 +111,7 @@ export function createStatusPane(
       parent: pane,
       top: currentY,
       left: 1,
-      content: `{cyan-fg}Branch:{/cyan-fg} ${truncate(branch, 22)}`,
+      content: `{#818cf8-fg}Branch:{/#818cf8-fg} {#c7d2fe-fg}${truncate(branch, 22)}{/#c7d2fe-fg}`,
       tags: true,
     });
     currentY += 1;
@@ -120,7 +121,7 @@ export function createStatusPane(
       parent: pane,
       top: currentY,
       left: 1,
-      content: `{gray-fg}Base: ${truncate(baseBranch, 24)}{/gray-fg}`,
+      content: `{#5c6370-fg}Base: ${truncate(baseBranch, 24)}{/#5c6370-fg}`,
       tags: true,
     });
     currentY += 1;
@@ -140,13 +141,13 @@ export function createStatusPane(
         left: buttonX,
         width: truncate(`[View ${spec}]`, 18).length,
         height: 1,
-        content: `{cyan-fg}[View ${truncate(spec, 12)}]{/cyan-fg}`,
+        content: `{#818cf8-fg}[View ${truncate(spec, 12)}]{/#818cf8-fg}`,
         tags: true,
         mouse: true,
         style: {
-          fg: 'cyan',
+          fg: '#818cf8',
           hover: {
-            fg: 'yellow',
+            fg: '#a78bfa',
           },
         },
       });
@@ -162,13 +163,13 @@ export function createStatusPane(
         left: buttonX,
         width: 13,
         height: 1,
-        content: '{cyan-fg}[Alignment]{/cyan-fg}',
+        content: '{#818cf8-fg}[Alignment]{/#818cf8-fg}',
         tags: true,
         mouse: true,
         style: {
-          fg: 'cyan',
+          fg: '#818cf8',
           hover: {
-            fg: 'yellow',
+            fg: '#a78bfa',
           },
         },
       });
@@ -186,13 +187,13 @@ export function createStatusPane(
         left: 1,
         width: 16,
         height: 1,
-        content: '{cyan-fg}[E2E Test Plan]{/cyan-fg}',
+        content: '{#818cf8-fg}[E2E Test Plan]{/#818cf8-fg}',
         tags: true,
         mouse: true,
         style: {
-          fg: 'cyan',
+          fg: '#818cf8',
           hover: {
-            fg: 'yellow',
+            fg: '#a78bfa',
           },
         },
       });
@@ -208,7 +209,7 @@ export function createStatusPane(
     parent: pane,
     top: currentY,
     left: 1,
-    content: '{gray-fg}── Active Agents ──{/gray-fg}',
+    content: '{#6366f1-fg}━━ Active Agents ━━{/#6366f1-fg}',
     tags: true,
   });
   currentY += 1;
@@ -219,21 +220,22 @@ export function createStatusPane(
       parent: pane,
       top: currentY,
       left: 1,
-      content: '{gray-fg}No active agents{/gray-fg}',
+      content: '{239-fg}No active agents{/239-fg}',
       tags: true,
     });
     currentY += 2;
   } else {
-    const boxHeight = 4;
+    const boxHeight = 3;
     const padding = 1;
 
     agents.forEach((agent, index) => {
       const top = currentY + index * (boxHeight + padding);
 
       const isSelected = selectedIndex === index;
+      // Use purple (#4A34C5 ≈ 63) for selected, muted gray-blue for unselected
       const boxStyle = isSelected
-        ? { border: { fg: 'yellow' }, fg: 'white' }
-        : { border: { fg: 'gray' }, fg: 'white' };
+        ? { border: { fg: '#4A34C5' }, fg: 'white' }
+        : { border: { fg: '#3a3f5c' }, fg: 'white' };
 
       const agentBox = blessed.box({
         parent: pane,
@@ -276,7 +278,7 @@ export function createStatusPane(
     parent: pane,
     top: currentY,
     left: 1,
-    content: '{gray-fg}── Recent Activity ──{/gray-fg}',
+    content: '{#6366f1-fg}━━ Recent Activity ━━{/#6366f1-fg}',
     tags: true,
   });
   currentY += 1;
@@ -290,7 +292,7 @@ export function createStatusPane(
       parent: pane,
       top: currentY,
       left: 1,
-      content: '{gray-fg}No recent activity{/gray-fg}',
+      content: '{#5c6370-fg}No recent activity{/#5c6370-fg}',
       tags: true,
     });
   } else {
@@ -301,7 +303,7 @@ export function createStatusPane(
         parent: pane,
         top: currentY + i,
         left: 1,
-        content: `{gray-fg}${truncatedEntry}{/gray-fg}`,
+        content: `{#8b92a8-fg}${truncatedEntry}{/#8b92a8-fg}`,
         tags: true,
       });
     });
@@ -312,7 +314,7 @@ export function createStatusPane(
     parent: pane,
     bottom: 0,
     left: 1,
-    content: '{gray-fg}Ctrl-L: Full Log{/gray-fg}',
+    content: '{#5c6370-fg}Ctrl-L: Full Log{/#5c6370-fg}',
     tags: true,
   });
 

@@ -225,10 +225,11 @@ export class TUI {
                 const prompts = loadAllPrompts(planningKey, this.options.cwd);
                 const status = readStatus(planningKey, this.options.cwd);
 
-                this.state.prompts = prompts.map((p: { frontmatter: { number: number; title: string; status: string } }) => ({
+                this.state.prompts = prompts.map((p: { path: string; frontmatter: { number: number; title: string; status: string } }) => ({
                   number: p.frontmatter.number,
                   title: p.frontmatter.title,
                   status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+                  path: p.path,
                 }));
                 // Don't restore loopEnabled from status - always requires manual enable
                 this.state.emergentEnabled = status?.loop?.emergent ?? false;
@@ -283,6 +284,7 @@ export class TUI {
             number: p.frontmatter.number,
             title: p.frontmatter.title,
             status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
+            path: p.path,
           }));
 
           // Log meaningful changes
@@ -457,13 +459,13 @@ export class TUI {
       left: 0,
       width: '100%',
       height: 3,
-      content: '{center}{bold}ALL HANDS AGENTIC HARNESS{/bold}{/center}',
+      content: '{center}{bold}{#a78bfa-fg}ALL HANDS{/#a78bfa-fg} {#e0e7ff-fg}AGENTIC HARNESS{/#e0e7ff-fg}{/bold}{/center}',
       tags: true,
       style: {
-        fg: 'cyan',
-        bg: 'black',
+        fg: '#e0e7ff',
+        bg: '#22263C',
         border: {
-          fg: 'cyan',
+          fg: '#4A34C5',
         },
       },
       border: {
@@ -692,12 +694,35 @@ export class TUI {
         this.handleAction(item.id);
       }
     } else if (this.focusedPane === 'prompts') {
-      const prompt = this.state.prompts[this.selectedIndex.prompts];
-      if (prompt) {
-        this.options.onAction('select-prompt', { prompt });
+      const sortedPrompts = this.getSortedPrompts();
+      const prompt = sortedPrompts[this.selectedIndex.prompts];
+      if (prompt && prompt.path) {
+        // Open the prompt file in the file viewer
+        const title = `Prompt ${String(prompt.number).padStart(2, '0')}: ${prompt.title}`;
+        this.openFileViewer(title, prompt.path);
       }
     }
     // Status pane selection - could show agent details
+  }
+
+  /**
+   * Get prompts sorted the same way they appear in the prompts pane.
+   * Order: in_progress first, then pending, then done (each sorted by number).
+   */
+  private getSortedPrompts(): PromptItem[] {
+    const inProgress = this.state.prompts
+      .filter((p) => p.status === 'in_progress')
+      .sort((a, b) => a.number - b.number);
+
+    const pending = this.state.prompts
+      .filter((p) => p.status === 'pending')
+      .sort((a, b) => a.number - b.number);
+
+    const done = this.state.prompts
+      .filter((p) => p.status === 'done')
+      .sort((a, b) => a.number - b.number);
+
+    return [...inProgress, ...pending, ...done];
   }
 
   private handleAction(actionId: string): void {
@@ -845,9 +870,9 @@ export class TUI {
       tags: true,
       style: {
         border: {
-          fg: 'yellow',
+          fg: '#a78bfa',
         },
-        bg: 'black',
+        bg: '#1e2235',
       },
     });
 
@@ -856,7 +881,7 @@ export class TUI {
       parent: box,
       top: 1,
       left: 1,
-      content: 'Enter a custom message (system prompt).\nLeave empty to skip. Press Enter to confirm.',
+      content: '{#c7d2fe-fg}Enter a custom message (system prompt).\nLeave empty to skip. Press Enter to confirm.{/#c7d2fe-fg}',
       tags: true,
     });
 
@@ -872,11 +897,12 @@ export class TUI {
       },
       style: {
         border: {
-          fg: 'cyan',
+          fg: '#4A34C5',
         },
+        bg: '#22263C',
         focus: {
           border: {
-            fg: 'yellow',
+            fg: '#a78bfa',
           },
         },
       },
@@ -888,7 +914,7 @@ export class TUI {
       parent: box,
       bottom: 0,
       left: 1,
-      content: '{gray-fg}[Enter] Confirm  [Esc] Cancel{/gray-fg}',
+      content: '{#5c6370-fg}[Enter] Confirm  [Esc] Cancel{/#5c6370-fg}',
       tags: true,
     });
 
@@ -1012,9 +1038,9 @@ export class TUI {
         tags: true,
         style: {
           border: {
-            fg: 'yellow',
+            fg: '#a78bfa',
           },
-          bg: 'black',
+          bg: '#1e2235',
         },
       });
 
@@ -1024,7 +1050,7 @@ export class TUI {
         top: 1,
         left: 2,
         right: 2,
-        content: message,
+        content: `{#c7d2fe-fg}${message}{/#c7d2fe-fg}`,
         tags: true,
       });
 
@@ -1033,7 +1059,7 @@ export class TUI {
         parent: box,
         bottom: 0,
         left: 1,
-        content: '{green-fg}[Enter]{/green-fg} Proceed  {red-fg}[Esc]{/red-fg} Cancel',
+        content: '{#10b981-fg}[Enter]{/#10b981-fg} Proceed  {#ef4444-fg}[Esc]{/#ef4444-fg} Cancel',
         tags: true,
       });
 
@@ -1262,7 +1288,8 @@ export class TUI {
     for (const [paneId, pane] of Object.entries(panes)) {
       const isFocused = paneId === this.focusedPane;
       if (pane.style && pane.style.border) {
-        pane.style.border.fg = isFocused ? 'yellow' : 'cyan';
+        // Focused: bright purple, Unfocused: muted purple
+        pane.style.border.fg = isFocused ? '#a78bfa' : '#4A34C5';
       }
     }
   }

@@ -62,9 +62,9 @@ export function createModal(
     tags: true,
     style: {
       border: {
-        fg: 'yellow',
+        fg: '#a78bfa',
       },
-      bg: 'black',
+      bg: '#1e2235',
     },
   });
 
@@ -83,21 +83,21 @@ export function createModal(
     alwaysScroll: scrollable,
     scrollbar: scrollable
       ? {
-          ch: '│',
+          ch: '┃',
           track: {
-            bg: 'gray',
+            bg: '#22263C',
           },
           style: {
-            inverse: true,
+            fg: '#4A34C5',
           },
         }
       : {
           ch: ' ',
         },
     style: {
-      bg: 'black',
+      bg: '#1e2235',
       selected: {
-        bg: 'black',
+        bg: '#1e2235',
       },
     },
     keys: false, // We handle keys ourselves
@@ -106,8 +106,8 @@ export function createModal(
 
   // Add help text (fixed at bottom of container, outside scrollable area)
   const helpText = onClear
-    ? '{gray-fg}[Space] Select  [x] Close  [Esc] Cancel{/gray-fg}'
-    : '{gray-fg}[Space] Select  [Esc] Cancel{/gray-fg}';
+    ? '{#5c6370-fg}[Space] Select  [x] Close  [Esc] Cancel{/#5c6370-fg}'
+    : '{#5c6370-fg}[Space] Select  [Esc] Cancel{/#5c6370-fg}';
   blessed.text({
     parent: container,
     bottom: 0,
@@ -141,11 +141,11 @@ export function createModal(
 
     items.forEach((item, index) => {
       if (item.type === 'header') {
-        lines.push(`{cyan-fg}${item.label}{/cyan-fg}`);
+        lines.push(`{#818cf8-fg}${item.label}{/#818cf8-fg}`);
       } else {
         const isSelected = index === selectedIndex;
-        const prefix = isSelected ? '{inverse}> ' : '  ';
-        const suffix = isSelected ? '{/inverse}' : '';
+        const prefix = isSelected ? '{#a78bfa-fg}{bold}▸ ' : '  ';
+        const suffix = isSelected ? '{/bold}{/#a78bfa-fg}' : '';
         lines.push(`${prefix}${item.label}${suffix}`);
       }
     });

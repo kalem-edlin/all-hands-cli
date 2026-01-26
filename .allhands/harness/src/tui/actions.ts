@@ -67,8 +67,9 @@ export function createActionsPane(
     tags: true,
     style: {
       border: {
-        fg: 'cyan',
+        fg: '#4A34C5',
       },
+      bg: '#22263C',
     },
   });
 
@@ -89,7 +90,7 @@ export function createActionsPane(
         top: y,
         left: 1,
         width: PANE_WIDTH - 4,
-        content: `{gray-fg}${item.label}{/gray-fg}`,
+        content: `{#6366f1-fg}${item.label}{/#6366f1-fg}`,
         tags: true,
       });
       y += 1;
@@ -121,14 +122,14 @@ export function createActionsPane(
     parent: pane,
     bottom: 1,
     left: 1,
-    content: '{gray-fg}Tab: Switch Pane{/gray-fg}',
+    content: '{#5c6370-fg}Tab: Switch Pane{/#5c6370-fg}',
     tags: true,
   });
   blessed.text({
     parent: pane,
     bottom: 0,
     left: 1,
-    content: '{gray-fg}j/k: Navigate{/gray-fg}',
+    content: '{#5c6370-fg}j/k: Navigate{/#5c6370-fg}',
     tags: true,
   });
 
@@ -163,13 +164,13 @@ function buildActionItems(toggleState: ToggleState): ActionItem[] {
     { id: 'custom-flow', label: 'Custom Flow', key: '0', type: 'action' },
     // Spacing before toggles
     { id: 'spacer-1', label: '', type: 'separator' },
-    { id: 'separator-toggles', label: '─── Toggles ───', type: 'separator' },
+    { id: 'separator-toggles', label: '━━ Toggles ━━', type: 'separator' },
     { id: 'toggle-loop', label: 'Loop', key: 'O', type: 'toggle', checked: toggleState.loopEnabled },
     { id: 'toggle-emergent', label: 'Emergent', key: 'E', type: 'toggle', checked: toggleState.emergentEnabled },
     { id: 'toggle-parallel', label: 'Parallel', key: 'P', type: 'toggle', checked: toggleState.parallelEnabled },
     // Spacing before controls
     { id: 'spacer-2', label: '', type: 'separator' },
-    { id: 'separator-bottom', label: '─── Controls ───', type: 'separator' },
+    { id: 'separator-bottom', label: '━━ Controls ━━', type: 'separator' },
     { id: 'view-logs', label: 'View Logs', key: 'V', type: 'action' },
     { id: 'clear-logs', label: 'Clear Logs', key: 'C', type: 'action' },
     { id: 'refresh', label: 'Refresh', key: 'R', type: 'action' },
@@ -189,12 +190,12 @@ function getPRActionLabel(state: PRActionState): string {
 }
 
 function formatItemContent(item: ActionItem, isSelected: boolean): string {
-  const prefix = item.key ? `[${item.key}] ` : '    ';
+  const prefix = item.key ? `{#818cf8-fg}[${item.key}]{/#818cf8-fg} ` : '    ';
   let label = item.label;
 
   // Toggle checkbox
   if (item.type === 'toggle') {
-    const checkbox = item.checked ? '[x]' : '[ ]';
+    const checkbox = item.checked ? '{#10b981-fg}[x]{/#10b981-fg}' : '{#5c6370-fg}[ ]{/#5c6370-fg}';
     label = `${checkbox} ${label}`;
   }
 
@@ -203,14 +204,16 @@ function formatItemContent(item: ActionItem, isSelected: boolean): string {
   let endStyle = '';
 
   if (item.disabled) {
-    style = '{gray-fg}';
-    endStyle = '{/gray-fg}';
+    style = '{#3a3f5c-fg}';
+    endStyle = '{/#3a3f5c-fg}';
   } else if (isSelected) {
-    style = '{inverse}';
-    endStyle = '{/inverse}';
+    style = '{#a78bfa-fg}{bold}▸ ';
+    endStyle = '{/bold}{/#a78bfa-fg}';
+    // For selected items, use plain prefix without colors
+    return `${style}${item.key ? `[${item.key}] ` : ''}${label}${endStyle}`;
   } else if (item.highlight) {
-    style = '{yellow-fg}';
-    endStyle = '{/yellow-fg}';
+    style = '{#f59e0b-fg}';
+    endStyle = '{/#f59e0b-fg}';
   }
 
   return `${style}${prefix}${label}${endStyle}`;

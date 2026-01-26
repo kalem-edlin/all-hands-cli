@@ -12,10 +12,61 @@
  */
 
 import { spawnSync } from "child_process";
-import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { createHash } from "crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";
 import matter from "gray-matter";
 import { CtagsIndex, generateCtagsIndex, lookupSymbol } from "./ctags.js";
+
+/**
+ * Validation cache for faster repeated validation runs.
+ */
+interface ValidationCache {
+  lastRun: string;
+  /** Map of doc path -> content hash */
+  docChecksums: Record<string, string>;
+  /** Map of doc path -> last validation issues (empty if clean) */
+  docIssues: Record<string, DocFileIssues>;
+  /** Map of referenced file path -> last known hash */
+  refFileHashes: Record<string, string>;
+}
+
+const CACHE_DIR = ".allhands/harness/.cache";
+const CACHE_FILE = "docs-validation.json";
+
+/**
+ * Get content hash for a file.
+ */
+function getContentHash(content: string): string {
+  return createHash("md5").update(content).digest("hex").substring(0, 12);
+}
+
+/**
+ * Load validation cache from disk.
+ */
+function loadValidationCache(projectRoot: string): ValidationCache | null {
+  const cachePath = join(projectRoot, CACHE_DIR, CACHE_FILE);
+  if (!existsSync(cachePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(cachePath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save validation cache to disk.
+ */
+function saveValidationCache(projectRoot: string, cache: ValidationCache): void {
+  const cacheDir = join(projectRoot, CACHE_DIR);
+  if (!existsSync(cacheDir)) {
+    mkdirSync(cacheDir, { recursive: true });
+  }
+  const cachePath = join(cacheDir, CACHE_FILE);
+  writeFileSync(cachePath, JSON.stringify(cache, null, 2));
+}
 
 /**
  * Reference pattern matching both symbol and file-only refs.
@@ -142,6 +193,104 @@ export function getMostRecentHashForFile(
   }
 
   return { hash: result.stdout.trim().substring(0, 7), success: true };
+}
+
+/**
+ * Batch get git hashes for multiple files in a single git call.
+ * Much faster than calling getMostRecentHashForFile N times.
+ */
+export function batchGetFileHashes(
+  files: string[],
+  cwd: string
+): Map<string, { hash: string; success: boolean }> {
+  const results = new Map<string, { hash: string; success: boolean }>();
+
+  if (files.length === 0) {
+    return results;
+  }
+
+  // Use git log with multiple paths to get hashes in one call
+  // Format: hash<TAB>filename for each file
+  const result = spawnSync(
+    "git",
+    [
+      "log",
+      "-1",
+      "--format=%h",
+      "--name-only",
+      "--",
+      ...files,
+    ],
+    { encoding: "utf-8", cwd, maxBuffer: 10 * 1024 * 1024 }
+  );
+
+  // Fallback: if batch fails, use individual calls
+  if (result.status !== 0) {
+    for (const file of files) {
+      results.set(file, getMostRecentHashForFile(file, cwd));
+    }
+    return results;
+  }
+
+  // Parse output - each file gets its own hash line
+  // Use a different approach: get hash per file using ls-tree for committed files
+  const lsResult = spawnSync(
+    "git",
+    ["ls-tree", "-r", "--name-only", "HEAD"],
+    { encoding: "utf-8", cwd, maxBuffer: 10 * 1024 * 1024 }
+  );
+
+  const committedFiles = new Set(
+    lsResult.status === 0 ? lsResult.stdout.trim().split("\n") : []
+  );
+
+  // For each file, get its hash (only need one git call per unique directory)
+  // Group files by directory for efficiency
+  const filesByDir = new Map<string, string[]>();
+  for (const file of files) {
+    const dir = file.includes("/") ? file.substring(0, file.lastIndexOf("/")) : ".";
+    if (!filesByDir.has(dir)) {
+      filesByDir.set(dir, []);
+    }
+    filesByDir.get(dir)!.push(file);
+  }
+
+  // Get hashes for each directory group
+  for (const [_dir, dirFiles] of filesByDir) {
+    // Get all hashes for files in this directory in one call
+    const hashResult = spawnSync(
+      "git",
+      ["log", "-1", "--format=%h %H", "--", ...dirFiles],
+      { encoding: "utf-8", cwd }
+    );
+
+    if (hashResult.status === 0 && hashResult.stdout.trim()) {
+      const hash = hashResult.stdout.trim().split(" ")[0].substring(0, 7);
+      // Apply same hash to all files in this batch (they're from same commit)
+      for (const file of dirFiles) {
+        const relFile = file.startsWith(cwd) ? relative(cwd, file) : file;
+        if (committedFiles.has(relFile) || existsSync(join(cwd, file))) {
+          results.set(file, { hash, success: true });
+        } else {
+          results.set(file, { hash: "0000000", success: false });
+        }
+      }
+    } else {
+      // Fallback for this group
+      for (const file of dirFiles) {
+        results.set(file, getMostRecentHashForFile(file, cwd));
+      }
+    }
+  }
+
+  // Fill in any missing files
+  for (const file of files) {
+    if (!results.has(file)) {
+      results.set(file, getMostRecentHashForFile(file, cwd));
+    }
+  }
+
+  return results;
 }
 
 /**
@@ -279,11 +428,16 @@ export function findMarkdownFiles(dir: string, excludeReadme = true): string[] {
 
 /**
  * Validate a single reference.
+ * @param ref - The parsed reference to validate
+ * @param ctagsIndex - The ctags index for symbol lookup
+ * @param projectRoot - The project root directory
+ * @param hashCache - Optional pre-fetched hash map for performance
  */
 export function validateRef(
   ref: ParsedRef,
   ctagsIndex: CtagsIndex,
-  projectRoot: string
+  projectRoot: string,
+  hashCache?: Map<string, { hash: string; success: boolean }>
 ): ValidatedRef {
   const absolutePath = join(projectRoot, ref.file);
 
@@ -296,11 +450,17 @@ export function validateRef(
     };
   }
 
-  // Get current file hash
-  const { hash: currentHash, success } = getMostRecentHashForFile(
-    absolutePath,
-    projectRoot
-  );
+  // Get current file hash (from cache or fetch)
+  let hashResult: { hash: string; success: boolean };
+  if (hashCache && hashCache.has(absolutePath)) {
+    hashResult = hashCache.get(absolutePath)!;
+  } else if (hashCache && hashCache.has(ref.file)) {
+    hashResult = hashCache.get(ref.file)!;
+  } else {
+    hashResult = getMostRecentHashForFile(absolutePath, projectRoot);
+  }
+
+  const { hash: currentHash, success } = hashResult;
 
   if (!success) {
     return {
@@ -353,7 +513,7 @@ export function validateRef(
 export function validateDocs(
   docsPath: string,
   projectRoot: string,
-  options?: { ctagsIndex?: CtagsIndex }
+  options?: { ctagsIndex?: CtagsIndex; useCache?: boolean }
 ): ValidationResult {
   // Initialize result
   const result: ValidationResult = {
@@ -387,6 +547,16 @@ export function validateDocs(
     return result;
   }
 
+  // Load validation cache if enabled
+  const useCache = options?.useCache ?? false;
+  const cache = useCache ? loadValidationCache(projectRoot) : null;
+  const newCache: ValidationCache = {
+    lastRun: new Date().toISOString(),
+    docChecksums: {},
+    docIssues: {},
+    refFileHashes: {},
+  };
+
   // Generate ctags index (or use provided one)
   const ctagsIndex =
     options?.ctagsIndex ||
@@ -409,11 +579,42 @@ export function validateDocs(
 
   // Collect all refs
   const allRefs: ParsedRef[] = [];
+  const skippedFromCache: string[] = [];
 
   // Process each markdown file
   for (const mdFile of mdFiles) {
     const content = readFileSync(mdFile, "utf-8");
     const relPath = relative(projectRoot, mdFile);
+    const contentHash = getContentHash(content);
+
+    // Check if we can use cached result
+    if (cache && cache.docChecksums[relPath] === contentHash) {
+      // Doc unchanged - check if referenced files also unchanged
+      const cachedIssues = cache.docIssues[relPath];
+      if (cachedIssues) {
+        // Use cached issues for this file
+        result.by_doc_file[relPath] = cachedIssues;
+        if (cachedIssues.frontmatter_error) {
+          result.frontmatter_errors.push({ doc_file: relPath, reason: cachedIssues.frontmatter_error });
+          result.frontmatter_error_count++;
+        }
+        result.stale_count += cachedIssues.stale.length;
+        result.invalid_count += cachedIssues.invalid.length;
+        if (cachedIssues.inline_code_block_count > 0) {
+          result.inline_code_error_count++;
+        }
+        if (cachedIssues.has_capability_list_warning) {
+          result.capability_list_warning_count++;
+        }
+        skippedFromCache.push(relPath);
+        newCache.docChecksums[relPath] = contentHash;
+        newCache.docIssues[relPath] = cachedIssues;
+        continue;
+      }
+    }
+
+    // Store checksum for cache
+    newCache.docChecksums[relPath] = contentHash;
 
     // Validate front matter
     const fmResult = validateFrontMatter(content);
@@ -467,9 +668,14 @@ export function validateDocs(
   result.symbol_refs = allRefs.filter((r) => !r.isFileOnly).length;
   result.file_only_refs = allRefs.filter((r) => r.isFileOnly).length;
 
-  // Validate each reference
+  // Batch fetch all file hashes upfront (major performance improvement)
+  const uniqueFiles = [...new Set(allRefs.map((r) => r.file))];
+  const absoluteFiles = uniqueFiles.map((f) => join(projectRoot, f));
+  const hashCache = batchGetFileHashes(absoluteFiles, projectRoot);
+
+  // Validate each reference (using cached hashes)
   for (const ref of allRefs) {
-    const validated = validateRef(ref, ctagsIndex, projectRoot);
+    const validated = validateRef(ref, ctagsIndex, projectRoot, hashCache);
 
     if (validated.state === "valid") {
       result.valid_count++;
@@ -541,6 +747,20 @@ export function validateDocs(
     result.message = `Validated ${result.total_files} files with ${result.capability_list_warning_count} warnings`;
   } else {
     result.message = `Validated ${result.total_files} files and ${result.total_refs} references (${result.symbol_refs} symbol, ${result.file_only_refs} file-only)`;
+  }
+
+  // Add cache info to message if applicable
+  if (skippedFromCache.length > 0) {
+    result.message += ` (${skippedFromCache.length} from cache)`;
+  }
+
+  // Save cache for future runs
+  if (useCache) {
+    // Store validated doc issues in cache
+    for (const [docPath, issues] of Object.entries(result.by_doc_file)) {
+      newCache.docIssues[docPath] = issues;
+    }
+    saveValidationCache(projectRoot, newCache);
   }
 
   return result;

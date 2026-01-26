@@ -74,20 +74,20 @@ export function createFileViewer(
     keys: false, // We handle keys manually
     vi: false,
     scrollbar: {
-      ch: '│',
+      ch: '┃',
       track: {
-        bg: 'gray',
+        bg: '#22263C',
       },
       style: {
-        inverse: true,
+        fg: '#4A34C5',
       },
     },
     style: {
       border: {
-        fg: 'yellow',
+        fg: '#a78bfa',
       },
-      bg: 'black',
-      fg: 'white',
+      bg: '#1e2235',
+      fg: '#e0e7ff',
     },
   });
 
@@ -142,7 +142,7 @@ export function createFileViewer(
     parent: box,
     bottom: 0,
     left: 1,
-    content: '{gray-fg}j/k:scroll  u/d:page  g/G:top/bottom  Esc:close{/gray-fg}',
+    content: '{#5c6370-fg}j/k:scroll  u/d:page  g/G:top/bottom  Esc:close{/#5c6370-fg}',
     tags: true,
   });
 

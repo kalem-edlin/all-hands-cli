@@ -12,7 +12,7 @@
  */
 
 import { Command } from "commander";
-import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { join, relative, extname, dirname } from "path";
 import {
   executeCommand,
@@ -29,6 +29,7 @@ import {
 } from "../lib/ctags.js";
 import {
   getMostRecentHashForFile,
+  batchGetFileHashes,
   validateDocs,
 } from "../lib/docs-validation.js";
 
@@ -134,7 +135,7 @@ async function formatReference(
 /**
  * Validate all documentation references.
  */
-async function validate(docsPath: string): Promise<CommandResult> {
+async function validate(docsPath: string, options?: { useCache?: boolean }): Promise<CommandResult> {
   const projectRoot = getProjectRoot();
   const absoluteDocsPath = docsPath.startsWith("/")
     ? docsPath
@@ -149,8 +150,10 @@ async function validate(docsPath: string): Promise<CommandResult> {
     };
   }
 
-  // Run validation
-  const result = validateDocs(absoluteDocsPath, projectRoot);
+  // Run validation (with optional caching)
+  const result = validateDocs(absoluteDocsPath, projectRoot, {
+    useCache: options?.useCache ?? false,
+  });
 
   // Consider it a success even with issues (issues are in the data)
   return { success: true, data: result };
@@ -419,6 +422,139 @@ async function tree(pathArg: string, maxDepth: number): Promise<CommandResult> {
 }
 
 /**
+ * Placeholder ref pattern - matches [ref:file:symbol] without hash
+ */
+const PLACEHOLDER_REF_PATTERN = /\[ref:([^:\]]+):([^\]]+)\]/g;
+
+/**
+ * Finalize a documentation file by replacing placeholder refs with full refs.
+ * This allows writers to use [ref:file:symbol] syntax without hashes during writing,
+ * then batch-process all refs in a single pass.
+ */
+async function finalize(docPath: string): Promise<CommandResult> {
+  const projectRoot = getProjectRoot();
+  const absolutePath = docPath.startsWith("/") ? docPath : join(projectRoot, docPath);
+  const relativePath = relative(projectRoot, absolutePath);
+
+  if (!existsSync(absolutePath)) {
+    return {
+      success: false,
+      error: `file_not_found: File not found: ${relativePath}`,
+    };
+  }
+
+  // Check ctags availability
+  const ctagsCheck = checkCtagsAvailable();
+  if (!ctagsCheck.available) {
+    return {
+      success: false,
+      error: `ctags_unavailable: ${ctagsCheck.error}`,
+    };
+  }
+
+  const content = readFileSync(absolutePath, "utf-8");
+
+  // Find all placeholder refs
+  const placeholders: Array<{ match: string; file: string; symbol: string }> = [];
+  let match;
+  PLACEHOLDER_REF_PATTERN.lastIndex = 0;
+  while ((match = PLACEHOLDER_REF_PATTERN.exec(content)) !== null) {
+    // Skip if it already looks like a full ref (has 3 colons indicating hash)
+    if (match[0].split(":").length > 3) continue;
+    placeholders.push({
+      match: match[0],
+      file: match[1],
+      symbol: match[2],
+    });
+  }
+
+  if (placeholders.length === 0) {
+    return {
+      success: true,
+      data: {
+        message: "No placeholder refs found",
+        path: relativePath,
+        replacements: 0,
+      },
+    };
+  }
+
+  // Batch get file hashes
+  const uniqueFiles = [...new Set(placeholders.map((p) => p.file))];
+  const absoluteFiles = uniqueFiles.map((f) => join(projectRoot, f));
+  const hashCache = batchGetFileHashes(absoluteFiles, projectRoot);
+
+  // Generate ctags index for symbol lookup (used by findSymbolInFile)
+  generateCtagsIndex(projectRoot);
+
+  // Process each placeholder
+  const errors: Array<{ placeholder: string; reason: string }> = [];
+  const replacements: Array<{ from: string; to: string }> = [];
+  let finalizedContent = content;
+
+  for (const placeholder of placeholders) {
+    const absoluteFilePath = join(projectRoot, placeholder.file);
+
+    // Check file exists
+    if (!existsSync(absoluteFilePath)) {
+      errors.push({
+        placeholder: placeholder.match,
+        reason: `File not found: ${placeholder.file}`,
+      });
+      continue;
+    }
+
+    // Get hash from cache
+    const hashResult = hashCache.get(absoluteFilePath) || hashCache.get(placeholder.file);
+    if (!hashResult || !hashResult.success) {
+      errors.push({
+        placeholder: placeholder.match,
+        reason: `Git hash lookup failed for ${placeholder.file} (uncommitted file?)`,
+      });
+      continue;
+    }
+
+    // For file-only refs (empty symbol), just add the hash
+    if (!placeholder.symbol || placeholder.symbol.trim() === "") {
+      const fullRef = `[ref:${placeholder.file}::${hashResult.hash}]`;
+      finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+      replacements.push({ from: placeholder.match, to: fullRef });
+      continue;
+    }
+
+    // For symbol refs, verify symbol exists
+    const entry = findSymbolInFile(absoluteFilePath, placeholder.symbol, projectRoot);
+    if (!entry) {
+      errors.push({
+        placeholder: placeholder.match,
+        reason: `Symbol '${placeholder.symbol}' not found in ${placeholder.file}`,
+      });
+      continue;
+    }
+
+    // Create full ref
+    const fullRef = `[ref:${placeholder.file}:${placeholder.symbol}:${hashResult.hash}]`;
+    finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+    replacements.push({ from: placeholder.match, to: fullRef });
+  }
+
+  // Write back if there were successful replacements
+  if (replacements.length > 0) {
+    writeFileSync(absolutePath, finalizedContent, "utf-8");
+  }
+
+  return {
+    success: errors.length === 0,
+    data: {
+      path: relativePath,
+      replacements: replacements.length,
+      replaced: replacements,
+      errors: errors.length > 0 ? errors : undefined,
+    },
+  };
+}
+
+/**
  * Register docs commands.
  */
 export function register(program: Command): void {
@@ -444,13 +580,16 @@ export function register(program: Command): void {
   const validateCmd = docs
     .command("validate")
     .description("Validate all documentation references")
-    .option("--path <path>", "Docs directory path", "docs/");
+    .option("--path <path>", "Docs directory path", "docs/")
+    .option("--cache", "Use validation cache for faster repeated runs", false);
 
   addCommonOptions(validateCmd);
 
   validateCmd.action(async (options) => {
     const context = parseContext(options);
-    await executeCommand("docs:validate", context, () => validate(options.path));
+    await executeCommand("docs:validate", context, () =>
+      validate(options.path, { useCache: options.cache })
+    );
   });
 
   // complexity
@@ -479,5 +618,18 @@ export function register(program: Command): void {
     const context = parseContext(options);
     const depth = parseInt(options.depth || "3", 10);
     await executeCommand("docs:tree", context, () => tree(path, depth));
+  });
+
+  // finalize
+  const finalizeCmd = docs
+    .command("finalize")
+    .description("Replace placeholder refs [ref:file:symbol] with full refs including hashes")
+    .argument("<doc-path>", "Path to documentation file to finalize");
+
+  addCommonOptions(finalizeCmd);
+
+  finalizeCmd.action(async (docPath: string, options) => {
+    const context = parseContext(options);
+    await executeCommand("docs:finalize", context, () => finalize(docPath));
   });
 }

@@ -97,9 +97,24 @@ feature: "<feature-name>"  # the cross-cutting feature this covers
 doc_directory: "docs/<domain>/<feature>/"
 source_directories: ["<path/to/src>", "<related/lib>", "<hooks/if-any>"]  # all sources for this feature
 critical_technologies: ["<tech>"]
-target_file_count: 2-4
+target_file_count: 1-2
 notes: "<what knowledge to capture about this feature>"
 ```
+
+### File Organization
+
+Target: 1-2 comprehensive files per major feature area, not 3-4 thin files per subdomain.
+
+| Approach | Files | Rationale |
+|----------|-------|-----------|
+| Many thin | hooks/context.md, hooks/enforcement.md, hooks/lifecycle.md | Fragments knowledge, harder to search |
+| Few rich | hooks.md (comprehensive) | Single search hit gives complete picture |
+
+Consolidation rules:
+- If 3+ files share the same conceptual parent, merge them
+- 150-line doc with clear sections > three 50-line docs
+- Subdirectories only when domains are truly distinct (not just different source paths)
+- Size docs by the questions they answer, not arbitrary file count
 
 ### Validate
 After all writers complete:

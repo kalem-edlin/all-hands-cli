@@ -3,10 +3,12 @@
  * Uses @visheratin/web-ai-node for embeddings and usearch for HNSW indexing.
  */
 
+import { spawnSync } from "child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import matter from "gray-matter";
 import { basename, extname, join, relative } from "path";
 import { Index, MetricKind, ScalarKind } from "usearch";
+import { loadProjectSettings } from "../hooks/shared.js";
 
 // Types
 interface DocumentMeta {
@@ -77,17 +79,11 @@ const INDEX_CONFIGS: Record<string, IndexConfig> = {
 
 export type IndexName = keyof typeof INDEX_CONFIGS;
 
-// Environment config with defaults
-const SEARCH_SIMILARITY_THRESHOLD = parseFloat(
-  process.env.SEARCH_SIMILARITY_THRESHOLD ?? "0.65"
-);
-const SEARCH_CONTEXT_TOKEN_LIMIT = parseInt(
-  process.env.SEARCH_CONTEXT_TOKEN_LIMIT ?? "5000",
-  10
-);
-const SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD = parseFloat(
-  process.env.SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD ?? "0.82"
-);
+// Config with settings override > default
+const settings = loadProjectSettings();
+const SEARCH_SIMILARITY_THRESHOLD = settings?.knowledge?.similarityThreshold ?? 0.65;
+const SEARCH_CONTEXT_TOKEN_LIMIT = settings?.knowledge?.contextTokenLimit ?? 5000;
+const SEARCH_FULL_CONTEXT_SIMILARITY_THRESHOLD = settings?.knowledge?.fullContextSimilarityThreshold ?? 0.82;
 
 export class KnowledgeService {
   private model: unknown = null;
@@ -552,9 +548,125 @@ export class KnowledgeService {
   /**
    * Check if a specific index exists
    */
-  async checkIndex(indexName: IndexName): Promise<{ exists: boolean }> {
+  indexExists(indexName: IndexName): boolean {
     const paths = this.getIndexPaths(indexName);
-    return { exists: existsSync(paths.index) && existsSync(paths.meta) };
+    return existsSync(paths.index) && existsSync(paths.meta);
+  }
+
+  /**
+   * Check if a specific index exists (async wrapper for backward compat)
+   */
+  async checkIndex(indexName: IndexName): Promise<{ exists: boolean }> {
+    return { exists: this.indexExists(indexName) };
+  }
+
+  /**
+   * Get file changes from git since last index update for a specific index.
+   * Returns files that have been added, modified, or deleted.
+   */
+  getChangesFromGit(indexName: IndexName): FileChange[] {
+    const config = this.getIndexConfig(indexName);
+    const paths = this.getIndexPaths(indexName);
+
+    // If no metadata file, can't do incremental - need full reindex
+    if (!existsSync(paths.meta)) {
+      return [];
+    }
+
+    const meta: IndexMetadata = JSON.parse(readFileSync(paths.meta, "utf-8"));
+    const lastUpdated = meta.lastUpdated;
+
+    if (!lastUpdated) {
+      return [];
+    }
+
+    // Get git changes since last update for the relevant paths
+    const changes: FileChange[] = [];
+
+    for (const configPath of config.paths) {
+      // Get files changed since last update
+      const result = spawnSync(
+        "git",
+        ["diff", "--name-status", `--since=${lastUpdated}`, "HEAD", "--", configPath],
+        { encoding: "utf-8", cwd: this.projectRoot }
+      );
+
+      if (result.status !== 0) {
+        // Fallback: check what files differ from index
+        const diffResult = spawnSync(
+          "git",
+          ["status", "--porcelain", "--", configPath],
+          { encoding: "utf-8", cwd: this.projectRoot }
+        );
+
+        if (diffResult.status === 0 && diffResult.stdout) {
+          for (const line of diffResult.stdout.trim().split("\n")) {
+            if (!line) continue;
+            const status = line.substring(0, 2).trim();
+            const filePath = line.substring(3);
+
+            if (!config.extensions.some(ext => filePath.endsWith(ext))) continue;
+
+            changes.push({
+              path: filePath,
+              added: status === "A" || status === "?",
+              modified: status === "M",
+              deleted: status === "D",
+            });
+          }
+        }
+        continue;
+      }
+
+      // Parse git diff --name-status output
+      for (const line of result.stdout.trim().split("\n")) {
+        if (!line) continue;
+        const [status, filePath] = line.split("\t");
+
+        if (!filePath || !config.extensions.some(ext => filePath.endsWith(ext))) continue;
+
+        changes.push({
+          path: filePath,
+          added: status === "A",
+          modified: status === "M",
+          deleted: status === "D",
+        });
+      }
+    }
+
+    // Also check for new files not yet in the index
+    const indexedPaths = new Set(Object.keys(meta.path_to_id));
+    for (const configPath of config.paths) {
+      const fullConfigPath = join(this.projectRoot, configPath);
+      if (!existsSync(fullConfigPath)) continue;
+
+      this.findFilesRecursive(fullConfigPath, config.extensions).forEach(filePath => {
+        const relativePath = relative(this.projectRoot, filePath);
+        if (!indexedPaths.has(relativePath) && !changes.some(c => c.path === relativePath)) {
+          changes.push({ path: relativePath, added: true });
+        }
+      });
+    }
+
+    return changes;
+  }
+
+  /**
+   * Find files recursively matching extensions
+   */
+  private findFilesRecursive(dir: string, extensions: string[]): string[] {
+    const files: string[] = [];
+    if (!existsSync(dir)) return files;
+
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...this.findFilesRecursive(fullPath, extensions));
+      } else if (extensions.some(ext => entry.name.endsWith(ext)) && entry.name !== "README.md") {
+        files.push(fullPath);
+      }
+    }
+    return files;
   }
 
   /**

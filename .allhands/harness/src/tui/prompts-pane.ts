@@ -15,6 +15,7 @@ export interface PromptItem {
   number: number;
   title: string;
   status: 'pending' | 'in_progress' | 'done';
+  path: string;
 }
 
 const ACTIONS_WIDTH = 24;
@@ -39,18 +40,19 @@ export function createPromptsPane(
     scrollable: true,
     alwaysScroll: true,
     scrollbar: {
-      ch: '│',
+      ch: '┃',
       track: {
-        bg: 'gray',
+        bg: '#22263C',
       },
       style: {
-        inverse: true,
+        fg: '#4A34C5',
       },
     },
     style: {
       border: {
-        fg: 'cyan',
+        fg: '#4A34C5',
       },
+      bg: '#22263C',
     },
   });
 
@@ -65,7 +67,7 @@ export function createPromptsPane(
     parent: pane,
     bottom: 0,
     left: 1,
-    content: '{gray-fg}u/d: Page Up/Down{/gray-fg}',
+    content: '{#5c6370-fg}u/d: Page Up/Down{/#5c6370-fg}',
     tags: true,
   });
 
@@ -90,7 +92,7 @@ function sortPrompts(prompts: PromptItem[]): PromptItem[] {
 
 function formatPromptsContent(prompts: PromptItem[], selectedIndex?: number): string {
   if (prompts.length === 0) {
-    return '{gray-fg}  No prompts found{/gray-fg}';
+    return '{#5c6370-fg}  No prompts found{/#5c6370-fg}';
   }
 
   const lines: string[] = [];
@@ -101,7 +103,7 @@ function formatPromptsContent(prompts: PromptItem[], selectedIndex?: number): st
     // Add section separator when status changes
     if (prompt.status !== currentStatus) {
       if (currentStatus !== null) {
-        lines.push('{gray-fg}────────────────────────{/gray-fg}');
+        lines.push('{#3a3f5c-fg}━━━━━━━━━━━━━━━━━━━━━━━━{/#3a3f5c-fg}');
       }
       currentStatus = prompt.status;
     }
@@ -138,11 +140,11 @@ function formatPromptLine(prompt: PromptItem, isSelected: boolean): string {
 function getStatusIcon(status: string): string {
   switch (status) {
     case 'done':
-      return '{green-fg}✓{/green-fg}';
+      return '{#10b981-fg}✓{/#10b981-fg}';
     case 'in_progress':
-      return '{yellow-fg}▶{/yellow-fg}';
+      return '{#a78bfa-fg}▶{/#a78bfa-fg}';
     case 'pending':
-      return '{gray-fg}○{/gray-fg}';
+      return '{#5c6370-fg}○{/#5c6370-fg}';
     default:
       return '?';
   }
