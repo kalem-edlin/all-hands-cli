@@ -16,7 +16,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { getGitRoot, getCurrentBranch } from '../lib/planning.js';
 import { getBaseBranch, commitFilesToBranch, createBranchWithoutCheckout } from '../lib/git.js';
 import { KnowledgeService } from '../lib/knowledge.js';
-import { findSpecByBranch } from '../lib/specs.js';
+import { findSpecByBranch, getSpecForBranch } from '../lib/specs.js';
 import { logCommandStart, logCommandSuccess, logCommandError } from '../lib/trace-store.js';
 
 interface SpecFrontmatter {
@@ -275,7 +275,7 @@ export function register(program: Command): void {
     .option('--json', 'Output as JSON')
     .action((options: { json?: boolean }) => {
       const branch = getCurrentBranch();
-      const spec = findSpecByBranch(branch);
+      const spec = getSpecForBranch(branch);
 
       if (!spec) {
         if (options.json) {

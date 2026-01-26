@@ -18,11 +18,14 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
 import {
-  getActiveSpec,
+  getCurrentBranch,
+  sanitizeBranchForDir,
   getPlanningPaths,
   listPromptFiles,
   planningDirExists,
 } from '../lib/planning.js';
+import { getSpecForBranch } from '../lib/specs.js';
+import { tracedAction } from '../lib/base-command.js';
 
 interface PromptFrontmatter {
   number: number;
@@ -147,7 +150,7 @@ export function register(program: Command): void {
     .option('--type <type>', 'Filter by type (planned, emergent, user-patch, review-fix)')
     .option('--emergent', 'Shorthand for --type emergent')
     .option('--user-patch', 'Shorthand for --type user-patch')
-    .action(async (options: {
+    .action(tracedAction('prompts status', async (options: {
       json?: boolean;
       spec?: string;
       pending?: boolean;
@@ -159,17 +162,19 @@ export function register(program: Command): void {
     }) => {
       const cwd = process.cwd();
 
-      // Determine which spec to use
+      // Determine which planning key to use (from option or current branch)
       let spec: string | null = options.spec ?? null;
       if (!spec) {
-        spec = getActiveSpec(cwd);
-        if (!spec) {
+        const branch = getCurrentBranch(cwd);
+        const currentSpec = getSpecForBranch(branch, cwd);
+        if (!currentSpec) {
           console.log(JSON.stringify({
             success: false,
-            error: 'No active spec. Use "ah planning activate <spec>" to set one.',
+            error: 'No spec for current branch. Checkout a spec branch first.',
           }, null, 2));
           return;
         }
+        spec = sanitizeBranchForDir(branch);
       }
 
       // Check if spec has planning
@@ -221,32 +226,34 @@ export function register(program: Command): void {
         stats,
         prompts,
       }, null, 2));
-    });
+    }));
 
   cmd
     .command('unblocked')
     .description('List prompts that are ready to execute (pending with all dependencies done)')
     .option('--spec <name>', 'Spec to check (defaults to active)')
-    .action(async (options: { spec?: string }) => {
+    .action(tracedAction('prompts unblocked', async (options: { spec?: string }) => {
       const cwd = process.cwd();
 
-      // Determine which spec to use
+      // Determine which planning key to use (from option or current branch)
       let spec: string | null = options.spec ?? null;
       if (!spec) {
-        spec = getActiveSpec(cwd);
-        if (!spec) {
+        const branch = getCurrentBranch(cwd);
+        const currentSpec = getSpecForBranch(branch, cwd);
+        if (!currentSpec) {
           console.log(JSON.stringify({
             success: false,
-            error: 'No active spec.',
+            error: 'No spec for current branch.',
           }, null, 2));
           return;
         }
+        spec = sanitizeBranchForDir(branch);
       }
 
       if (!planningDirExists(spec, cwd)) {
         console.log(JSON.stringify({
           success: false,
-          error: `No planning directory found for spec "${spec}".`,
+          error: `No planning directory found for "${spec}".`,
         }, null, 2));
         return;
       }
@@ -274,32 +281,34 @@ export function register(program: Command): void {
         count: unblocked.length,
         prompts: unblocked,
       }, null, 2));
-    });
+    }));
 
   cmd
     .command('summaries')
     .description('List prompts that have success/failure summaries (completed executions)')
     .option('--spec <name>', 'Spec to check (defaults to active)')
-    .action(async (options: { spec?: string }) => {
+    .action(tracedAction('prompts summaries', async (options: { spec?: string }) => {
       const cwd = process.cwd();
 
-      // Determine which spec to use
+      // Determine which planning key to use (from option or current branch)
       let spec: string | null = options.spec ?? null;
       if (!spec) {
-        spec = getActiveSpec(cwd);
-        if (!spec) {
+        const branch = getCurrentBranch(cwd);
+        const currentSpec = getSpecForBranch(branch, cwd);
+        if (!currentSpec) {
           console.log(JSON.stringify({
             success: false,
-            error: 'No active spec.',
+            error: 'No spec for current branch.',
           }, null, 2));
           return;
         }
+        spec = sanitizeBranchForDir(branch);
       }
 
       if (!planningDirExists(spec, cwd)) {
         console.log(JSON.stringify({
           success: false,
-          error: `No planning directory found for spec "${spec}".`,
+          error: `No planning directory found for "${spec}".`,
         }, null, 2));
         return;
       }
@@ -312,5 +321,5 @@ export function register(program: Command): void {
         count: prompts.length,
         prompts,
       }, null, 2));
-    });
+    }));
 }

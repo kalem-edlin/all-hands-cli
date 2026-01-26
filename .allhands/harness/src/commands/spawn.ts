@@ -10,7 +10,6 @@ import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { AgentRunner } from "../lib/opencode/index.js";
-import { logWarn } from "../lib/observability.js";
 import { BaseCommand, type CommandResult } from "../lib/base-command.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -115,12 +114,7 @@ Respond with JSON matching the required schema.`;
 
       const data = result.data!;
 
-      // Warn if agent reported issues
-      if (data.warnings?.length) {
-        for (const warning of data.warnings) {
-          logWarn(`[codesearch] ${warning}`);
-        }
-      }
+      // Warnings are included in the response data
 
       return this.success({
         query,

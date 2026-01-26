@@ -30,9 +30,9 @@ After initial ideation prompt, prepare for interview:
 - Run `ah specs list --roadmap --domain <domain_name>` for domain milestone visibility
 - Read dependent milestone specs
 
-Spawn parallel exploration subtasks:
+Spawn parallel general subtasks:
 - 1-3 Tasks: Read `.allhands/flows/shared/IDEATION_CODEBASE_GROUNDING.md` with verbose search goals for codebase reality (yields hard dependencies)
-- 1-2 Tasks: Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` with search goals for high-level solution approaches
+- 0-2 Tasks: Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` with search goals for high-level solution approaches (if necessary)
 
 ## Surveying
 

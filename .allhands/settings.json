@@ -9,5 +9,8 @@
       "command": "pnpm format",
       "patterns": []
     }
+  },
+  "tldr": {
+    "enableForHarness": true
   }
 }

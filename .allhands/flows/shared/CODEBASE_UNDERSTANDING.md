@@ -14,7 +14,7 @@ Choose the right tool for the query type:
 
 | Need | Tool | When |
 |------|------|------|
-| **Conceptual understanding w/ quick access file references** | `ah knowledge search` | "How does X work?", "Why is Y designed this way?" |
+| **Conceptual understanding w/ quick access file references** | `ah knowledge docs search` | "How does X work?", "Why is Y designed this way?" |
 | **Find relevant codebase patterns** | `tldr semantic search` or grep | Known string, error message, literal pattern |
 | **Find symbol definition** | LSP | Class, function, type by name |
 | **Find file by name** | Glob | Filename pattern known |
@@ -23,7 +23,7 @@ Choose the right tool for the query type:
 ### Search Flow
 
 ```
-Engineer Task → Knowledge Search → LSP on Referenced Symbols → Full Reads only when Needed
+Engineer Task → Knowledge Docs Search → LSP on Referenced Symbols → Full Reads only when Needed
 ```
 
 ## Query Formatting
@@ -32,10 +32,10 @@ Queries should be **complete sentences** with full context, not minimal keywords
 
 ```bash
 # GOOD - complete question with context
-ah knowledge search "how does the retry mechanism handle rate limits when calling external APIs"
+ah knowledge docs search "how does the retry mechanism handle rate limits when calling external APIs"
 
 # BAD - keyword soup
-ah knowledge search "retry rate limit api"
+ah knowledge docs search "retry rate limit api"
 ```
 
 ## Response Interpretation
@@ -53,10 +53,10 @@ Need codebase context?
 ├─ Know exact symbol? → LSP directly
 ├─ Know exact string? → tldr semantic search / grep
 ├─ Similar problem before? → ah solutions search first
-└─ Conceptual/discovery question? → ah knowledge search
+└─ Conceptual/discovery question? → ah knowledge docs search
     ├─ Aggregated result? → Follow lsp_entry_points (why field = priority)
     └─ Direct result? → relevant_files + [ref:...] blocks → LSP on symbols
-        └─ Use ah knowledge search for deeper understanding
+        └─ Use ah knowledge docs search for deeper understanding
             └─ ast-grep if still struggling
 ```
 
@@ -64,7 +64,7 @@ Need codebase context?
 
 | Situation | Next Step |
 |-----------|-----------|
-| Knowledge search returns nothing | Try different semantic phrasing |
+| Knowledge docs search returns nothing | Try different semantic phrasing |
 | grep returns nothing | Try alternative names (error/exception/failure) |
 | LSP can't find symbol | Check import statements, search file contents |
 | Pattern not found | Widen search directory, check file extensions |

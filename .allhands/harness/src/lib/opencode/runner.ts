@@ -6,7 +6,7 @@
 import { createOpencode } from "@opencode-ai/sdk";
 import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
-import { logCommandComplete, logCommandStart } from "../observability.js";
+import { logCommandStart, logCommandSuccess, logCommandError } from "../trace-store.js";
 import type { AgentConfig, AgentResult } from "./index.js";
 
 const MAX_EXPANSIONS = 3;
@@ -31,7 +31,7 @@ export class AgentRunner {
     const startTime = Date.now();
     // Use config.model if specified, else env AGENT_MODEL, else opencode default
     const model = config.model ?? ENV_AGENT_MODEL;
-    logCommandStart("agent.run", {
+    logCommandStart("opencode.agent.run", {
       agent: config.name,
       model: model ?? "opencode-default",
       steps: config.steps,
@@ -124,11 +124,12 @@ export class AgentRunner {
           throw new Error("Failed to parse agent response as JSON");
         }
 
-        logCommandComplete("agent.run", "success", Date.now() - startTime, {
+        logCommandSuccess("opencode.agent.run", {
           agent: config.name,
           expansions: expansionCount,
           retry: true,
           model: model ?? "opencode-default",
+          duration_ms: Date.now() - startTime,
         });
 
         return {
@@ -141,10 +142,11 @@ export class AgentRunner {
         };
       }
 
-      logCommandComplete("agent.run", "success", durationMs, {
+      logCommandSuccess("opencode.agent.run", {
         agent: config.name,
         expansions: expansionCount,
         model: model ?? "opencode-default",
+        duration_ms: durationMs,
       });
 
       return {
@@ -159,10 +161,10 @@ export class AgentRunner {
       const durationMs = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      logCommandComplete("agent.run", "error", durationMs, {
+      logCommandError("opencode.agent.run", errorMessage, {
         agent: config.name,
         model: model ?? "opencode-default",
-        error: errorMessage,
+        duration_ms: durationMs,
       });
 
       return {

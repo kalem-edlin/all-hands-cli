@@ -15,7 +15,7 @@ import { sendNotification } from '../lib/notification.js';
 import { killWindow, SESSION_NAME, windowExists } from '../lib/tmux.js'; // killWindow used in compact
 import { getPromptByNumber } from '../lib/prompts.js';
 import { getCurrentBranch, sanitizeBranchForDir } from '../lib/planning.js';
-import { findSpecByBranch } from '../lib/specs.js';
+import { getSpecForBranch } from '../lib/specs.js';
 import { ask } from '../lib/llm.js';
 import { logHookStart, logHookSuccess } from '../lib/trace-store.js';
 
@@ -168,7 +168,7 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
   let spec = process.env.SPEC_NAME;
   if (!spec) {
     const branch = getCurrentBranch();
-    const currentSpec = findSpecByBranch(branch);
+    const currentSpec = getSpecForBranch(branch);
     if (currentSpec) {
       spec = sanitizeBranchForDir(branch);
     }

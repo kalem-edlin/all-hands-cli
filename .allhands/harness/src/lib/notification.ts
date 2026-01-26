@@ -16,7 +16,6 @@
 
 import { spawnSync } from "child_process";
 import { existsSync } from "fs";
-import { logInfo, logWarn } from "./observability.js";
 import { getBranch, getRepoName } from "./git.js";
 
 export interface NotifyOptions {
@@ -55,7 +54,7 @@ function getNotifierPath(): string | null {
 export function sendNotification(options: NotifyOptions): boolean {
   const notifierPath = getNotifierPath();
   if (!notifierPath) {
-    logWarn("notification.skip", { reason: "notifier not installed" });
+    // Notifier not installed - silently skip
     return false;
   }
 
@@ -81,20 +80,8 @@ export function sendNotification(options: NotifyOptions): boolean {
       timeout: 5000,
     });
 
-    if (result.status === 0) {
-      logInfo("notification.sent", {
-        title: options.title,
-        message: options.message.substring(0, 50),
-        branch,
-        type: notifType,
-      });
-      return true;
-    } else {
-      logWarn("notification.failed", { status: result.status });
-      return false;
-    }
-  } catch (e) {
-    logWarn("notification.error", { error: String(e) });
+    return result.status === 0;
+  } catch {
     return false;
   }
 }

@@ -6,7 +6,6 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 - Spec doc path
 - Alignment doc path
 - Prompts folder path
-- Last known branch (may be null if spec was just created)
 </inputs>
 
 <constraints>
@@ -21,14 +20,14 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 - Read the spec doc (high-level engineer intent)
 - Read the alignment doc for existing prompts that may impact planning (if exists)
 - Read codebase files referenced in spec for initial grounding
-- Ensure you're on an appropriate branch for this work (if you need to create/switch branches and it differs from Last Known Branch, use `ah planning update-branch --spec <name> --branch <branch>`)
+- Ensure you're on the spec's branch (check spec frontmatter for `branch` field, checkout if needed)
 - Search documented solutions with `ah solutions search "<keywords>"` for relevant past learnings in this domain
 
 ## Deep Research
 
 For each implementation approach area identified from spec, spawn parallel subtasks:
 - Read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` for codebase grounding
-- Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` for solution exploration
+- Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` for solution exploration (if necessary)
 
 ## External Technology Research
 

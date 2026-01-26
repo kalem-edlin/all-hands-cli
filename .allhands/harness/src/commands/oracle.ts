@@ -130,13 +130,13 @@ export function register(program: Command): void {
       try {
         // Import planning utils here to avoid circular dependency
         const { getCurrentBranch, sanitizeBranchForDir, planningDirExists } = await import('../lib/planning.js');
-        const { findSpecByBranch } = await import('../lib/specs.js');
+        const { getSpecForBranch } = await import('../lib/specs.js');
 
         let spec = options.spec;
         if (!spec) {
           // Use current branch to find spec
           const branch = getCurrentBranch();
-          const currentSpec = findSpecByBranch(branch);
+          const currentSpec = getSpecForBranch(branch);
           if (currentSpec) {
             spec = sanitizeBranchForDir(branch);
           }
