@@ -3,9 +3,10 @@ Enable context-efficient codebase exploration using intentional tooling. Per **C
 </goal>
 
 <constraints>
-- MUST use `ah knowledge search` before grep for discovery questions
+- MUST use `ah knowledge search` FIRST for ANY DISCOVERY TASKS
 - MUST use complete sentences for knowledge search queries (RAG performs better with semantic content)
 - NEVER read full files unless LSP/search exploration proves insufficient
+- TLDR semantic search is your backup weapon
 </constraints>
 
 ## Search Tool Selection
@@ -14,16 +15,16 @@ Choose the right tool for the query type:
 
 | Need | Tool | When |
 |------|------|------|
-| **Conceptual understanding w/ quick access file references** | `ah knowledge docs search` | "How does X work?", "Why is Y designed this way?" |
-| **Find relevant codebase patterns** | `tldr semantic search` or grep | Known string, error message, literal pattern |
-| **Find symbol definition** | LSP | Class, function, type by name |
-| **Find file by name** | Glob | Filename pattern known |
+| **Great codebase navigation tool AND documented knowledge!!** | `ah knowledge docs search` | "How does X work?", "Why is Y designed this way?" |
+| **Find relevant codebase patterns when knowledge search is not enough** | `tldr semantic search` or grep | Known string, error message, literal pattern |
+| **Find symbol definition - usually from symbols given by knowledge search** | LSP | Class, function, type by name |
 | **Past solutions** | `ah solutions search` | Similar problem solved before |
+| **Grep but better** | `ast-grep` | Known string, error message, literal pattern |
 
 ### Search Flow
 
 ```
-Engineer Task → Knowledge Docs Search → LSP on Referenced Symbols → Full Reads only when Needed
+Engineer Task → Knowledge Docs Search → LSP on Referenced Symbols → Grep/ast-grep if needed
 ```
 
 ## Query Formatting
@@ -44,20 +45,19 @@ Knowledge search returns:
 - `insight`: Engineering / Product knowledge with the "why"
 - `lsp_entry_points`: Key file references with exploration rationale and LSP symbols
 - `design_notes`: Relevant architectural decisions
+- `[ref:...]`: Contains file references and LSP symbols. Only returned if the full docs document is returned.
 
 ## Decision Tree
 
 ```
 Need codebase context?
-├─ Know exact file? → Read directly
-├─ Know exact symbol? → LSP directly
-├─ Know exact string? → tldr semantic search / grep
-├─ Similar problem before? → ah solutions search first
-└─ Conceptual/discovery question? → ah knowledge docs search
+├─ Get relevant codebase direction with knowledge? → ah knowledge docs search
     ├─ Aggregated result? → Follow lsp_entry_points (why field = priority)
     └─ Direct result? → relevant_files + [ref:...] blocks → LSP on symbols
-        └─ Use ah knowledge docs search for deeper understanding
-            └─ ast-grep if still struggling
+├─ Know exact symbol? → LSP directly
+├─ Know semantic idea? → tldr semantic search / grep
+├─ Suspect a similar problem faced before? → ah solutions search first
+└─ ast-grep if still struggling
 ```
 
 ### Failure Recovery
@@ -68,10 +68,3 @@ Need codebase context?
 | grep returns nothing | Try alternative names (error/exception/failure) |
 | LSP can't find symbol | Check import statements, search file contents |
 | Pattern not found | Widen search directory, check file extensions |
-
-## Full File Reads
-
-Only read full files when:
-- LSP exploration reveals complex implementation needs investigation
-- Path-only references (no symbol to LSP into)
-- Search tooling not effective for current language

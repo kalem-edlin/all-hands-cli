@@ -11,10 +11,6 @@ Milestone specs are one type of spec in the workflow system - they represent pla
 - NEVER use literal placeholder text in commands
 </constraints>
 
-## Pre-flight
-
-No branch requirements - specs are persisted to `$BASE_BRANCH` automatically after writing, regardless of which branch you're currently on.
-
 ## Initiation
 
 - Run `ah specs list --domains-only` to list all domains for roadmap visibility (may return empty)

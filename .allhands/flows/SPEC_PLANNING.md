@@ -9,10 +9,9 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 </inputs>
 
 <constraints>
-- MUST research implementation approaches deeply before presenting options
+- MUST research / gather implementation approaches deeply before presenting options
 - MUST present recommended approach for each decision point
 - MUST spawn plan review jury before finalizing
-- NEVER work directly on `$BASE_BRANCH`
 </constraints>
 
 ## Context Gathering
@@ -20,30 +19,25 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 - Read the spec doc (high-level engineer intent)
 - Read the alignment doc for existing prompts that may impact planning (if exists)
 - Read codebase files referenced in spec for initial grounding
-- Ensure you're on the spec's branch (check spec frontmatter for `branch` field, checkout if needed)
+- Ensure your branch is up to date with base branch
 - Search documented solutions with `ah solutions search "<keywords>"` for relevant past learnings in this domain
 
 ## Deep Research
 
-For each implementation approach area identified from spec, spawn parallel subtasks:
-- Read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` for codebase grounding
-- Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` for solution exploration (if necessary)
-
-## External Technology Research
-
-Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
-- Dissect open source libraries for guidance
-- Consolidate approach against actual documentation
-- Derive specific implementation steps
+Spawn parallel general subtasks to ground yourself with information that will help you be confident making recommendations in the upcoming interview and subsequent writing of this implementation:
+- 1-4 Tasks: Read `.allhands/flows/shared/CODEBASE_GROUNDING.md` with understanding relevant implementation approaches in the codebase
+- 0-3 Tasks: Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` with search goals for isolating optimal solutions to the problem (if necessary)
 
 ## Engineer Interview
 
-Per **Quality Engineering**, present researched approaches as options:
-- Each implementation approach becomes a set of options
+Per **Quality Engineering**, present researched approaches as options using the `AskUserQuestion` tool:
+- Ask ONE decision point at a time - do not batch all questions together
+- Each implementation approach becomes a set of options (2-4 per question)
 - Engineer can choose one OR many (disposable variants)
 - When selecting many, create parallel variant prompts behind feature flags
 - Engineer MUST choose a **convention** when selecting multiple approaches
-- Each option MUST have a recommended approach
+- Each option MUST have a recommended approach (mark with "(Recommended)" suffix)
+- Adapt subsequent questions based on previous answers when logical dependencies exist
 
 Keep interview concise and actionable.
 
@@ -55,6 +49,14 @@ When engineer selects multiple approaches:
 - Variants are cheap to implement and test
 - Planning agent is the only agent who architects variant prompt structures
 - Pass variant knowledge to prompt creation phase
+
+## External Technology Implementation Usage Research
+
+Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
+- Typically run after understanding the implementation approach and the external technology required
+- Can be used to answer questions on open source libraries to help with the engineer interview, where beneficial 
+- Consolidate approach against actual documentation
+- Derive specific implementation steps
 
 ## Prompt Creation
 

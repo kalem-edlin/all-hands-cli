@@ -12,6 +12,8 @@ Pick the right research tool and depth for the need. Per **Context is Precious**
 ## Decision Tree
 
 ```
+├─ Broad synthesis, deep research with citations? → `ah perplexity research "<query>"`
+├─ Same + X/Twitter community insights? → `ah perplexity research "<query>" --grok-challenge`
 ├─ Find sources, discover URLs? → `ah tavily search "<query>"`
 ├─ Full content from known URL? → `ah tavily extract "<url1>" "<url2>"`
 ├─ Challenge findings with social signals? → `ah perplexity research "<query>" --challenge`
@@ -22,6 +24,8 @@ Pick the right research tool and depth for the need. Per **Context is Precious**
 
 | Need | Tool | Why |
 |------|------|-----|
+| "Best ways to solve X?" | perplexity | Synthesizes multiple sources |
+| "Best ways to solve X for agentic developers?" | perplexity --grok-challenge | Synthesis + X/Twitter community challenge |
 | "Find articles about X" | tavily search | Returns URLs to explore |
 | "Get content from this doc" | tavily extract | Full page content |
 | "Challenge research with developer sentiment" | perplexity --challenge | Validates findings via X/Twitter |
