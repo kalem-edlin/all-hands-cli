@@ -342,6 +342,8 @@ export function register(program: Command): void {
       if (positionalArgs[0]) namedArgs.query = positionalArgs[0];
       const result = await searchCmd.execute(namedArgs);
       console.log(JSON.stringify(result, null, 2));
+      // Exit explicitly - ONNX runtime thread pools don't auto-cleanup
+      process.exit(0);
     }));
 
     // Reindex command
@@ -352,6 +354,8 @@ export function register(program: Command): void {
       const opts = args[args.length - 2] as Record<string, unknown>;
       const result = await reindexCmd.execute(opts);
       console.log(JSON.stringify(result, null, 2));
+      // Exit explicitly - ONNX runtime thread pools don't auto-cleanup
+      process.exit(0);
     }));
   }
 
@@ -363,6 +367,8 @@ export function register(program: Command): void {
     const opts = args[args.length - 2] as Record<string, unknown>;
     const result = await globalReindexCmd.execute(opts);
     console.log(JSON.stringify(result, null, 2));
+    // Exit explicitly - ONNX runtime thread pools don't auto-cleanup
+    process.exit(0);
   }));
 
   // Status command

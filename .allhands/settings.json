@@ -12,5 +12,17 @@
   },
   "tldr": {
     "enableForHarness": true
+  },
+  "knowledge": {
+    "similarityThreshold": 0.65,
+    "fullContextSimilarityThreshold": 0.82,
+    "contextTokenLimit": 5000
+  },
+  "oracle": {
+    "defaultProvider": "openai"
+  },
+  "opencodeSdk": {
+    "model": "opencode/gpt-5-nano",
+    "codesearchToolBudget": 12
   }
 }
