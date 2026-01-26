@@ -29,7 +29,6 @@ export const TemplateVars = {
 
   // Branch/context variables
   BRANCH: z.string().describe('Current git branch name'),
-  LAST_KNOWN_BRANCH: z.string().nullable().describe('Last known branch for this spec (from status.yaml)'),
 } as const;
 
 /**
@@ -45,7 +44,6 @@ export const TEMPLATE_VAR_NAMES = Object.keys(TemplateVars) as TemplateVarName[]
 /**
  * Context object passed to template resolution.
  * All variables are optional - validation happens against profile requirements.
- * Values can be string or null (for nullable variables like LAST_KNOWN_BRANCH).
  */
 export type TemplateContext = Partial<Record<TemplateVarName, string | null>>;
 
@@ -74,8 +72,7 @@ export function validateContext(
   for (const varName of requiredVars) {
     const value = context[varName];
 
-    // Allow null values - they're valid for nullable schemas (e.g., LAST_KNOWN_BRANCH)
-    // Only reject undefined or empty string
+    // Reject undefined or empty string
     if (value === undefined || value === '') {
       errors.push(`Missing required template variable: ${varName}`);
       continue;

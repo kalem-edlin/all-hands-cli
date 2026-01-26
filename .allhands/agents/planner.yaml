@@ -9,9 +9,7 @@ message_template: |
   Spec: ${SPEC_NAME}
   Spec Path: ${SPEC_PATH}
   Prompts Folder: ${PROMPTS_FOLDER}
-  Last Known Branch: ${LAST_KNOWN_BRANCH}
 template_vars:
   - SPEC_NAME
   - SPEC_PATH
   - PROMPTS_FOLDER
-  - LAST_KNOWN_BRANCH

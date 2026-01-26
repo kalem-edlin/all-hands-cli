@@ -890,20 +890,13 @@ export function buildTemplateContext(
     context.PROMPT_PATH = promptPath;
   }
 
-  // Try to read spec path and last_known_branch from status (YAML format)
+  // Try to read spec path from status (YAML format)
   if (existsSync(paths.status)) {
     try {
       const content = readFileSync(paths.status, 'utf-8');
-      // Simple YAML parsing for spec path
       const specMatch = content.match(/^spec:\s*(.+)/m);
       if (specMatch) {
         context.SPEC_PATH = specMatch[1].trim();
-      }
-      // Parse last_known_branch (null is valid - agents handle branching)
-      const branchMatch = content.match(/^last_known_branch:\s*(.+)/m);
-      if (branchMatch) {
-        const branchValue = branchMatch[1].trim();
-        context.LAST_KNOWN_BRANCH = branchValue === 'null' ? null : branchValue;
       }
     } catch {
       // Ignore parse errors
