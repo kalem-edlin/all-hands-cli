@@ -1,0 +1,23 @@
+{
+  "CLAUDE.md": [
+    "@.allhands/flows/CORE.md",
+    "@.allhands/flows/shared/TLDR_CLI.md"
+  ],
+  ".gitignore": [
+    ".planning/",
+    ".env.ai",
+    ".tldr/",
+    ".reposearch/",
+    ".allhands-*.backup/",
+    ".claude-*.backup/",
+    ".allhands/harness/.cache/",
+    "test_plan.md",
+    "problems.md"
+  ],
+  ".tldrignore": [
+    ".reposearch/",
+    ".planning/",
+    "docs/",
+    ".allhands/"
+  ]
+}

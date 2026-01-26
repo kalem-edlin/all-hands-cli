@@ -1,7 +1,6 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { cmdInit } from './commands/init.js';
-import { cmdUpdate } from './commands/update.js';
+import { cmdSync } from './commands/sync.js';
 import { cmdPullManifest } from './commands/pull-manifest.js';
 import { cmdPush } from './commands/push.js';
 import { checkGitInstalled } from './lib/git.js';
@@ -10,6 +9,28 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 const VERSION = pkg.version;
+
+// Sync command handler for reuse
+const syncHandler = async (argv: { target?: string; yes?: boolean }) => {
+  const code = await cmdSync(argv.target || '.', argv.yes || false);
+  process.exit(code);
+};
+
+// Sync command builder for reuse
+const syncBuilder = (yargs: yargs.Argv) => {
+  return yargs
+    .positional('target', {
+      describe: 'Target repository path (defaults to current directory)',
+      type: 'string',
+      default: '.',
+    })
+    .option('yes', {
+      alias: 'y',
+      type: 'boolean',
+      describe: 'Skip confirmation prompts',
+      default: false,
+    });
+};
 
 async function main() {
   // Check dependencies
@@ -23,41 +44,31 @@ async function main() {
     .version(VERSION)
     .usage('$0 <command> [options]')
     .command(
-      'init <target>',
-      'Initialize allhands in target repo',
-      (yargs) => {
-        return yargs
-          .positional('target', {
-            describe: 'Target repository path',
-            type: 'string',
-            demandOption: true,
-          })
-          .option('yes', {
-            alias: 'y',
-            type: 'boolean',
-            describe: 'Skip confirmation prompts',
-            default: false,
-          });
-      },
-      async (argv) => {
-        const code = await cmdInit(argv.target as string, argv.yes as boolean);
-        process.exit(code);
-      }
+      'sync [target]',
+      'Initialize or update allhands in target repo',
+      syncBuilder,
+      syncHandler
+    )
+    // Backwards compatibility aliases
+    .command(
+      'init [target]',
+      false, // hidden from help
+      syncBuilder,
+      syncHandler
     )
     .command(
       'update',
-      'Pull latest from allhands',
+      false, // hidden from help
       (yargs) => {
-        return yargs
-          .option('yes', {
-            alias: 'y',
-            type: 'boolean',
-            describe: 'Skip confirmation prompts',
-            default: false,
-          });
+        return yargs.option('yes', {
+          alias: 'y',
+          type: 'boolean',
+          describe: 'Skip confirmation prompts',
+          default: false,
+        });
       },
       async (argv) => {
-        const code = await cmdUpdate(argv.yes as boolean);
+        const code = await cmdSync('.', argv.yes as boolean);
         process.exit(code);
       }
     )

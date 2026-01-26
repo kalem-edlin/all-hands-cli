@@ -1,9 +1,7 @@
 import { copyFileSync, cpSync, existsSync, renameSync, rmSync } from 'fs';
 import { join } from 'path';
 import { restoreDotfiles } from './dotfiles.js';
-import { syncMarkerSection, ensureLineInFile } from './marker-sync.js';
-
-const CLAUDE_MD_REFERENCE = '@.allhands/flows/CORE.md';
+import { ensureTargetLines } from './target-lines.js';
 
 interface FullReplaceOptions {
   sourceRoot: string;      // all-hands source directory
@@ -13,11 +11,11 @@ interface FullReplaceOptions {
 
 interface FullReplaceResult {
   backupPath: string | null;
+  claudeBackupPath: string | null;
   filesRestored: string[];
-  claudeMdUpdated: boolean;
+  claudeFilesRestored: string[];
+  targetLinesUpdated: boolean;
   envExampleCopied: boolean;
-  gitignoreSynced: boolean;
-  tldrignoreSynced: boolean;
 }
 
 /**
@@ -26,6 +24,14 @@ interface FullReplaceResult {
  */
 const PRESERVE_IN_ALLHANDS = [
   'node_modules',  // target's local dependencies
+];
+
+/**
+ * Files/directories to preserve from the target's existing .claude
+ * These are restored after the wholesale copy.
+ */
+const PRESERVE_IN_CLAUDE = [
+  'settings.local.json',  // target's local settings
 ];
 
 /**
@@ -41,21 +47,24 @@ const PRESERVE_AT_ROOT = [
 /**
  * Generate timestamp-based backup directory name
  */
-function getBackupDirName(): string {
+function getBackupDirName(prefix: string = '.allhands'): string {
   const now = new Date();
   const ts = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return `.allhands-${ts}.backup`;
+  return `${prefix}-${ts}.backup`;
 }
 
 /**
- * Perform full replace of .allhands directory.
+ * Perform full replace of .allhands and .claude directories.
  *
  * 1. Backup existing .allhands to .allhands-[timestamp].backup
  * 2. Copy entire .allhands from source
  * 3. Restore preserved items from backup (node_modules, etc.)
- * 4. Handle CLAUDE.md reference
- * 5. Copy .env.example files
- * 6. Restore dotfiles
+ * 4. Backup existing .claude to .claude-[timestamp].backup
+ * 5. Copy entire .claude from source (if exists)
+ * 6. Restore preserved items from .claude backup (settings.local.json)
+ * 7. Copy .env.example files
+ * 8. Restore dotfiles
+ * 9. Sync target-lines (CLAUDE.md, .gitignore, .tldrignore)
  */
 export async function fullReplace(options: FullReplaceOptions): Promise<FullReplaceResult> {
   const { sourceRoot, targetRoot, verbose = false } = options;
@@ -65,11 +74,11 @@ export async function fullReplace(options: FullReplaceOptions): Promise<FullRepl
 
   const result: FullReplaceResult = {
     backupPath: null,
+    claudeBackupPath: null,
     filesRestored: [],
-    claudeMdUpdated: false,
+    claudeFilesRestored: [],
+    targetLinesUpdated: false,
     envExampleCopied: false,
-    gitignoreSynced: false,
-    tldrignoreSynced: false,
   };
 
   // 1. Backup existing .allhands if it exists
@@ -106,10 +115,45 @@ export async function fullReplace(options: FullReplaceOptions): Promise<FullRepl
     }
   }
 
-  // 4. Handle CLAUDE.md - ensure it has the reference line
-  const claudeMdPath = join(targetRoot, 'CLAUDE.md');
-  if (verbose) console.log('Ensuring CLAUDE.md has CORE.md reference...');
-  result.claudeMdUpdated = ensureLineInFile(claudeMdPath, CLAUDE_MD_REFERENCE, verbose);
+  // 4. Handle .claude directory (if source has it)
+  const sourceClaude = join(sourceRoot, '.claude');
+  const targetClaude = join(targetRoot, '.claude');
+
+  if (existsSync(sourceClaude)) {
+    // 4a. Backup existing .claude if it exists
+    if (existsSync(targetClaude)) {
+      const claudeBackupName = getBackupDirName('.claude');
+      const claudeBackupPath = join(targetRoot, claudeBackupName);
+
+      if (verbose) console.log(`Backing up .claude → ${claudeBackupName}`);
+      renameSync(targetClaude, claudeBackupPath);
+      result.claudeBackupPath = claudeBackupPath;
+    }
+
+    // 4b. Copy entire .claude from source
+    if (verbose) console.log('Copying .claude from source...');
+    cpSync(sourceClaude, targetClaude, { recursive: true });
+
+    // 4c. Restore preserved items from .claude backup
+    if (result.claudeBackupPath) {
+      for (const item of PRESERVE_IN_CLAUDE) {
+        const backupItem = join(result.claudeBackupPath, item);
+        const targetItem = join(targetClaude, item);
+
+        if (existsSync(backupItem)) {
+          // Remove what we just copied (if exists)
+          if (existsSync(targetItem)) {
+            rmSync(targetItem, { recursive: true, force: true });
+          }
+
+          // Restore from backup
+          if (verbose) console.log(`  Restoring .claude/${item} from backup`);
+          cpSync(backupItem, targetItem, { recursive: true });
+          result.claudeFilesRestored.push(item);
+        }
+      }
+    }
+  }
 
   // 5. Copy .env.example files (but don't overwrite actual .env files)
   const envExamples = ['.env.example', '.env.ai.example'];
@@ -128,17 +172,9 @@ export async function fullReplace(options: FullReplaceOptions): Promise<FullRepl
   if (verbose) console.log('Restoring dotfiles...');
   restoreDotfiles(targetAllhands);
 
-  // 7. Sync .gitignore (lines after # ALLHANDS_SYNC)
-  const sourceGitignore = join(sourceRoot, '.gitignore');
-  const targetGitignore = join(targetRoot, '.gitignore');
-  if (verbose) console.log('Syncing .gitignore...');
-  result.gitignoreSynced = syncMarkerSection(sourceGitignore, targetGitignore, verbose);
-
-  // 8. Sync .tldrignore (lines after # ALLHANDS_SYNC)
-  const sourceTldrignore = join(sourceRoot, '.tldrignore');
-  const targetTldrignore = join(targetRoot, '.tldrignore');
-  if (verbose) console.log('Syncing .tldrignore...');
-  result.tldrignoreSynced = syncMarkerSection(sourceTldrignore, targetTldrignore, verbose);
+  // 7. Ensure target files have required lines (CLAUDE.md, .gitignore, .tldrignore)
+  if (verbose) console.log('Syncing target-lines...');
+  result.targetLinesUpdated = ensureTargetLines(targetRoot, verbose);
 
   return result;
 }
