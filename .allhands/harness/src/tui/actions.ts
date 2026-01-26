@@ -16,7 +16,7 @@
  * [ ] Loop
  * [ ] Emergent
  * ─ Controls ─
- * [L] View Logs
+ * [V] View Logs
  * [C] Clear Logs
  * [R] Refresh
  * [Q] Quit
@@ -168,7 +168,7 @@ function buildActionItems(toggleState: ToggleState): ActionItem[] {
     // Spacing before controls
     { id: 'spacer-2', label: '', type: 'separator' },
     { id: 'separator-bottom', label: '─── Controls ───', type: 'separator' },
-    { id: 'view-logs', label: 'View Logs', key: 'L', type: 'action' },
+    { id: 'view-logs', label: 'View Logs', key: 'V', type: 'action' },
     { id: 'clear-logs', label: 'Clear Logs', key: 'C', type: 'action' },
     { id: 'refresh', label: 'Refresh', key: 'R', type: 'action' },
     { id: 'quit', label: 'Quit', key: 'Q', type: 'action' },

@@ -455,7 +455,7 @@ export class TUI {
       { id: 'toggle-loop', label: 'Loop', key: 'O', type: 'toggle', checked: this.state.loopEnabled },
       { id: 'toggle-emergent', label: 'Emergent', key: 'E', type: 'toggle', checked: this.state.emergentEnabled },
       { id: 'separator-controls', label: '─ Controls ─', type: 'separator' },
-      { id: 'view-logs', label: 'View Logs', key: 'L', type: 'action' },
+      { id: 'view-logs', label: 'View Logs', key: 'V', type: 'action' },
       { id: 'clear-logs', label: 'Clear Logs', key: 'C', type: 'action' },
       { id: 'refresh', label: 'Refresh', key: 'R', type: 'action' },
       { id: 'quit', label: 'Quit', key: 'Q', type: 'action' },
@@ -572,7 +572,7 @@ export class TUI {
         this.handleAction('refresh');
       }
     });
-    this.screen.key(['l'], () => {
+    this.screen.key(['v'], () => {
       if (!this.activeModal) {
         this.handleAction('view-logs');
       }
@@ -583,14 +583,6 @@ export class TUI {
       }
     });
 
-    // Log modal toggle (Ctrl-L)
-    this.screen.key(['C-l'], () => {
-      if (this.activeModal) {
-        this.closeModal();
-      } else {
-        this.openLogModal();
-      }
-    });
   }
 
   private cyclePane(direction: number): void {
