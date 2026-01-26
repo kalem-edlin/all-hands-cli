@@ -16,21 +16,6 @@ For local development, copy the shim to your PATH:
 cp .allhands/harness/ah ~/.local/bin/ah
 ```
 
-## Environment Variables
-
-Check `.env.ai.example` for what you should populate `.env.ai` with.
-
-
-## Quick Start
-
-```bash
-ah <command>
-```
-
-The `ah` command works from any directory within an all-hands project.
-
-## Optional Dependencies
-
 ### Universal Ctags (for `ah docs` command)
 
 ```bash
@@ -57,6 +42,27 @@ cargo install ast-grep --locked
 brew install --cask notifier
 ```
 
+## Language Servers (for LSP tool)
+
+```bash
+npm install -g typescript-language-server typescript pyright
+brew install swift  
+```
+
+## Environment Variables
+
+Check `.env.ai.example` for what you should populate `.env.ai` with.
+
+
+## Quick Start
+
+```bash
+ah <command>
+```
+
+The `ah` command works from any directory within an all-hands project.
+
+
 ## Project Settings
 
 Project-specific configuration lives in `.allhands/settings.json`:
@@ -64,16 +70,6 @@ Project-specific configuration lives in `.allhands/settings.json`:
 ```json
 {
   "$schema": "./harness/src/schemas/settings.schema.json",
-  "git": {
-    "baseBranch": "main"
-  },
-  "validation": {
-    "format": {
-      "enabled": false,
-      "command": "pnpm format"
-    }
-  }
 }
 ```
 
-See the schema for all available options.
