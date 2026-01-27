@@ -396,60 +396,103 @@ function archContextInject(input: HookInput): void {
 // PreToolUse: signature-helper (Edit)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Keywords and builtins to skip - no point searching for these
+const SIGNATURE_SKIP_NAMES = new Set([
+  // Python keywords/builtins
+  'if', 'for', 'while', 'with', 'except', 'match', 'case', 'assert',
+  'print', 'len', 'str', 'int', 'list', 'dict', 'set', 'tuple', 'bool', 'float',
+  'range', 'enumerate', 'zip', 'map', 'filter', 'sorted', 'reversed',
+  'type', 'isinstance', 'hasattr', 'getattr', 'setattr', 'super', 'object',
+  'open', 'input', 'any', 'all', 'min', 'max', 'sum', 'abs', 'round', 'repr',
+  // JS/TS keywords/builtins
+  'require', 'import', 'export', 'return', 'const', 'let', 'var',
+  'function', 'async', 'await', 'new', 'this', 'class', 'extends', 'typeof',
+  'console', 'log', 'warn', 'error', 'info', 'debug',
+  'Array', 'Object', 'String', 'Number', 'Boolean', 'Promise', 'Map', 'Set',
+  'JSON', 'parse', 'stringify', 'Math', 'Date', 'Error', 'RegExp',
+  'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+  'push', 'pop', 'shift', 'unshift', 'slice', 'splice', 'concat', 'join',
+  'split', 'trim', 'replace', 'match', 'test', 'exec', 'find', 'includes',
+  'forEach', 'filter', 'reduce', 'some', 'every', 'keys', 'values', 'entries',
+]);
+
+/**
+ * Extract function calls from code, filtering out keywords/builtins.
+ */
+function extractFunctionCalls(code: string): string[] {
+  const callRe = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
+  const calls = new Set<string>();
+  let match;
+  while ((match = callRe.exec(code)) !== null) {
+    const name = match[1];
+    if (!SIGNATURE_SKIP_NAMES.has(name) && !SIGNATURE_SKIP_NAMES.has(name.toLowerCase())) {
+      calls.add(name);
+    }
+  }
+  return Array.from(calls);
+}
+
+/**
+ * Get the search pattern for a function based on file language.
+ */
+function getSearchPattern(funcName: string, filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || '';
+  if (ext === 'py') {
+    return `def ${funcName}`;
+  }
+  // For JS/TS, function declarations are more common
+  return `function ${funcName}`;
+}
+
 /**
  * Inject function signatures for called functions in edit context.
- * Two-step approach (like Continuous-Claude-v3):
- * 1. searchDaemon to find the file containing the function
- * 2. extractDaemon on that file to get the signature
+ *
+ * Optimized approach:
+ * - Skip upfront daemon checks (let calls fail gracefully)
+ * - Filter out builtins/keywords before any I/O
+ * - Use single search pattern based on file type
+ * - Early exit for tiny edits
  */
 function signatureHelper(input: HookInput): void {
   const projectDir = getProjectDir();
-
-  if (!isTldrInstalled() || !isTldrDaemonRunning(projectDir)) {
-    allowTool(HOOK_SIGNATURE);
-  }
-
+  const filePath = (input.tool_input?.file_path as string) || '';
   const newString = (input.tool_input?.new_string as string) || '';
-  if (!newString) {
+
+  // Early exit for tiny edits (not worth the overhead)
+  if (!newString || newString.length < 15) {
     allowTool(HOOK_SIGNATURE);
   }
 
-  // Extract function calls from the new code
-  const refs = extractReferences(newString);
-  if (refs.length === 0) {
+  // Extract function calls, filtering out builtins
+  const calls = extractFunctionCalls(newString);
+  if (calls.length === 0) {
     allowTool(HOOK_SIGNATURE);
   }
 
   const signatures: string[] = [];
 
-  for (const ref of refs.slice(0, 5)) {
-    // Step 1: Search for the function definition
-    // Try TypeScript/JS patterns first, then Python
-    const searchPatterns = [`function ${ref}`, `def ${ref}`, `${ref} =`];
-    let foundFile: string | null = null;
+  // Limit to 3 calls for performance (was 5)
+  for (const call of calls.slice(0, 3)) {
+    // Use single search pattern based on file type
+    const pattern = getSearchPattern(call, filePath);
+    const searchResults = searchDaemon(pattern, projectDir);
 
-    for (const pattern of searchPatterns) {
-      const searchResults = searchDaemon(pattern, projectDir);
-      if (searchResults.length > 0) {
-        const firstResult = searchResults[0];
-        foundFile = firstResult.file.startsWith('/')
-          ? firstResult.file
-          : `${projectDir}/${firstResult.file}`;
-        break;
-      }
-    }
+    if (searchResults.length === 0) continue;
 
-    if (!foundFile) continue;
+    const firstResult = searchResults[0];
+    const foundFile = firstResult.file.startsWith('/')
+      ? firstResult.file
+      : `${projectDir}/${firstResult.file}`;
 
-    // Step 2: Extract symbols from the file to get signature
+    // Extract symbols from the file to get signature
     const extracted = extractDaemon(foundFile, projectDir);
     if (!extracted) continue;
 
     // Look for the function in extracted symbols
     for (const func of extracted.functions || []) {
-      if (func.name === ref || func.name === `async ${ref}`) {
+      if (func.name === call || func.name === `async ${call}`) {
         if (func.signature) {
-          signatures.push(`${ref}: ${func.signature}`);
+          signatures.push(`${call}: ${func.signature}`);
           break;
         }
       }
@@ -457,7 +500,6 @@ function signatureHelper(input: HookInput): void {
   }
 
   if (signatures.length > 0) {
-    // Use additionalContext in hookSpecificOutput (like Continuous-Claude-v3)
     logHookSuccess(HOOK_SIGNATURE, { action: 'signature', count: signatures.length });
     const output = {
       hookSpecificOutput: {
