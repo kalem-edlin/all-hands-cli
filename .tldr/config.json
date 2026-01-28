@@ -1,0 +1,11 @@
+{
+  "semantic": {
+    "enabled": true,
+    "auto_reindex_threshold": 20,
+    "model": "bge-large-en-v1.5",
+    "default_language": "all"
+  },
+  "warm": {
+    "default_language": "all"
+  }
+}
