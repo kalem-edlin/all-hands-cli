@@ -33,7 +33,7 @@ Look for code that:
 
 | Pattern | Description |
 |---------|-------------|
-| Beyond Scope | Implementation exceeds prompt tasks |
+| Beyond Scope | Implementation exceeds prompt tasks (note: `type: emergent` prompts explore extensions by design per **Quality Engineering** - YAGNI applies to implementation efficiency within the prompt, not to the emergent hypothesis itself) |
 | Unused Code | Functions/classes not called anywhere |
 | Over-Abstraction | Abstractions for single use cases |
 | Feature Flags | Configuration for features not requested |

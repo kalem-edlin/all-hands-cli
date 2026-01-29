@@ -3,8 +3,9 @@ Create a harness improvement spec when compounding identifies systemic issues. P
 </goal>
 
 <inputs>
-- Improvement recommendation from compounding
-- Problem encountered, fix proposed
+- Engineer-selected improvement issues from compounding (one or more)
+- Problems encountered, fixes proposed
+- Per-tool impact map from compounding signal analysis (evidence for spec motivation)
 </inputs>
 
 <outputs>
@@ -14,7 +15,7 @@ Create a harness improvement spec when compounding identifies systemic issues. P
 <constraints>
 - MUST create spec, NOT implement directly
 - MUST get engineer confirmation
-- MUST scope to single improvement
+- MUST scope to engineer-selected improvements from a single compounding session
 - Harness specs do NOT block feature specs
 </constraints>
 
@@ -28,13 +29,13 @@ Assess: affected flows/commands/hooks, new capability vs fix, risk level.
 
 Present: problem, proposed solution, impact scope, effort, urgency.
 
-If engineer declines: document in `.allhands/memories.md`, exit flow.
+If engineer declines: document in `docs/memories.md`, exit flow.
 
 ## Spec Creation
 
 Use `name: harness-{name}` and `domain_name: harness` (triggers `harness-maintenance` skill during planning).
 
-Body sections: Problem Statement, Proposed Solution, Acceptance Criteria, Affected Components, Testing Strategy.
+Body sections: Problem Statement, Proposed Solution, Affected Components, Testing Strategy (brief - how to verify the improvement works).
 
 Follow `.allhands/flows/shared/CREATE_SPEC.md`.
 

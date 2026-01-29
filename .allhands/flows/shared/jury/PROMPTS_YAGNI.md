@@ -34,7 +34,7 @@ Look for:
 | Future-Proofing | Building for hypothetical requirements | Config for thing that won't change |
 | Over-Configuration | Making unchanging things configurable | ENV var for hardcoded value |
 | Defensive Complexity | Error handling for impossible scenarios | Null check on required param |
-| Feature Creep | Scope beyond stated goals | "While we're here, let's add..." |
+| Feature Creep | Scope beyond stated goals within planned prompts (note: `type: emergent` prompts and disposable variants are not feature creep per **Quality Engineering** - they discover which extensions are valuable) | "While we're here, let's add..." |
 | Scope Bloat | 10+ files or 7+ tasks in single prompt | Split needed |
 
 ## Priority Weighting
