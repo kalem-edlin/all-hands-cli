@@ -30,7 +30,7 @@ jobs:
       - name: Ensure version is higher than published
         run: |
           CURRENT=$(node -p "require('./package.json').version")
-          LATEST=$(npm view claude-all-hands version 2>/dev/null || echo "0.0.0")
+          LATEST=$(npm view all-hands version 2>/dev/null || echo "0.0.0")
 
           # Compare versions using node
           NEEDS_BUMP=$(node -e "
