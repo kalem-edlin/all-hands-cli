@@ -412,6 +412,11 @@ async function handleAction(
         return;
       }
 
+      if (currentSpec.status === 'completed') {
+        tui.log('Spec is already marked as completed.');
+        break;
+      }
+
       // Warn about uncommitted changes — gives user a chance to cancel and commit first
       try {
         const statusOut = execSync('git status --porcelain', { encoding: 'utf-8', cwd }).trim();
@@ -480,8 +485,12 @@ async function handleAction(
         // Reindex roadmap and docs indexes after file move
         await reindexAfterMove(cwd, currentSpec.path, destPath, true);
 
-        // Commit the move — use git add -A specs/ to stage both the deletion and addition
-        execSync(`git add -A specs/ && git commit -m "chore: mark spec ${currentSpec.id} as completed"`, { stdio: 'pipe', cwd });
+        // Stage and commit the move (skip commit if nothing staged)
+        execSync('git add -A specs/', { stdio: 'pipe', cwd });
+        const staged = execSync('git diff --cached --quiet || echo changed', { encoding: 'utf-8', cwd }).trim();
+        if (staged) {
+          execSync(`git commit -m "chore: mark spec ${currentSpec.id} as completed"`, { stdio: 'pipe', cwd });
+        }
 
         // Push the completion commit
         try {
