@@ -478,7 +478,7 @@ async function handleAction(
         tui.log(`Moved spec to: specs/completed/${currentSpec.filename}`);
 
         // Reindex roadmap and docs indexes after file move
-        await reindexAfterMove(cwd, currentSpec.path, destPath);
+        await reindexAfterMove(cwd, currentSpec.path, destPath, true);
 
         // Commit the move — use git add -A specs/ to stage both the deletion and addition
         execSync(`git add -A specs/ && git commit -m "chore: mark spec ${currentSpec.id} as completed"`, { stdio: 'pipe', cwd });
@@ -577,7 +577,7 @@ async function handleAction(
             if (wasNotInRoadmap) {
               mkdirSync(roadmapDir, { recursive: true });
               renameSync(specFile.path, targetPath);
-              await reindexAfterMove(cwd, specFile.path, targetPath);
+              await reindexAfterMove(cwd, specFile.path, targetPath, true);
             }
 
             tui.log('Spec resurrected and indexes updated ✓');
