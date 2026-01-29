@@ -468,7 +468,7 @@ export function hasCapabilityList(content: string): boolean {
 /**
  * Recursively find all markdown files in a directory.
  */
-export function findMarkdownFiles(dir: string, excludeReadme = true): string[] {
+export function findMarkdownFiles(dir: string, excludeReadme = true, excludePaths: string[] = []): string[] {
   const files: string[] = [];
 
   if (!existsSync(dir)) {
@@ -478,10 +478,16 @@ export function findMarkdownFiles(dir: string, excludeReadme = true): string[] {
   const entries = readdirSync(dir);
   for (const entry of entries) {
     const fullPath = join(dir, entry);
+
+    // Skip excluded paths (exact match for files, prefix match for directories)
+    if (excludePaths.some(ep => fullPath === ep || fullPath.startsWith(ep + "/"))) {
+      continue;
+    }
+
     const stat = statSync(fullPath);
 
     if (stat.isDirectory()) {
-      files.push(...findMarkdownFiles(fullPath, excludeReadme));
+      files.push(...findMarkdownFiles(fullPath, excludeReadme, excludePaths));
     } else if (entry.endsWith(".md")) {
       if (excludeReadme && entry === "README.md") {
         continue;
@@ -593,7 +599,7 @@ export function validateRef(
 export function validateDocs(
   docsPath: string,
   projectRoot: string,
-  options?: { ctagsIndex?: CtagsIndex; useCache?: boolean }
+  options?: { ctagsIndex?: CtagsIndex; useCache?: boolean; excludePaths?: string[] }
 ): ValidationResult {
   // Initialize result
   const result: ValidationResult = {
@@ -621,7 +627,7 @@ export function validateDocs(
   };
 
   // Find markdown files
-  const mdFiles = findMarkdownFiles(docsPath);
+  const mdFiles = findMarkdownFiles(docsPath, true, options?.excludePaths ?? []);
   result.total_files = mdFiles.length;
 
   if (mdFiles.length === 0) {

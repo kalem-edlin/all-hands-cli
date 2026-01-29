@@ -35,6 +35,9 @@ import {
 /**
  * Validate all documentation references.
  */
+/** Paths excluded from validation and finalization (relative to project root). */
+const EXCLUDED_DOC_PATHS = ["docs/memories.md", "docs/solutions"];
+
 async function validate(docsPath: string, options?: { useCache?: boolean }): Promise<CommandResult> {
   const projectRoot = getProjectRoot();
   const absoluteDocsPath = docsPath.startsWith("/")
@@ -50,9 +53,12 @@ async function validate(docsPath: string, options?: { useCache?: boolean }): Pro
     };
   }
 
+  const excludePaths = EXCLUDED_DOC_PATHS.map((p) => join(projectRoot, p));
+
   // Run validation (with optional caching)
   const result = validateDocs(absoluteDocsPath, projectRoot, {
     useCache: options?.useCache ?? false,
+    excludePaths,
   });
 
   // Consider it a success even with issues (issues are in the data)
@@ -318,10 +324,13 @@ async function finalize(docsPath: string): Promise<CommandResult> {
   generateCtagsIndex(projectRoot);
 
   // Determine if path is a file or directory
+  const excludePaths = EXCLUDED_DOC_PATHS.map((p) => join(projectRoot, p));
   const stat = statSync(absolutePath);
   const filesToProcess: string[] = stat.isDirectory()
-    ? findMarkdownFiles(absolutePath, false)
-    : [absolutePath];
+    ? findMarkdownFiles(absolutePath, false, excludePaths)
+    : excludePaths.some((ep) => absolutePath === ep || absolutePath.startsWith(ep + "/"))
+      ? []
+      : [absolutePath];
 
   if (filesToProcess.length === 0) {
     return {
