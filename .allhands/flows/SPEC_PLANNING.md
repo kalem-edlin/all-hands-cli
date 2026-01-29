@@ -1,5 +1,5 @@
 <goal>
-Transform the spec into executable prompts with validated approaches. Per **Quality Engineering**, present approach variants for engineer selection - cheap software means multiple variants can be tested in parallel behind feature flags.
+Transform the spec into executable prompts with type-appropriate planning depth. Per **Quality Engineering**, milestone specs get deep planning with variant architecture. Per **Frontier Models are Capable**, exploratory specs get lightweight scoping that leaves room for hypothesis-driven discovery.
 </goal>
 
 <inputs>
@@ -9,29 +9,41 @@ Transform the spec into executable prompts with validated approaches. Per **Qual
 </inputs>
 
 <constraints>
-- MUST research / gather implementation approaches deeply before presenting options
+- MUST read spec `type` field before planning — it determines planning depth
 - MUST present recommended approach for each decision point
-- MUST spawn plan review jury before finalizing
+- Milestone specs MUST include jury review before finalizing
+- Exploratory specs MUST document unresolved questions in alignment doc for hypothesis planner consumption
 - Prompts MUST be fully autonomous - no human intervention during execution
 - Testing is NOT a prompt - validation happens via validation_suites attached to prompts
 </constraints>
 
 ## Context Gathering
 
-- Read the spec doc (high-level engineer intent)
+- Read the spec doc — note the `type` field (milestone, investigation, optimization, refactor, documentation, triage)
 - Read the alignment doc for existing prompts that may impact planning (if exists)
 - Read codebase files referenced in spec for initial grounding
 - Ensure your branch is up to date with base branch
 - Search documented solutions with `ah solutions search "<keywords>"` for relevant past learnings in this domain
 - Search memories with `ah memories search "<keywords>"` for engineer preferences and prior spec insights
 
-## Deep Research
+## Planning Depth by Spec Type
+
+Per **Frontier Models are Capable**, the spec `type` determines planning depth — deduce appropriate behavior:
+
+| Spec Type | Planning Path | Research | Interview | Jury | Output |
+|-----------|--------------|----------|-----------|------|--------|
+| `milestone` (or missing) | Milestone Planning | 1-4 deep subtasks | Full decision interview | Yes | 5-15 prompts + detailed alignment doc |
+| All other types | Exploratory Planning | 1-2 focused subtasks | Open questions only (skippable) | No | 0-3 seed prompts + problem-focused alignment doc |
+
+## Milestone Planning
+
+### Deep Research
 
 Spawn parallel general subtasks to ground yourself with information that will help you be confident making recommendations in the upcoming interview and subsequent writing of this implementation:
 - 1-4 Tasks: Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` in order to understand relevant implementation approaches in the codebase
 - 0-3 Tasks: Tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` in order to isolate optimal solutions to the problem (if necessary)
 
-## Engineer Interview
+### Engineer Interview
 
 Per **Quality Engineering**, present researched approaches as options using the `AskUserQuestion` tool:
 - Ask ONE decision point at a time - do not batch all questions together
@@ -44,7 +56,7 @@ Per **Quality Engineering**, present researched approaches as options using the 
 
 Keep interview concise and actionable.
 
-## Disposable Variant Architecture
+### Disposable Variant Architecture
 
 When engineer selects multiple approaches:
 - Create variant prompts that can execute in parallel
@@ -53,15 +65,15 @@ When engineer selects multiple approaches:
 - Planning agent is the only agent who architects variant prompt structures
 - Pass variant knowledge to prompt creation phase
 
-## External Technology Implementation Usage Research
+### External Technology Implementation Usage Research
 
 Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
 - Typically run after understanding the implementation approach and the external technology required
-- Can be used to answer questions on open source libraries to help with the engineer interview, where beneficial 
+- Can be used to answer questions on open source libraries to help with the engineer interview, where beneficial
 - Consolidate approach against actual documentation
 - Derive specific implementation steps
 
-## Prompt Creation
+### Prompt Creation
 
 - Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt creation guidance
 - Transform researched approaches into executable prompts
@@ -69,7 +81,7 @@ Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
 - For high-risk domains (auth, payments, data), note TDD approach requirement in prompt
   - Reference `.allhands/flows/shared/TDD_WORKFLOW.md` for TDD execution guidance
 
-## Alignment Doc Setup
+### Milestone Alignment Doc
 
 - Run `ah schema alignment` for format
 - Create alignment doc with Overview + Hard User Requirements sections
@@ -79,7 +91,7 @@ Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
   - Purpose: future agents need to know where human judgment overrode AI suggestions
 - Do NOT write prompt summaries - those are appended by executor after prompt completion
 
-## Plan Verification
+### Plan Verification
 
 Before spawning jury, self-verify plans can achieve goals:
 
@@ -93,7 +105,7 @@ Before spawning jury, self-verify plans can achieve goals:
 
 If issues found, fix before jury review.
 
-## Plan Review Jury
+### Plan Review Jury
 
 Spawn parallel review subtasks (provide alignment doc, spec doc, prompts folder paths):
 
@@ -114,7 +126,7 @@ After jury returns:
   - Update prompt dependencies when inserting new prompts
 - Document only deviations from recommendations (including accepted risks that were flagged)
 
-## Plan Deepening (Optional)
+### Plan Deepening (Optional)
 
 Per **Knowledge Compounding**, offer to deepen the plan:
 
@@ -132,6 +144,40 @@ This is recommended for:
 - High-risk domains (security, payments, data migrations)
 - Novel technologies not yet in codebase
 - Large specs with many unknowns
+
+## Exploratory Planning
+
+### Focused Research
+
+Spawn 1-2 targeted research subtasks grounded in the problem area:
+- Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` focused on the specific problem domain
+- Only spawn external research (`.allhands/flows/shared/RESEARCH_GUIDANCE.md`) if the spec references external tools or novel approaches
+
+### Engineer Scope Narrowing
+
+Present spec open questions and concerns to the engineer using `AskUserQuestion`:
+- Each open question becomes a question — engineer can answer to narrow scope or skip
+- Skipped/unanswered questions remain open for hypothesis-driven discovery
+- Include a recommended approach for each question
+- Keep interview brief — exploratory specs intentionally leave room for discovery
+
+### Seed Prompt Creation
+
+- Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt creation guidance
+- Create 0-3 seed prompts as testable hypotheses grounded in research findings
+- Read `.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md` to discover and assign validation suites
+- Seed prompts target the most concrete, immediately actionable aspects of the spec
+- Remaining open questions are left for the hypothesis planner to design experiments around
+
+### Exploratory Alignment Doc
+
+- Run `ah schema alignment` for format — use the same schema sections with type-appropriate content:
+  - **Overview**: Problem statement, evidence, context, and unresolved questions — the hypothesis planner reads these to design experiments
+  - **Hard User Requirements**: Success criteria and constraints
+  - **Engineer Decisions**: Only deviations from recommendations (same as milestone)
+- Document unresolved questions (skipped interview questions, open spec questions) prominently in Overview — per **Knowledge Compounding**, this enables hypothesis planner to discover and test answers
+- Document concerns and limitations as context for hypothesis formation
+- Do NOT write prompt summaries - those are appended by executor after prompt completion
 
 ## Completion
 
