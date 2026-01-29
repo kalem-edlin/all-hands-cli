@@ -512,6 +512,7 @@ export interface ValidationSettings {
 /** Git settings */
 export interface GitSettings {
   baseBranch?: string;
+  localBaseBranch?: string;
 }
 
 /** TLDR settings */
@@ -602,6 +603,15 @@ export function loadProjectSettings(): ProjectSettings | null {
 export function getBaseBranch(): string {
   const settings = loadProjectSettings();
   return settings?.git?.baseBranch || 'main';
+}
+
+/**
+ * Get local base branch for checkout operations.
+ * Priority: settings.git.localBaseBranch > settings.git.baseBranch > "main"
+ */
+export function getLocalBaseBranch(): string {
+  const settings = loadProjectSettings();
+  return settings?.git?.localBaseBranch || settings?.git?.baseBranch || 'main';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

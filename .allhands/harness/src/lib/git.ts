@@ -7,10 +7,10 @@
 import { execSync, spawnSync } from "child_process";
 import { basename, dirname, join, relative } from "path";
 import { existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
-import { getBaseBranch } from '../hooks/shared.js';
+import { getBaseBranch, getLocalBaseBranch } from '../hooks/shared.js';
 
-// Re-export getBaseBranch for consumers
-export { getBaseBranch };
+// Re-export getBaseBranch and getLocalBaseBranch for consumers
+export { getBaseBranch, getLocalBaseBranch };
 
 // Protected branches - no planning required
 const PROTECTED_BRANCHES = new Set([

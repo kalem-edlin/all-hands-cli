@@ -23,15 +23,18 @@ import {
   readStatus,
   getCurrentBranch,
   updateStatus,
+  updatePRReviewStatus,
   initializeStatus,
   getPlanningPaths,
   ensurePlanningDir,
   sanitizeBranchForDir,
   planningDirExists,
 } from '../lib/planning.js';
+import { triggerPRReview } from '../lib/pr-review.js';
+import { loadProjectSettings } from '../hooks/shared.js';
 import { findSpecForPath, extractSpecNameFromFile } from '../lib/planning-utils.js';
-import { getBaseBranch } from '../lib/git.js';
-import { loadAllPrompts } from '../lib/prompts.js';
+import { getBaseBranch, getLocalBaseBranch } from '../lib/git.js';
+import { loadAllPrompts, getNextPromptNumber } from '../lib/prompts.js';
 import {
   isTmuxInstalled,
   spawnAgentFromProfile,
@@ -91,6 +94,19 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
 
   const baseBranch = getBaseBranch();
 
+  // Determine initial PR action state based on PR and review status
+  let initialPRActionState: PRActionState = 'create-pr';
+  if (status?.pr?.url) {
+    // PR exists - check if review feedback was received
+    if (status?.prReview?.lastReviewTime) {
+      // Review feedback was received - show rerun option
+      initialPRActionState = 'rerun-pr-review';
+    } else {
+      // PR created but waiting for review
+      initialPRActionState = 'awaiting-review';
+    }
+  }
+
   const initialState: Partial<TUIState> = {
     loopEnabled: false, // Always start disabled, regardless of saved status
     emergentEnabled: status?.loop.emergent ?? false,
@@ -100,7 +116,7 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
     spec: currentSpec?.id,
     branch,
     baseBranch,
-    prActionState: 'create-pr' as PRActionState,
+    prActionState: initialPRActionState,
     compoundRun: status?.compound_run ?? false,
     customFlowCounter: 0,
   };
@@ -270,15 +286,25 @@ async function handleAction(
         return;
       }
 
-      tui.log('Creating PR via oracle...');
+      // Check if we're creating or updating
+      const existingStatus = status?.pr?.url ? 'Updating' : 'Creating';
+      tui.log(`${existingStatus} PR via oracle...`);
 
       try {
         // buildPR uses planning key for reading prompts/alignment
         const result = await buildPR(planningKey, cwd);
 
         if (result.success && result.prUrl) {
-          tui.log(`PR created: ${result.prUrl}`);
+          const action = result.existingPR ? 'updated' : 'created';
+          tui.log(`PR ${action}: ${result.prUrl}`);
           tui.setPRUrl(result.prUrl);
+
+          // Set lastReviewRunTime to now for comment filtering
+          updatePRReviewStatus(
+            { lastReviewRunTime: new Date().toISOString() },
+            planningKey,
+            cwd
+          );
         } else {
           tui.log(`Error: ${result.body}`);
           tui.log('You may need to push your branch first or check gh auth status.');
@@ -298,15 +324,141 @@ async function handleAction(
       break;
     }
 
+    case 'rerun-pr-review': {
+      if (!planningKey) {
+        tui.log('Error: No planning context. Checkout a spec branch first.');
+        return;
+      }
+
+      // Get PR URL from status
+      const prStatus = status?.pr;
+      if (!prStatus?.url) {
+        tui.log('Error: No PR found. Create a PR first.');
+        return;
+      }
+
+      tui.log('Triggering PR re-review...');
+
+      try {
+        // Push any unpushed commits before triggering review
+        try {
+          const unpushedResult = execSync('git log @{u}..HEAD --oneline 2>/dev/null || echo ""', {
+            encoding: 'utf-8',
+            cwd: cwd || process.cwd(),
+          }).trim();
+
+          if (unpushedResult) {
+            tui.log('Pushing local commits to remote...');
+            execSync('git push', {
+              encoding: 'utf-8',
+              cwd: cwd || process.cwd(),
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            tui.log('Commits pushed successfully.');
+          }
+        } catch {
+          // No upstream or other git error - try push anyway
+          try {
+            execSync('git push', {
+              encoding: 'utf-8',
+              cwd: cwd || process.cwd(),
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+          } catch {
+            // Push failed, but continue with review trigger
+            tui.log('Warning: Could not push commits. Continuing with review trigger...');
+          }
+        }
+
+        // Load settings for rerun comment
+        const settings = loadProjectSettings();
+        const rerunComment = settings?.prReview?.rerunComment ?? '@greptile';
+
+        // Post comment to trigger review
+        const result = await triggerPRReview(prStatus.url, rerunComment, cwd);
+
+        if (result.success) {
+          tui.log(`Re-review triggered with comment: ${rerunComment}`);
+
+          // Update lastReviewRunTime and transition to awaiting state
+          updatePRReviewStatus(
+            { lastReviewRunTime: new Date().toISOString() },
+            planningKey,
+            cwd
+          );
+
+          // Transition TUI back to awaiting-review state
+          tui.setPRUrl(prStatus.url);
+        } else {
+          tui.log('Error: Failed to post review comment');
+          logTuiError('rerun-pr-review', 'Failed to post review comment', {
+            prUrl: prStatus.url,
+          }, cwd);
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        tui.log(`Error: ${message}`);
+        logTuiError('rerun-pr-review', e instanceof Error ? e : message, {
+          prUrl: prStatus?.url,
+        }, cwd);
+      }
+      break;
+    }
+
     case 'mark-completed': {
       if (!currentSpec) {
         tui.log('Error: No spec for this branch. Checkout a spec branch first.');
         return;
       }
 
+      // Check for uncommitted changes before proceeding
+      try {
+        const statusOut = execSync('git status --porcelain', { encoding: 'utf-8', cwd }).trim();
+        if (statusOut.length > 0) {
+          await tui.showConfirmation(
+            'Uncommitted Changes',
+            'You have uncommitted changes in your working tree. Please commit or discard them before marking the spec as completed.'
+          );
+          break;
+        }
+      } catch {
+        // git status failed — warn and bail
+        tui.log('Error: Could not check git status.');
+        break;
+      }
+
       tui.log(`Marking spec as completed: ${currentSpec.id}`);
 
       try {
+        // Push any unpushed commits to the feature branch
+        try {
+          const unpushedResult = execSync('git log @{u}..HEAD --oneline 2>/dev/null || echo ""', {
+            encoding: 'utf-8',
+            cwd: cwd || process.cwd(),
+          }).trim();
+
+          if (unpushedResult) {
+            tui.log('Pushing local commits to remote...');
+            execSync('git push', {
+              encoding: 'utf-8',
+              cwd: cwd || process.cwd(),
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            tui.log('Commits pushed successfully.');
+          }
+        } catch {
+          // No upstream or other git error - try push anyway
+          try {
+            execSync('git push', {
+              encoding: 'utf-8',
+              cwd: cwd || process.cwd(),
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+          } catch {
+            tui.log('Warning: Could not push commits. Continuing with completion...');
+          }
+        }
+
         // Move spec from roadmap to completed
         const completedDir = join(cwd, 'specs', 'completed');
         if (!existsSync(completedDir)) {
@@ -322,22 +474,37 @@ async function handleAction(
         renameSync(currentSpec.path, destPath);
         tui.log(`Moved spec to: specs/completed/${currentSpec.filename}`);
 
-        // Checkout base branch
+        // Commit the move
+        execSync(`git add "${currentSpec.path}" "${destPath}" && git commit -m "chore: mark spec ${currentSpec.id} as completed"`, { stdio: 'pipe', cwd });
+
+        // Push the completion commit
+        try {
+          execSync('git push', {
+            encoding: 'utf-8',
+            cwd: cwd || process.cwd(),
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+        } catch {
+          tui.log('Warning: Could not push completion commit.');
+        }
+
+        // Checkout local base branch
+        const localBase = getLocalBaseBranch();
         const baseBranch = getBaseBranch();
-        tui.log(`Checking out base branch: ${baseBranch}`);
-        execSync(`git checkout ${baseBranch}`, { stdio: 'pipe', cwd });
+        tui.log(`Checking out local base branch: ${localBase}`);
+        execSync(`git checkout ${localBase}`, { stdio: 'pipe', cwd });
 
         // Update TUI state
         tui.updateState({
           spec: undefined,
-          branch: baseBranch,
+          branch: localBase,
           prompts: [],
         });
 
         // Sync EventLoop state to prevent stale branch detection
-        tui.syncBranchContext(baseBranch, null);
+        tui.syncBranchContext(localBase, null);
 
-        tui.log(`Spec completed. Now on branch: ${baseBranch}`);
+        tui.log(`Spec ${currentSpec.id} completed. You are now ready to merge into ${baseBranch}.`);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         tui.log(`Error: ${message}`);
@@ -557,21 +724,37 @@ async function handleAction(
     }
 
     case 'clear-spec': {
-      const baseBranch = getBaseBranch();
-      tui.log(`Checking out base branch: ${baseBranch}`);
+      // Check for uncommitted changes before proceeding
+      try {
+        const statusOut = execSync('git status --porcelain', { encoding: 'utf-8', cwd }).trim();
+        if (statusOut.length > 0) {
+          await tui.showConfirmation(
+            'Uncommitted Changes',
+            'You have uncommitted changes in your working tree. Please commit or discard them before clearing the spec.'
+          );
+          break;
+        }
+      } catch {
+        tui.log('Error: Could not check git status.');
+        break;
+      }
+
+      const localBase = getLocalBaseBranch();
+      tui.log(`Checking out local base branch: ${localBase}`);
 
       try {
-        execSync(`git checkout ${baseBranch}`, { stdio: 'pipe', cwd });
+        execSync(`git checkout ${localBase}`, { stdio: 'pipe', cwd });
+
         tui.updateState({
           spec: undefined,
-          branch: baseBranch,
+          branch: localBase,
           prompts: [],
         });
 
         // Sync EventLoop state to prevent stale branch detection
-        tui.syncBranchContext(baseBranch, null);
+        tui.syncBranchContext(localBase, null);
 
-        tui.log(`Now on branch: ${baseBranch} (no spec)`);
+        tui.log(`Now on branch: ${localBase} (no spec)`);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         tui.log(`Error: ${message}`);
@@ -640,19 +823,21 @@ function spawnExecutorForPrompt(tui: TUI, prompt: PromptFile, branch: string, sp
 }
 
 function spawnEmergentForPrompt(tui: TUI, prompt: PromptFile, branch: string, specId: string): void {
-  const promptNumber = prompt.frontmatter.number;
   const cwd = process.cwd();
   const planningKey = sanitizeBranchForDir(branch);
 
-  tui.log(`Spawning emergent for: ${prompt.frontmatter.title}`);
+  // Get next available prompt number for the emergent agent to create
+  const nextPromptNumber = getNextPromptNumber(planningKey, cwd);
+
+  tui.log(`Spawning emergent (will create prompt ${nextPromptNumber}) after: ${prompt.frontmatter.title}`);
 
   try {
-    // Build context with prompt-specific info (use sanitized planning key for paths)
+    // Build context with the NEXT prompt number (emergent will create this prompt)
     const context = buildTemplateContext(
       planningKey,
-      specId,  // Use spec file name, not prompt title
-      promptNumber,
-      prompt.path,
+      specId,
+      nextPromptNumber,
+      undefined,  // No prompt path yet - emergent will create it
       cwd
     );
 
@@ -660,7 +845,7 @@ function spawnEmergentForPrompt(tui: TUI, prompt: PromptFile, branch: string, sp
       {
         agentName: 'emergent',
         context,
-        promptNumber,
+        promptNumber: nextPromptNumber,
         focusWindow: false, // Don't steal focus from TUI
       },
       branch,
@@ -673,8 +858,8 @@ function spawnEmergentForPrompt(tui: TUI, prompt: PromptFile, branch: string, sp
     const message = e instanceof Error ? e.message : String(e);
     tui.log(`Error spawning emergent: ${message}`);
     logTuiError('spawn-emergent', e instanceof Error ? e : message, {
-      promptNumber,
-      promptTitle: prompt.frontmatter.title,
+      promptNumber: nextPromptNumber,
+      promptTitle: `emergent-${nextPromptNumber}`,
       branch,
     }, cwd);
   }
