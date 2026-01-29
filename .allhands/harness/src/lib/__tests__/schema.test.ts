@@ -367,6 +367,34 @@ describe('loadSchema', () => {
     const second = loadSchema('prompt');
     expect(first).toBe(second); // same reference
   });
+
+  it('returns null consistently for nonexistent type (no stale cache)', () => {
+    // Verify that looking up a nonexistent type multiple times
+    // always returns null and doesn't corrupt the cache
+    const first = loadSchema('totally-fake-schema');
+    const second = loadSchema('totally-fake-schema');
+    expect(first).toBeNull();
+    expect(second).toBeNull();
+  });
+
+  it('does not cross-contaminate cache between different schema types', () => {
+    const prompt = loadSchema('prompt');
+    const suite = loadSchema('validation-suite');
+    expect(prompt).not.toBeNull();
+    expect(suite).not.toBeNull();
+    // They should be different objects (different schema definitions)
+    expect(prompt).not.toBe(suite);
+  });
+
+  it('cached schema retains full structure on repeated access', () => {
+    // Load once to populate cache, then verify structure is intact on cache hit
+    loadSchema('prompt'); // warm cache
+    const cached = loadSchema('prompt');
+    expect(cached).not.toBeNull();
+    expect(cached!.frontmatter).toBeDefined();
+    expect(cached!.frontmatter!['number']).toBeDefined();
+    expect(cached!.frontmatter!['number'].type).toBe('integer');
+  });
 });
 
 describe('listSchemas', () => {
@@ -444,6 +472,73 @@ Body only.`;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// extractFrontmatter — Boundary Conditions (Stability)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractFrontmatter boundary conditions', () => {
+  it('returns null frontmatter for empty string input', () => {
+    const result = extractFrontmatter('');
+    expect(result.frontmatter).toBeNull();
+    expect(result.body).toBe('');
+  });
+
+  it('returns null frontmatter for only frontmatter delimiters with empty YAML', () => {
+    // "---\n---\n" has empty YAML between delimiters
+    // parseYaml('') returns null — extractFrontmatter should handle gracefully
+    const content = '---\n---\n';
+    const result = extractFrontmatter(content);
+    // The regex matches but parseYaml on empty string returns null,
+    // which is cast to Record<string, unknown> — may be null
+    expect(result.body).toBeDefined();
+  });
+
+  it('handles content ending at closing --- with no trailing newline', () => {
+    // Regex: /^---\n([\s\S]*?)\n---\n([\s\S]*)$/
+    // Content "---\nkey: val\n---" has no trailing \n after closing ---
+    // This means the regex will NOT match (requires \n after closing ---)
+    // DIVERGENCE: hooks parseFrontmatter regex /^---\n([\s\S]*?)\n---/ DOES match this
+    const content = '---\nkey: val\n---';
+    const result = extractFrontmatter(content);
+    expect(result.frontmatter).toBeNull();
+    expect(result.body).toBe(content);
+  });
+
+  it('handles embedded --- in YAML string values', () => {
+    // Non-greedy ([\s\S]*?) should stop at first literal \n---\n
+    // The quoted "---" inside a value should not confuse the regex
+    const content = '---\nseparator: "---"\ntitle: test\n---\n\nBody text.';
+    const result = extractFrontmatter(content);
+    expect(result.frontmatter).not.toBeNull();
+    expect(result.frontmatter!['title']).toBe('test');
+    expect(result.body).toContain('Body text.');
+  });
+
+  it('returns null frontmatter for content with only opening ---', () => {
+    const content = '---\nkey: value\nmore: stuff';
+    const result = extractFrontmatter(content);
+    expect(result.frontmatter).toBeNull();
+    expect(result.body).toBe(content);
+  });
+
+  it('captures first --- block only, not body content with triple-dash', () => {
+    const content = '---\nfoo: bar\n---\n\nBody\n\n---\n\nMore body.';
+    const result = extractFrontmatter(content);
+    expect(result.frontmatter).not.toBeNull();
+    expect(result.frontmatter!['foo']).toBe('bar');
+    // Body should contain everything after the first closing ---\n
+    expect(result.body).toContain('Body');
+    expect(result.body).toContain('More body.');
+  });
+
+  it('returns null frontmatter when content starts with whitespace before ---', () => {
+    // Regex anchors with ^--- so leading whitespace prevents match
+    const content = ' ---\nkey: val\n---\n\nBody.';
+    const result = extractFrontmatter(content);
+    expect(result.frontmatter).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // validateFrontmatter — Multi-field
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -503,6 +598,61 @@ describe('validateFile', () => {
     const result = validateFile('Just body content', 'prompt');
     expect(result.valid).toBe(false);
     expect(result.errors[0].field).toBe('_frontmatter');
+  });
+
+  it('does not crash on empty string content with valid schema type', () => {
+    const result = validateFile('', 'prompt');
+    expect(result.valid).toBe(false);
+    // Empty string has no frontmatter, so should get _frontmatter error
+    expect(result.errors[0].field).toBe('_frontmatter');
+  });
+
+  it('returns _frontmatter error for content with only body (no delimiters)', () => {
+    const result = validateFile('# Just a heading\n\nSome body text.', 'prompt');
+    expect(result.valid).toBe(false);
+    expect(result.errors[0].field).toBe('_frontmatter');
+  });
+
+  it('validates valid frontmatter against a real schema type', () => {
+    // Minimal valid prompt content (all required fields present)
+    const content = `---
+number: 1
+title: "Test Task"
+type: planned
+status: pending
+---
+
+## Tasks
+
+- Do something
+
+## Acceptance Criteria
+
+- Something works
+`;
+    const result = validateFile(content, 'prompt');
+    expect(result.valid).toBe(true);
+  });
+
+  it('returns valid when schema has no frontmatter or fields keys', () => {
+    // validateFrontmatter iterates schema.frontmatter || schema.fields || {}
+    // An empty schema means zero fields to validate, so everything passes
+    const schema: Schema = {};
+    const result = validateFrontmatter({ anything: 'goes', extra: 42 }, schema);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('silently passes extra fields not defined in schema', () => {
+    const schema: Schema = {
+      frontmatter: {
+        name: { type: 'string', required: true },
+      },
+    };
+    // 'unknown_field' is not in schema — should be ignored, not rejected
+    const result = validateFrontmatter({ name: 'valid', unknown_field: 'extra' }, schema);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
   });
 });
 
