@@ -703,39 +703,6 @@ async function handleAction(
       break;
     }
 
-    case 'branch-changed': {
-      // Branch changes update the spec context in the branch-keyed model
-      const newBranch = data?.branch as string;
-      const newSpec = data?.spec as SpecFile | null | undefined;
-
-      if (!newBranch) break;
-
-      tui.log(`Branch changed to: ${newBranch}`);
-
-      // Update state based on new branch's spec
-      const newPlanningKey = sanitizeBranchForDir(newBranch);
-      const newStatus = planningDirExists(newPlanningKey, cwd) ? readStatus(newPlanningKey, cwd) : null;
-      const newPrompts = newStatus ? loadAllPrompts(newPlanningKey, cwd) : [];
-
-      tui.updateState({
-        branch: newBranch,
-        spec: newSpec?.id,
-        prompts: newPrompts.map((p) => ({
-          number: p.frontmatter.number,
-          title: p.frontmatter.title,
-          status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
-          path: p.path,
-        })),
-      });
-
-      if (newSpec) {
-        tui.log(`Spec: ${newSpec.id}`);
-      } else {
-        tui.log('No spec for this branch');
-      }
-      break;
-    }
-
     case 'refresh': {
       // Reload prompts from filesystem
       if (planningKey && planningDirExists(planningKey, cwd)) {

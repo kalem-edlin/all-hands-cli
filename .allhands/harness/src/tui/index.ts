@@ -217,48 +217,46 @@ export class TUI {
         },
         onBranchChange: (newBranch, newSpec) => {
           this.log(`Branch changed to: ${newBranch}`);
-          this.state.branch = newBranch;
 
-          // Update spec context when branch changes (branch-keyed model)
+          const updates: Partial<TUIState> = { branch: newBranch };
           const newSpecId = newSpec?.id;
-          if (newSpecId !== this.state.spec) {
-            this.state.spec = newSpecId;
 
-            // Reload prompts for new branch's planning directory
+          if (newSpecId !== this.state.spec) {
+            updates.spec = newSpecId;
+
             if (this.options.cwd) {
               const planningKey = sanitizeBranchForDir(newBranch);
               if (planningDirExists(planningKey, this.options.cwd)) {
                 const prompts = loadAllPrompts(planningKey, this.options.cwd);
                 const status = readStatus(planningKey, this.options.cwd);
 
-                this.state.prompts = prompts.map((p: { path: string; frontmatter: { number: number; title: string; status: string } }) => ({
+                updates.prompts = prompts.map((p: { path: string; frontmatter: { number: number; title: string; status: string } }) => ({
                   number: p.frontmatter.number,
                   title: p.frontmatter.title,
                   status: p.frontmatter.status as 'pending' | 'in_progress' | 'done',
                   path: p.path,
                 }));
                 // Don't restore loopEnabled from status - always requires manual enable
-                this.state.emergentEnabled = status?.loop?.emergent ?? false;
-                this.state.parallelEnabled = status?.loop?.parallel ?? false;
-                this.state.compoundRun = status?.compound_run ?? false;
+                updates.emergentEnabled = status?.loop?.emergent ?? false;
+                updates.parallelEnabled = status?.loop?.parallel ?? false;
+                updates.compoundRun = status?.compound_run ?? false;
               } else {
-                this.state.prompts = [];
-                this.state.loopEnabled = false;
-                this.state.emergentEnabled = false;
-                this.state.parallelEnabled = false;
-                this.state.compoundRun = false;
+                updates.prompts = [];
+                updates.loopEnabled = false;
+                updates.emergentEnabled = false;
+                updates.parallelEnabled = false;
+                updates.compoundRun = false;
               }
-
-              // Sync toggle states to event loop
-              this.eventLoop?.setEmergentEnabled(this.state.emergentEnabled);
-              this.eventLoop?.setParallelEnabled(this.state.parallelEnabled);
             }
 
-            this.buildActionItems();
+            if (newSpec) {
+              this.log(`Spec: ${newSpec.id}`);
+            } else {
+              this.log('No spec for this branch');
+            }
           }
 
-          this.options.onAction('branch-changed', { branch: newBranch, spec: newSpec });
-          this.render();
+          this.updateState(updates);
         },
         onAgentsChange: (agents) => {
           this.state.activeAgents = agents.map((name) => ({
