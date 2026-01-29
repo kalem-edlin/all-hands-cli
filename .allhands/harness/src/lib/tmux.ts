@@ -34,6 +34,7 @@ import {
 } from './opencode/index.js';
 import { getCurrentBranch, getPlanningPaths } from './planning.js';
 import { getBaseBranch } from './git.js';
+import { formatHypothesisDomains, DEFAULT_WORKFLOW } from './workflows.js';
 import { addSpawnedWindow, removeSpawnedWindow, getSpawnedWindows } from './session.js';
 import { loadProjectSettings } from '../hooks/shared.js';
 
@@ -644,6 +645,9 @@ export function spawnAgent(
   // Build the launcher script
   const scriptLines: string[] = ['#!/bin/bash', ''];
 
+  // Skip pyenv rehash to avoid lock contention when spawning multiple agents
+  scriptLines.push('export PYENV_REHASH_SKIP=1');
+
   // Export environment variables
   for (const [key, value] of Object.entries(env)) {
     scriptLines.push(`export ${key}="${value}"`);
@@ -832,6 +836,9 @@ export function spawnCustomFlow(
   // Build the launcher script
   const scriptLines: string[] = ['#!/bin/bash', ''];
 
+  // Skip pyenv rehash to avoid lock contention when spawning multiple agents
+  scriptLines.push('export PYENV_REHASH_SKIP=1');
+
   // Export environment variables
   for (const [key, value] of Object.entries(env)) {
     scriptLines.push(`export ${key}="${value}"`);
@@ -876,7 +883,8 @@ export function buildTemplateContext(
   specName?: string,
   promptNumber?: number,
   promptPath?: string,
-  cwd?: string
+  cwd?: string,
+  workflowType?: string
 ): TemplateContext {
   // Use spec for planning paths (directory key)
   const paths = getPlanningPaths(spec, cwd);
@@ -887,6 +895,7 @@ export function buildTemplateContext(
     PLANNING_FOLDER: paths.root,
     PROMPTS_FOLDER: paths.prompts,
     ALIGNMENT_PATH: paths.alignment,
+    OUTPUT_PATH: join(paths.root, 'e2e-test-plan.md'),
   };
 
   // Set spec name (use the display name if provided, else the directory name)
@@ -899,6 +908,11 @@ export function buildTemplateContext(
   if (promptPath) {
     context.PROMPT_PATH = promptPath;
   }
+
+  // Add hypothesis domains for emergent agents from settings.json
+  const workflow = workflowType || DEFAULT_WORKFLOW;
+  context.HYPOTHESIS_DOMAINS = formatHypothesisDomains(workflow, cwd);
+  context.WORKFLOW_TYPE = workflow;
 
   // Try to read spec path from status (YAML format)
   if (existsSync(paths.status)) {

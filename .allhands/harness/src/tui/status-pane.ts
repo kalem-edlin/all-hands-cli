@@ -3,21 +3,32 @@
  *
  * Layout:
  * ┌─ Status ─────────────────────┐
- * │ Spec: my-feature-spec        │  <- Current spec (green) or "No spec selected" (yellow)
- * │ Branch: feature/my-branch    │  <- Current branch (cyan)
- * │ Base: main                   │  <- Base branch (gray)
+ * │ Branch: feature/my-branch    │
+ * │ Base: main                   │
  * │                              │
- * │ [View Spec] [Alignment]      │  <- View buttons (if spec selected)
- * │ [E2E Test Plan]              │
+ * │ ┌──────────────────────────┐ │  <- Selectable spec box (full width)
+ * │ │ ▸ my-feature-spec        │ │
+ * │ └──────────────────────────┘ │
+ * │ ┌──────────────────────────┐ │  <- Selectable alignment box (if exists)
+ * │ │ ▸ Alignment Doc          │ │
+ * │ └──────────────────────────┘ │
+ * │ ┌──────────────────────────┐ │  <- Selectable e2e box (if exists)
+ * │ │ ▸ E2E Test Plan          │ │
+ * │ └──────────────────────────┘ │
+ * │                              │
  * │ ── Active Agents ────────────│
- * │  ┌────────┐  ┌────────┐      │  <- Agent grid
- * │  │ coord  │  │ planner│      │
- * │  │ ●      │  │ ●      │      │
- * │  └────────┘  └────────┘      │
+ * │ ┌──────────────────────────┐ │  <- Selectable agent box
+ * │ │ coordinator      ● #01   │ │
+ * │ └──────────────────────────┘ │
+ * │                              │
  * │ ── Recent Activity ──────────│
- * │ [12:34] Agent spawned        │  <- Log stream
- * │ [12:35] Prompt 03 started    │
+ * │ [12:34] Agent spawned        │
  * └──────────────────────────────┘
+ *
+ * Selection:
+ * - j/k navigates through docs + agents
+ * - Enter/Space on doc opens file viewer
+ * - x on agent deletes it
  */
 
 import blessed from 'blessed';
@@ -39,6 +50,7 @@ export interface StatusPaneOptions {
   onViewSpec?: () => void;
   onViewAlignment?: () => void;
   onViewE2ETestPlan?: () => void;
+  onDeleteAgent?: (agentName: string) => void;
 }
 
 export interface StatusPaneData {
@@ -50,8 +62,46 @@ export interface StatusPaneData {
   options?: StatusPaneOptions;
 }
 
-const ACTIONS_WIDTH = 24;
+/**
+ * Item types for selection tracking
+ */
+export type SelectableItemType = 'spec' | 'alignment' | 'e2e' | 'agent';
+
+export interface SelectableItem {
+  type: SelectableItemType;
+  agentName?: string; // Only for agent type
+}
+
 const HEADER_HEIGHT = 3;
+
+/**
+ * Calculate the list of selectable items based on current state
+ */
+export function getSelectableItems(
+  spec?: string,
+  fileStates?: FileStates,
+  agents: AgentInfo[] = []
+): SelectableItem[] {
+  const items: SelectableItem[] = [];
+
+  // Document items (only if they exist/are viewable)
+  if (spec) {
+    items.push({ type: 'spec' });
+  }
+  if (spec && fileStates?.alignment) {
+    items.push({ type: 'alignment' });
+  }
+  if (spec && fileStates?.e2eTestPlan) {
+    items.push({ type: 'e2e' });
+  }
+
+  // Agent items
+  for (const agent of agents) {
+    items.push({ type: 'agent', agentName: agent.name });
+  }
+
+  return items;
+}
 
 export function createStatusPane(
   screen: blessed.Widgets.Screen,
@@ -82,123 +132,148 @@ export function createStatusPane(
     },
   });
 
+  // Get the inner width for full-width boxes
+  const paneWidth = typeof pane.width === 'number' ? pane.width : 40;
+  const innerWidth = paneWidth - 4; // Account for pane borders and padding
+
   let currentY = 0;
 
-  // Current spec indicator (always shown at top)
+  // Build selectable items list to track what index corresponds to what
+  const selectableItems = getSelectableItems(spec, fileStates, agents);
+  let currentSelectableIndex = 0;
+
+  // Branch line and base branch on separate lines for clarity
+  if (branch || baseBranch) {
+    if (branch) {
+      blessed.text({
+        parent: pane,
+        top: currentY,
+        left: 1,
+        content: `{#818cf8-fg}Branch:{/#818cf8-fg} {#c7d2fe-fg}${truncate(branch, 24)}{/#c7d2fe-fg}`,
+        tags: true,
+      });
+      currentY += 1;
+    }
+    if (baseBranch) {
+      blessed.text({
+        parent: pane,
+        top: currentY,
+        left: 1,
+        content: `{#5c6370-fg}Base: ${truncate(baseBranch, 26)}{/#5c6370-fg}`,
+        tags: true,
+      });
+      currentY += 1;
+    }
+  }
+
+  currentY += 1; // spacing before document links
+
+  // Document boxes section - full width, selectable
+  const DOC_BOX_HEIGHT = 3;
+
+  // Spec box - ALWAYS shows when spec is selected
   if (spec) {
-    blessed.text({
+    const isSelected = selectedIndex === currentSelectableIndex;
+    const specBox = blessed.box({
       parent: pane,
       top: currentY,
       left: 1,
-      content: `{bold}{#a78bfa-fg}Spec:{/#a78bfa-fg} {#e0e7ff-fg}${truncate(spec, 25)}{/#e0e7ff-fg}{/bold}`,
+      width: innerWidth,
+      height: DOC_BOX_HEIGHT,
+      border: { type: 'line' },
+      tags: true,
+      mouse: true,
+      style: {
+        border: { fg: isSelected ? '#a78bfa' : '#4A34C5' },
+        hover: { border: { fg: '#a78bfa' } },
+      },
+    });
+    const specLabel = isSelected
+      ? `{#a78bfa-fg}{bold}▸{/bold}{/#a78bfa-fg} {#e0e7ff-fg}{bold}${truncate(spec, innerWidth - 6)}{/bold}{/#e0e7ff-fg}`
+      : `{#a78bfa-fg}▸{/#a78bfa-fg} {#e0e7ff-fg}${truncate(spec, innerWidth - 6)}{/#e0e7ff-fg}`;
+    blessed.text({
+      parent: specBox,
+      top: 0,
+      left: 1,
+      content: specLabel,
       tags: true,
     });
+    specBox.on('click', () => options?.onViewSpec?.());
+    currentY += DOC_BOX_HEIGHT;
+    currentSelectableIndex++;
   } else {
     blessed.text({
       parent: pane,
       top: currentY,
       left: 1,
-      content: '{bold}{#f59e0b-fg}No spec selected{/#f59e0b-fg}{/bold}',
+      content: '{#f59e0b-fg}No spec selected{/#f59e0b-fg}',
       tags: true,
     });
+    currentY += 1;
   }
-  currentY += 1;
 
-  // Branch indicators
-  if (branch) {
-    blessed.text({
+  // Alignment Doc box (only if file exists)
+  if (spec && fileStates?.alignment) {
+    const isSelected = selectedIndex === currentSelectableIndex;
+    const alignBox = blessed.box({
       parent: pane,
       top: currentY,
       left: 1,
-      content: `{#818cf8-fg}Branch:{/#818cf8-fg} {#c7d2fe-fg}${truncate(branch, 22)}{/#c7d2fe-fg}`,
+      width: innerWidth,
+      height: DOC_BOX_HEIGHT,
+      border: { type: 'line' },
+      tags: true,
+      mouse: true,
+      style: {
+        border: { fg: isSelected ? '#a78bfa' : '#4A34C5' },
+        hover: { border: { fg: '#a78bfa' } },
+      },
+    });
+    const alignLabel = isSelected
+      ? '{#a78bfa-fg}{bold}▸{/bold}{/#a78bfa-fg} {#e0e7ff-fg}{bold}Alignment Doc{/bold}{/#e0e7ff-fg}'
+      : '{#a78bfa-fg}▸{/#a78bfa-fg} {#e0e7ff-fg}Alignment Doc{/#e0e7ff-fg}';
+    blessed.text({
+      parent: alignBox,
+      top: 0,
+      left: 1,
+      content: alignLabel,
       tags: true,
     });
-    currentY += 1;
+    alignBox.on('click', () => options?.onViewAlignment?.());
+    currentY += DOC_BOX_HEIGHT;
+    currentSelectableIndex++;
   }
-  if (baseBranch) {
-    blessed.text({
+
+  // E2E Test Plan box (only if file exists)
+  if (spec && fileStates?.e2eTestPlan) {
+    const isSelected = selectedIndex === currentSelectableIndex;
+    const e2eBox = blessed.box({
       parent: pane,
       top: currentY,
       left: 1,
-      content: `{#5c6370-fg}Base: ${truncate(baseBranch, 24)}{/#5c6370-fg}`,
+      width: innerWidth,
+      height: DOC_BOX_HEIGHT,
+      border: { type: 'line' },
+      tags: true,
+      mouse: true,
+      style: {
+        border: { fg: isSelected ? '#a78bfa' : '#4A34C5' },
+        hover: { border: { fg: '#a78bfa' } },
+      },
+    });
+    const e2eLabel = isSelected
+      ? '{#a78bfa-fg}{bold}▸{/bold}{/#a78bfa-fg} {#e0e7ff-fg}{bold}E2E Test Plan{/bold}{/#e0e7ff-fg}'
+      : '{#a78bfa-fg}▸{/#a78bfa-fg} {#e0e7ff-fg}E2E Test Plan{/#e0e7ff-fg}';
+    blessed.text({
+      parent: e2eBox,
+      top: 0,
+      left: 1,
+      content: e2eLabel,
       tags: true,
     });
-    currentY += 1;
-  }
-
-  currentY += 1; // spacing
-
-  // View buttons row (only show if spec is selected)
-  if (spec) {
-    let buttonX = 1;
-
-    // View Spec button (if spec exists)
-    if (fileStates?.spec && options?.onViewSpec) {
-      const specButton = blessed.button({
-        parent: pane,
-        top: currentY,
-        left: buttonX,
-        width: truncate(`[View ${spec}]`, 18).length,
-        height: 1,
-        content: `{#818cf8-fg}[View ${truncate(spec, 12)}]{/#818cf8-fg}`,
-        tags: true,
-        mouse: true,
-        style: {
-          fg: '#818cf8',
-          hover: {
-            fg: '#a78bfa',
-          },
-        },
-      });
-      specButton.on('click', () => options.onViewSpec?.());
-      buttonX += specButton.width as number + 1;
-    }
-
-    // View Alignment button (if alignment.md exists)
-    if (fileStates?.alignment && options?.onViewAlignment) {
-      const alignButton = blessed.button({
-        parent: pane,
-        top: currentY,
-        left: buttonX,
-        width: 13,
-        height: 1,
-        content: '{#818cf8-fg}[Alignment]{/#818cf8-fg}',
-        tags: true,
-        mouse: true,
-        style: {
-          fg: '#818cf8',
-          hover: {
-            fg: '#a78bfa',
-          },
-        },
-      });
-      alignButton.on('click', () => options.onViewAlignment?.());
-      buttonX += 14;
-    }
-
-    currentY += 1;
-
-    // Second row for E2E Test Plan button
-    if (fileStates?.e2eTestPlan && options?.onViewE2ETestPlan) {
-      const e2eButton = blessed.button({
-        parent: pane,
-        top: currentY,
-        left: 1,
-        width: 16,
-        height: 1,
-        content: '{#818cf8-fg}[E2E Test Plan]{/#818cf8-fg}',
-        tags: true,
-        mouse: true,
-        style: {
-          fg: '#818cf8',
-          hover: {
-            fg: '#a78bfa',
-          },
-        },
-      });
-      e2eButton.on('click', () => options.onViewE2ETestPlan?.());
-      currentY += 1;
-    }
+    e2eBox.on('click', () => options?.onViewE2ETestPlan?.());
+    currentY += DOC_BOX_HEIGHT;
+    currentSelectableIndex++;
   }
 
   currentY += 1;
@@ -213,7 +288,7 @@ export function createStatusPane(
   });
   currentY += 1;
 
-  // Agent list (vertical)
+  // Agent list (vertical, full width, selectable)
   if (agents.length === 0) {
     blessed.text({
       parent: pane,
@@ -224,96 +299,116 @@ export function createStatusPane(
     });
     currentY += 2;
   } else {
-    const boxHeight = 3;
-    const padding = 1;
+    const AGENT_BOX_HEIGHT = 3;
 
     agents.forEach((agent, index) => {
-      const top = currentY + index * (boxHeight + padding);
-
-      const isSelected = selectedIndex === index;
-      // Use purple (#4A34C5 ≈ 63) for selected, muted gray-blue for unselected
+      const isSelected = selectedIndex === currentSelectableIndex;
       const boxStyle = isSelected
-        ? { border: { fg: '#4A34C5' }, fg: 'white' }
+        ? { border: { fg: '#a78bfa' }, fg: 'white' }
         : { border: { fg: '#3a3f5c' }, fg: 'white' };
 
       const agentBox = blessed.box({
         parent: pane,
-        top,
+        top: currentY,
         left: 1,
-        right: 1,
-        height: boxHeight,
-        border: {
-          type: 'line',
-        },
+        width: innerWidth,
+        height: AGENT_BOX_HEIGHT,
+        border: { type: 'line' },
         tags: true,
+        mouse: true,
         style: boxStyle,
       });
 
       // Agent name on the left, status indicator on the right
-      const displayName = truncate(agent.name, 20);
+      const displayName = truncate(agent.name, innerWidth - 12);
+      const nameStyle = isSelected ? '{bold}' : '';
+      const nameEndStyle = isSelected ? '{/bold}' : '';
       blessed.text({
         parent: agentBox,
         top: 0,
         left: 0,
-        content: displayName,
+        content: `${nameStyle}${displayName}${nameEndStyle}`,
         tags: true,
       });
 
       const statusLine = formatAgentStatus(agent);
       blessed.text({
         parent: agentBox,
-        top: 1,
-        left: 0,
+        top: 0,
+        right: 1,
         content: statusLine,
         tags: true,
       });
+
+      // Click to select (could expand to show details)
+      agentBox.on('click', () => {
+        // For now, clicking just selects - x key will delete
+      });
+
+      currentY += AGENT_BOX_HEIGHT;
+      currentSelectableIndex++;
     });
 
-    currentY += agents.length * (boxHeight + padding) + 1;
+    currentY += 1;
   }
 
-  // Log stream section (bottom half)
-  blessed.text({
-    parent: pane,
-    top: currentY,
-    left: 1,
-    content: '{#6366f1-fg}━━ Recent Activity ━━{/#6366f1-fg}',
-    tags: true,
-  });
-  currentY += 1;
+  // Log stream section - calculate available space
+  // Pane inner height = pane height - 2 (borders) - 1 (help text at bottom)
+  const paneHeight = typeof pane.height === 'number' ? pane.height : 30;
+  const availableForLogs = paneHeight - 2 - 1 - currentY - 1; // -1 for "Recent Activity" header
 
-  // Show last N log entries that fit
-  const maxLogLines = 8;
-  const recentLogs = logEntries.slice(-maxLogLines);
-
-  if (recentLogs.length === 0) {
+  // Only show logs section if there's space
+  if (availableForLogs > 1) {
     blessed.text({
       parent: pane,
       top: currentY,
       left: 1,
-      content: '{#5c6370-fg}No recent activity{/#5c6370-fg}',
+      content: '{#6366f1-fg}━━ Recent Activity ━━{/#6366f1-fg}',
       tags: true,
     });
-  } else {
-    recentLogs.forEach((entry, i) => {
-      // Truncate long entries
-      const truncatedEntry = entry.length > 35 ? entry.substring(0, 32) + '...' : entry;
+    currentY += 1;
+
+    // Show as many log entries as will fit (newest first)
+    const maxLogLines = Math.max(0, availableForLogs - 1); // -1 for header already added
+    const recentLogs = logEntries.slice(-maxLogLines).reverse();
+
+    if (recentLogs.length === 0) {
       blessed.text({
         parent: pane,
-        top: currentY + i,
+        top: currentY,
         left: 1,
-        content: `{#8b92a8-fg}${truncatedEntry}{/#8b92a8-fg}`,
+        content: '{#5c6370-fg}No recent activity{/#5c6370-fg}',
         tags: true,
       });
-    });
+    } else {
+      recentLogs.forEach((entry, i) => {
+        // Truncate long entries
+        const truncatedEntry = entry.length > 35 ? entry.substring(0, 32) + '...' : entry;
+        blessed.text({
+          parent: pane,
+          top: currentY + i,
+          left: 1,
+          content: `{#8b92a8-fg}${truncatedEntry}{/#8b92a8-fg}`,
+          tags: true,
+        });
+      });
+    }
   }
 
-  // Help text at bottom
+  // Help text at bottom - show context-sensitive hint
+  const selectedItem = selectableItems[selectedIndex ?? -1];
+  let helpText = '{#5c6370-fg}[v] Full Log{/#5c6370-fg}';
+  if (selectedItem?.type === 'agent') {
+    helpText = '{#5c6370-fg}[x] Delete | [v] Log{/#5c6370-fg}';
+  } else if (selectedItem?.type === 'spec' || selectedItem?.type === 'alignment' || selectedItem?.type === 'e2e') {
+    helpText = '{#5c6370-fg}[Enter] View | [v] Log{/#5c6370-fg}';
+  }
+
   blessed.text({
     parent: pane,
     bottom: 0,
     left: 1,
-    content: '{#5c6370-fg}Ctrl-L: Full Log{/#5c6370-fg}',
+    content: helpText,
     tags: true,
   });
 

@@ -24,6 +24,10 @@ export interface DaemonResponse {
   message?: string;
   error?: string;
   callers?: unknown[];  // For impact analysis responses
+  // Notify command response fields (dirty file tracking)
+  dirty_count?: number;
+  threshold?: number;
+  reindex_triggered?: boolean;
 }
 
 export interface SearchResult {
@@ -168,6 +172,32 @@ export function isTldrDaemonRunning(projectDir: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Start the TLDR daemon if not already running.
+ * Returns true if daemon is running (started or already was).
+ */
+export async function ensureTldrDaemon(projectDir: string): Promise<boolean> {
+  if (!isTldrInstalled()) {
+    return false;
+  }
+
+  if (isTldrDaemonRunning(projectDir)) {
+    return true;
+  }
+
+  try {
+    execSync(`tldr daemon start --project "${projectDir}"`, {
+      stdio: 'ignore',
+      timeout: 5000,
+    });
+    // Give daemon a moment to start accepting connections
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return isTldrDaemonRunning(projectDir);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -655,6 +685,77 @@ export async function warmIndex(projectDir: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+export interface WarmResult {
+  success: boolean;
+  files: number;
+  edges: number;
+}
+
+/**
+ * Run tldr warm to build call graph cache.
+ * Uses config default language from .tldr/config.json.
+ * Returns result with file and edge counts.
+ */
+export async function warmCallGraph(
+  projectDir: string,
+  onProgress?: (message: string) => void
+): Promise<WarmResult> {
+  if (!isTldrInstalled()) {
+    return { success: false, files: 0, edges: 0 };
+  }
+
+  try {
+    const { spawn } = await import('child_process');
+
+    return new Promise((resolve) => {
+      // Run tldr warm (uses config default language)
+      const proc = spawn('tldr', ['warm', projectDir], {
+        cwd: projectDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout?.on('data', (data: Buffer) => {
+        const line = data.toString().trim();
+        stdout += line + '\n';
+        if (onProgress && line) {
+          onProgress(line);
+        }
+      });
+
+      proc.stderr?.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          // Parse output for stats (e.g., "Total: Indexed 123 files, found 456 edges")
+          const match = stdout.match(/Indexed (\d+) files.*?(\d+) edges/);
+          const files = match ? parseInt(match[1], 10) : 0;
+          const edges = match ? parseInt(match[2], 10) : 0;
+          resolve({ success: true, files, edges });
+        } else {
+          resolve({ success: false, files: 0, edges: 0 });
+        }
+      });
+
+      proc.on('error', () => {
+        resolve({ success: false, files: 0, edges: 0 });
+      });
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        proc.kill();
+        resolve({ success: false, files: 0, edges: 0 });
+      }, 300000);
+    });
+  } catch {
+    return { success: false, files: 0, edges: 0 };
   }
 }
 

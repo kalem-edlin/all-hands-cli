@@ -130,6 +130,21 @@ export function loadAllPrompts(spec: string, cwd?: string): PromptFile[] {
 }
 
 /**
+ * Get the next available prompt number for a spec
+ * Returns the highest existing prompt number + 1
+ */
+export function getNextPromptNumber(spec: string, cwd?: string): number {
+  const prompts = loadAllPrompts(spec, cwd);
+
+  if (prompts.length === 0) {
+    return 1;
+  }
+
+  const highestNumber = Math.max(...prompts.map((p) => p.frontmatter.number));
+  return highestNumber + 1;
+}
+
+/**
  * Check if a prompt's dependencies are satisfied
  */
 export function dependenciesSatisfied(

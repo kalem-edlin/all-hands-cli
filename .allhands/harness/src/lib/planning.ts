@@ -83,9 +83,10 @@ export interface PRStatus {
   created: string;
 }
 
-export interface GreptileStatus {
+export interface PRReviewStatus {
   reviewCycle: number;
   lastReviewTime: string | null;
+  lastReviewRunTime: string | null;  // When we started waiting for review
   status: 'pending' | 'reviewing' | 'completed' | 'none';
 }
 
@@ -99,7 +100,7 @@ export interface StatusFile {
   created: string;
   updated: string;
   pr?: PRStatus;
-  greptile?: GreptileStatus;
+  prReview?: PRReviewStatus;
 }
 
 export interface AlignmentFrontmatter {
@@ -471,10 +472,10 @@ export function updatePRStatus(
 }
 
 /**
- * Update Greptile review status in status file for a key
+ * Update PR review status in status file for a key
  */
-export function updateGreptileStatus(
-  state: Partial<GreptileStatus>,
+export function updatePRReviewStatus(
+  state: Partial<PRReviewStatus>,
   key: string,
   cwd?: string
 ): StatusFile {
@@ -483,16 +484,17 @@ export function updateGreptileStatus(
     throw new Error('No status file exists. Initialize planning first.');
   }
 
-  const currentGreptile = current.greptile || {
+  const currentPRReview = current.prReview || {
     reviewCycle: 0,
     lastReviewTime: null,
+    lastReviewRunTime: null,
     status: 'none' as const,
   };
 
   return updateStatus(
     {
-      greptile: {
-        ...currentGreptile,
+      prReview: {
+        ...currentPRReview,
         ...state,
       },
     },

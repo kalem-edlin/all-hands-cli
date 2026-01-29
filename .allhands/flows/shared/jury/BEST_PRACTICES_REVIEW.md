@@ -17,6 +17,7 @@ Review implementation for domain best practices compliance. Per **Knowledge Comp
 <constraints>
 - MUST extract skills using SKILL_EXTRACTION.md subtask
 - MUST search codebase knowledge for established patterns
+- MUST use research tools if no skill findings exist for the domain
 - MUST order issues by priority for fixing
 </constraints>
 
@@ -35,6 +36,13 @@ Spawn subtask to read `.allhands/flows/shared/SKILL_EXTRACTION.md`:
 Search codebase knowledge:
 - Run `ah knowledge docs search "<domain> best practices"` for established patterns
 - Run `ah knowledge docs search "<domain> architecture"` for design decisions
+
+### Fallback: No Skill Findings
+
+Per **Knowledge Compounding**, skills are our maintained source of domain best practices. If skill extraction and knowledge search yield no findings:
+
+- Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` and research current best practices for the domain
+- LLM training data risks staleness without maintained skills - web research fills the gap
 
 ## Review Process
 

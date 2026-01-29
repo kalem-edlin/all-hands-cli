@@ -6,14 +6,12 @@
  *
  * Commands:
  * - ah oracle ask <query> - Raw LLM inference with file context
- * - ah oracle compaction <logs> <prompt> <alignment> - Post-agent analysis
  * - ah oracle pr-build [--branch] [--dry-run] - Create PR with generated description
  *
- * Note: Internal oracle functions (like branch naming) are NOT exposed
- * via CLI - they are only available through direct library imports.
  */
 
 import { Command } from 'commander';
+import { tracedAction } from '../lib/base-command.js';
 import {
   ask,
   getDefaultProvider,
@@ -21,8 +19,6 @@ import {
   type ProviderName,
 } from '../lib/llm.js';
 import { buildPR } from '../lib/oracle.js';
-import { runCompaction } from '../lib/compaction.js';
-import { tracedAction } from '../lib/base-command.js';
 
 export function register(program: Command): void {
   const oracle = program
@@ -82,35 +78,6 @@ export function register(program: Command): void {
         } else {
           console.error(`Error: ${error}`);
         }
-        process.exit(1);
-      }
-    }));
-
-  // ah oracle compaction
-  oracle
-    .command('compaction <conversation_logs> <prompt_file>')
-    .description('Post-agent analysis and learning extraction')
-    .action(tracedAction('oracle compaction', async (
-      conversationLogs: string,
-      promptFile: string
-    ) => {
-      try {
-        const result = await runCompaction({
-          conversationLogs,
-          promptFile,
-        });
-
-        // Simple output - window gets killed after this anyway
-        // The important work is updating the prompt file's Progress section
-        if (result.success) {
-          console.log(`Compaction complete: ${result.recommendation.action} (attempt ${result.attemptNumber})`);
-        } else {
-          console.error(`Compaction failed: ${result.error}`);
-          process.exit(1);
-        }
-      } catch (e) {
-        const error = e instanceof Error ? e.message : String(e);
-        console.error(`Error: ${error}`);
         process.exit(1);
       }
     }));

@@ -28,6 +28,7 @@ export interface ModalOptions {
   onCancel: () => void;
   onClear?: () => void;
   scrollable?: boolean;
+  startFromBottom?: boolean;
 }
 
 export interface Modal {
@@ -42,10 +43,10 @@ export function createModal(
   screen: blessed.Widgets.Screen,
   options: ModalOptions
 ): Modal {
-  const { title, items, onSelect, onCancel, onClear, scrollable = false } = options;
+  const { title, items, onSelect, onCancel, onClear, scrollable = false, startFromBottom = false } = options;
 
   // Calculate modal size
-  const width = 50;
+  const width = Math.floor((screen.width as number) * 0.75);
   const height = Math.min(items.length + 6, Math.floor(screen.height as number * 0.8));
 
   // Create outer container (non-scrollable, holds border and help text)
@@ -55,14 +56,13 @@ export function createModal(
     left: 'center',
     width,
     height,
-    border: {
-      type: 'line',
-    },
+    border: 'line',
     label: ` ${title} `,
     tags: true,
     style: {
       border: {
-        fg: '#a78bfa',
+        fg: '#c4b5fd',
+        bold: true,
       },
     },
   });
@@ -120,14 +120,16 @@ export function createModal(
   // Track selection state
   let selectedIndex = 0;
 
-  // Find first selectable item
+  // Find first/last selectable item based on startFromBottom
   const selectableIndices = items
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => item.type === 'item')
     .map(({ index }) => index);
 
   if (selectableIndices.length > 0) {
-    selectedIndex = selectableIndices[0];
+    selectedIndex = startFromBottom
+      ? selectableIndices[selectableIndices.length - 1]
+      : selectableIndices[0];
   }
 
   // Track current scroll position manually since setItems resets it
@@ -174,8 +176,8 @@ export function createModal(
       }
     }
 
-    // Clamp scroll position
-    const maxScroll = Math.max(0, items.length - contentHeight);
+    // Clamp scroll position (add 1 to maxScroll to ensure we can reach the true bottom)
+    const maxScroll = Math.max(0, items.length - contentHeight + 1);
     currentScrollPos = Math.max(0, Math.min(currentScrollPos, maxScroll));
 
     list.scrollTo(currentScrollPos);

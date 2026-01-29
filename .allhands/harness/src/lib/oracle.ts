@@ -7,21 +7,29 @@
  * Uses llm.ts for the underlying provider integration.
  *
  * Functions:
- * - generatePRDescription() - Generate PR content from prompts + alignment
+ * - generatePRDescription() - Generate PR content from spec + alignment
  * - analyzeConversation() - Analyze agent conversation for compaction
  * - recommendAction() - Recommend continue vs scratch based on analysis
  * - buildPR() - Create PR via gh CLI with generated description
  */
 
 import { execSync } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { z } from 'zod';
-import { ask } from './llm.js';
+import { ask, getCompactionProvider } from './llm.js';
 import {
   readAlignment,
-  updatePRStatus
+  readAlignmentFrontmatter,
+  readStatus,
+  updatePRStatus,
+  getPlanningPaths,
+  getGitRoot,
+  sanitizeBranchForDir,
+  getCurrentBranch,
 } from './planning.js';
-import { loadAllPrompts, type PromptFile } from './prompts.js';
 import { getBaseBranch } from './git.js';
+import { logEvent } from './trace-store.js';
 
 // ============================================================================
 // Zod Schemas for LLM Response Validation
@@ -33,9 +41,11 @@ const PRContentSchema = z.object({
   reviewSteps: z.string(),
 });
 
+// Use coerce to handle LLMs returning strings instead of proper types
+// e.g., "true" -> true, "65" -> 65
 const ConversationAnalysisSchema = z.object({
-  wasGettingClose: z.boolean(),
-  progressPercentage: z.number().min(0).max(100),
+  wasGettingClose: z.coerce.boolean(),
+  progressPercentage: z.coerce.number().min(0).max(100),
   keyLearnings: z.array(z.string()),
   blockers: z.array(z.string()),
   partialWork: z.array(z.string()),
@@ -132,6 +142,7 @@ export interface BuildPRResult {
   title: string;
   body: string;
   reviewSteps?: string;
+  existingPR?: boolean; // True if PR already existed and was reused
 }
 
 // ============================================================================
@@ -146,7 +157,7 @@ function getGitDiffFromBase(cwd?: string, maxLines: number = 300): string {
 
   try {
     // Use the configured base branch
-    const baseBranch = getBaseBranch(workingDir);
+    const baseBranch = getBaseBranch();
 
     // Get diff stat summary
     const diffStat = execSync(`git diff ${baseBranch}...HEAD --stat`, {
@@ -182,54 +193,47 @@ function getGitDiffFromBase(cwd?: string, maxLines: number = 300): string {
  * Uses Gemini provider for generation.
  */
 export async function generatePRDescription(
-  prompts: Array<{ number: number; title: string; status: string }>,
   alignmentContent: string,
   specName: string,
-  cwd?: string
+  cwd?: string,
+  specContent?: string
 ): Promise<PRContent> {
-  const promptSummary = prompts
-    .map((p) => `- ${p.number}. ${p.title} (${p.status})`)
-    .join('\n');
-
   const gitDiff = getGitDiffFromBase(cwd);
 
-  const prompt = `Generate a pull request title and description for this spec.
+  // Parse changed files from git diff for review steps grouping
+  const changedFiles = parseChangedFilesFromDiff(gitDiff);
 
-## Milestone: ${specName}
+  const prompt = `Generate a pull request title and description.
 
-## Prompts Completed:
-${promptSummary}
+## Original Requirements (Spec File):
+${specContent || 'Not provided'}
 
-## Alignment Document:
+## Implementation Summary (Alignment Document):
 ${alignmentContent}
 
-## Git Diff (from base branch):
-${gitDiff}
+## Changed Files:
+${changedFiles.join('\n')}
 
 ## Instructions:
-- Write a clear, concise PR title (max 72 chars)
-- Summarize the key changes based on the git diff
-- Reference the prompts that were completed
-- Include a Test Plan section
-- Generate a step-by-step file review guide for manual reviewers
+Write a standard, concise PR description like you would see on any professional open source project.
+- PR title: Clear, under 72 chars, describes what was implemented
+- PR body: Brief summary of what was built and why, followed by a test plan
+- Do NOT reference individual prompts, tasks, or implementation steps
+- Focus on the end result and value delivered
+- Keep it concise - this is a PR description, not documentation
 
-## Review Steps Guide Requirements:
-- List all changed files, grouping related files (e.g., component + test, interface + implementation)
-- Order steps by review priority:
-  1. Core logic changes first
-  2. API/interface changes
-  3. Supporting utilities
-  4. Tests and validation
-  5. Configuration and documentation
-- For each step, describe what to look for (breaking changes, edge cases, consistency)
-- Include key questions the reviewer should answer
-- Note cross-file concerns (data flow, state changes across boundaries)
+## Review Steps Requirements:
+Group the changed files into logical review buckets based on the alignment document and file relationships.
+- Group related files together (e.g., API + its tests, component + styles)
+- Order by review priority: Core logic → API/interfaces → Utilities → Tests → Config/docs
+- For each bucket, briefly note what to look for
+- Keep it scannable - bullet points, not paragraphs
 
 ## Response Format (JSON only):
 {
-  "title": "Short PR title (max 72 chars)",
-  "body": "Markdown PR body with Summary and Test Plan sections",
-  "reviewSteps": "Markdown guide with numbered steps for manual file review"
+  "title": "Short PR title",
+  "body": "## Summary\\n\\nBrief description.\\n\\n## Test Plan\\n\\n- How to test",
+  "reviewSteps": "## Review Steps\\n\\n### 1. Core Logic\\n- file1.ts\\n- file2.ts\\n\\nLook for: X, Y\\n\\n### 2. Tests\\n..."
 }`;
 
   try {
@@ -246,13 +250,99 @@ ${gitDiff}
     const parsed = PRContentSchema.parse(JSON.parse(jsonStr));
     return parsed;
   } catch {
-    // Fallback
+    // Fallback: Extract a summary from alignment doc instead of listing prompts
+    const alignmentSummary = extractAlignmentSummary(alignmentContent);
     return {
-      title: `[${specName}] Implementation complete`,
-      body: `## Summary\nImplementation of ${specName} spec.\n\n## Prompts\n${promptSummary}`,
-      reviewSteps: `## Review Steps\n\nReview all changed files in the diff.`,
+      title: `${specName}`,
+      body: `## Summary\n\n${alignmentSummary}\n\n## Test Plan\n\n- Run the test suite\n- Manual verification of core functionality`,
+      reviewSteps: generateFallbackReviewSteps(changedFiles),
     };
   }
+}
+
+/**
+ * Parse changed file paths from git diff output
+ */
+function parseChangedFilesFromDiff(gitDiff: string): string[] {
+  const files: string[] = [];
+  const lines = gitDiff.split('\n');
+  for (const line of lines) {
+    // Match "diff --git a/path b/path" format
+    const match = line.match(/^diff --git a\/(.+) b\//);
+    if (match) {
+      files.push(match[1]);
+    }
+  }
+  return files;
+}
+
+/**
+ * Extract a brief summary from the alignment document
+ */
+function extractAlignmentSummary(alignmentContent: string): string {
+  if (!alignmentContent) {
+    return 'Implementation complete.';
+  }
+
+  // Try to find an overview or summary section
+  const overviewMatch = alignmentContent.match(/## Overview\s*\n([\s\S]*?)(?=\n##|$)/i);
+  if (overviewMatch) {
+    const overview = overviewMatch[1].trim();
+    // Take first paragraph or first 500 chars
+    const firstParagraph = overview.split('\n\n')[0];
+    return firstParagraph.slice(0, 500);
+  }
+
+  // Fallback: take content after frontmatter, first paragraph
+  const withoutFrontmatter = alignmentContent.replace(/^---[\s\S]*?---\n/, '');
+  const firstParagraph = withoutFrontmatter.trim().split('\n\n')[0];
+  return firstParagraph.slice(0, 500) || 'Implementation complete.';
+}
+
+/**
+ * Generate fallback review steps grouped by file type
+ */
+function generateFallbackReviewSteps(files: string[]): string {
+  const groups: Record<string, string[]> = {
+    'Core Logic': [],
+    'API/Routes': [],
+    'Components': [],
+    'Tests': [],
+    'Configuration': [],
+    'Other': [],
+  };
+
+  for (const file of files) {
+    if (file.includes('.test.') || file.includes('.spec.') || file.includes('__tests__')) {
+      groups['Tests'].push(file);
+    } else if (file.includes('/api/') || file.includes('/routes/') || file.includes('router')) {
+      groups['API/Routes'].push(file);
+    } else if (file.includes('/components/') || file.includes('.tsx')) {
+      groups['Components'].push(file);
+    } else if (file.match(/\.(json|yaml|yml|config\.|rc\.)/) || file.includes('config')) {
+      groups['Configuration'].push(file);
+    } else if (file.match(/\.(ts|js|py|go|rs)$/)) {
+      groups['Core Logic'].push(file);
+    } else {
+      groups['Other'].push(file);
+    }
+  }
+
+  let steps = '## Review Steps\n\n';
+  let stepNum = 1;
+
+  for (const [groupName, groupFiles] of Object.entries(groups)) {
+    if (groupFiles.length > 0) {
+      steps += `### ${stepNum}. ${groupName}\n`;
+      for (const f of groupFiles) {
+        steps += `- ${f}\n`;
+      }
+      steps += '\n';
+      stepNum++;
+    }
+  }
+
+  return steps || '## Review Steps\n\nReview all changed files.';
 }
 
 // ============================================================================
@@ -305,6 +395,7 @@ ${logs}
   try {
     const result = await ask(prompt, {
       context: 'You must respond with valid JSON only. No markdown code blocks. Be concise.',
+      provider: getCompactionProvider(),
     });
 
     const jsonStr = extractJSON(result.text);
@@ -313,13 +404,21 @@ ${logs}
     }
 
     return ConversationAnalysisSchema.parse(JSON.parse(jsonStr));
-  } catch {
+  } catch (error) {
+    // Log the actual error for debugging
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logEvent('harness.error', {
+      source: 'oracle.analyzeConversation',
+      error: errorMsg,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     // Conservative fallback - assume some progress was made
     return {
       wasGettingClose: true,
       progressPercentage: 50,
       keyLearnings: [],
-      blockers: ['Analysis failed - defaulting to continue'],
+      blockers: [`Analysis failed: ${errorMsg}`],
       partialWork: [],
     };
   }
@@ -370,6 +469,7 @@ ${gitDiff}
   try {
     const result = await ask(prompt, {
       context: 'You must respond with valid JSON only. No markdown code blocks.',
+      provider: getCompactionProvider(),
     });
 
     const jsonStr = extractJSON(result.text);
@@ -379,11 +479,19 @@ ${gitDiff}
 
     // Zod validates action is 'scratch' | 'continue'
     return ActionRecommendationSchema.parse(JSON.parse(jsonStr));
-  } catch {
+  } catch (error) {
+    // Log the actual error for debugging
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logEvent('harness.error', {
+      source: 'oracle.recommendAction',
+      error: errorMsg,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     // Default to continue to avoid losing code
     return {
       action: 'continue',
-      reasoning: 'Defaulting to continue due to analysis failure',
+      reasoning: `Defaulting to continue: ${errorMsg}`,
       preserveFiles: [],
       discardFiles: [],
     };
@@ -411,33 +519,41 @@ export async function buildPR(
 ): Promise<BuildPRResult> {
   const workingDir = cwd || process.cwd();
 
-  // Load prompts and alignment from spec
-  const prompts = loadAllPrompts(spec, workingDir);
+  // Check if PR already exists in status.yaml
+  const branch = getCurrentBranch(workingDir);
+  const planningKey = sanitizeBranchForDir(branch);
+  const status = readStatus(planningKey, workingDir);
+  const existingPR = status?.pr;
+
+  // Load alignment and spec content
   const alignmentContent = readAlignment(spec, workingDir);
 
-  if (prompts.length === 0) {
+  if (!alignmentContent) {
     return {
       success: false,
       title: '',
-      body: 'No prompts found for this spec',
+      body: 'No alignment document found for this spec',
     };
   }
 
-  // Use spec name for PR generation
-  const specName = spec;
+  // Load spec content from the spec file path in alignment frontmatter
+  const alignmentFrontmatter = readAlignmentFrontmatter(spec, workingDir);
+  let specContent: string | undefined;
+  if (alignmentFrontmatter?.spec) {
+    try {
+      const specPath = join(getGitRoot(workingDir), alignmentFrontmatter.spec);
+      specContent = readFileSync(specPath, 'utf-8');
+    } catch {
+      // Non-fatal: spec file might not exist
+    }
+  }
 
   // Generate PR content
-  const promptSummary = prompts.map((p: PromptFile) => ({
-    number: p.frontmatter.number,
-    title: p.frontmatter.title,
-    status: p.frontmatter.status,
-  }));
-
   const prContent = await generatePRDescription(
-    promptSummary,
-    alignmentContent || '',
-    specName,
-    workingDir
+    alignmentContent,
+    spec,
+    workingDir,
+    specContent
   );
 
   if (dryRun) {
@@ -449,7 +565,67 @@ export async function buildPR(
     };
   }
 
+  // If PR already exists, UPDATE instead of creating
+  if (existingPR?.url && existingPR?.number) {
+    try {
+      // Push any new changes first
+      try {
+        execSync('git push -u origin HEAD', {
+          encoding: 'utf-8',
+          cwd: workingDir,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      } catch {
+        // Ignore push errors - might already be up to date
+      }
+
+      // Update PR description
+      updatePRDescription(existingPR.number, prContent.body, workingDir);
+
+      // Update comments (review steps and E2E test plan)
+      updatePRComments(existingPR.number, prContent.reviewSteps, spec, workingDir);
+
+      return {
+        success: true,
+        prUrl: existingPR.url,
+        prNumber: existingPR.number,
+        title: prContent.title,
+        body: prContent.body,
+        reviewSteps: prContent.reviewSteps,
+        existingPR: true,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        title: prContent.title,
+        body: `PR update failed: ${errorMsg}`,
+      };
+    }
+  }
+
+  // No existing PR - create new one
   try {
+    // Push branch to remote before creating PR
+    try {
+      execSync('git push -u origin HEAD', {
+        encoding: 'utf-8',
+        cwd: workingDir,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (pushError) {
+      // If push fails, it might already be pushed or there's an auth issue
+      // Try to continue with PR creation anyway
+      const pushMessage = pushError instanceof Error ? pushError.message : String(pushError);
+      if (!pushMessage.includes('Everything up-to-date')) {
+        return {
+          success: false,
+          title: prContent.title,
+          body: `Failed to push branch: ${pushMessage}`,
+        };
+      }
+    }
+
     // Create PR via gh CLI using stdin for body to avoid shell escaping issues
     const output = execSync(
       `gh pr create --title "${prContent.title.replace(/"/g, '\\"')}" --body-file -`,
@@ -465,26 +641,10 @@ export async function buildPR(
     const prUrl = urlMatch ? urlMatch[0] : undefined;
     const prNumber = urlMatch ? parseInt(urlMatch[1], 10) : undefined;
 
-    // Update status.yaml with PR info
+    // Update status.yaml with PR info and post comments
     if (prUrl && prNumber) {
       updatePRStatus(prUrl, prNumber, spec, workingDir);
-
-      // Post review steps as the first comment
-      if (prContent.reviewSteps) {
-        try {
-          execSync(
-            `gh pr comment ${prNumber} --body-file -`,
-            {
-              encoding: 'utf-8',
-              cwd: workingDir,
-              input: prContent.reviewSteps,
-            }
-          );
-        } catch {
-          // Non-fatal: PR was created, just couldn't add the comment
-          console.error('Warning: Could not add review steps comment to PR');
-        }
-      }
+      postPRComments(prNumber, prContent.reviewSteps, spec, workingDir);
     }
 
     return {
@@ -497,10 +657,260 @@ export async function buildPR(
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // Check if PR already exists (race condition) - update instead
+    if (errorMsg.includes('already exists') || errorMsg.includes('pull request already')) {
+      try {
+        // Get existing PR info via gh pr view
+        const prViewOutput = execSync('gh pr view --json url,number', {
+          encoding: 'utf-8',
+          cwd: workingDir,
+        });
+        const prInfo = JSON.parse(prViewOutput);
+        const raceExistingUrl = prInfo.url;
+        const raceExistingNumber = prInfo.number;
+
+        if (raceExistingUrl && raceExistingNumber) {
+          // Record and update the existing PR
+          updatePRStatus(raceExistingUrl, raceExistingNumber, spec, workingDir);
+          updatePRDescription(raceExistingNumber, prContent.body, workingDir);
+          updatePRComments(raceExistingNumber, prContent.reviewSteps, spec, workingDir);
+
+          return {
+            success: true,
+            prUrl: raceExistingUrl,
+            prNumber: raceExistingNumber,
+            title: prContent.title,
+            body: prContent.body,
+            reviewSteps: prContent.reviewSteps,
+            existingPR: true,
+          };
+        }
+      } catch {
+        // Couldn't get existing PR info, fall through to error
+      }
+    }
+
     return {
       success: false,
       title: prContent.title,
       body: `PR creation failed: ${errorMsg}`,
     };
+  }
+}
+
+/**
+ * Post review steps and E2E test plan comments to a PR
+ * Order: Review steps first, then E2E test plan
+ */
+function postPRComments(
+  prNumber: number,
+  reviewSteps: string | undefined,
+  spec: string,
+  workingDir: string
+): void {
+  // Post review steps FIRST
+  if (reviewSteps) {
+    try {
+      execSync(
+        `gh pr comment ${prNumber} --body-file -`,
+        {
+          encoding: 'utf-8',
+          cwd: workingDir,
+          input: reviewSteps,
+        }
+      );
+    } catch {
+      console.error('Warning: Could not add review steps comment to PR');
+    }
+  }
+
+  // Post E2E test plan AFTER review steps
+  const planningPaths = getPlanningPaths(spec, workingDir);
+  const e2eTestPlanPath = join(planningPaths.root, 'e2e-test-plan.md');
+  if (existsSync(e2eTestPlanPath)) {
+    try {
+      let e2eTestPlan = readFileSync(e2eTestPlanPath, 'utf-8');
+      // Strip YAML frontmatter if present
+      e2eTestPlan = e2eTestPlan.replace(/^---\n[\s\S]*?\n---\n*/, '').trim();
+      execSync(
+        `gh pr comment ${prNumber} --body-file -`,
+        {
+          encoding: 'utf-8',
+          cwd: workingDir,
+          input: `## E2E Test Plan\n\n${e2eTestPlan}`,
+        }
+      );
+    } catch {
+      console.error('Warning: Could not add e2e test plan comment to PR');
+    }
+  }
+}
+
+/**
+ * Update PR description via gh CLI
+ */
+function updatePRDescription(
+  prNumber: number,
+  body: string,
+  workingDir: string
+): boolean {
+  try {
+    execSync(
+      `gh pr edit ${prNumber} --body-file -`,
+      {
+        encoding: 'utf-8',
+        cwd: workingDir,
+        input: body,
+      }
+    );
+    return true;
+  } catch {
+    console.error('Warning: Could not update PR description');
+    return false;
+  }
+}
+
+interface PRComment {
+  id: number;
+  body: string;
+  author: { login: string };
+  createdAt: string;
+}
+
+/**
+ * Get all issue comments on a PR (these are the top-level comments, not review comments)
+ */
+function getPRComments(prNumber: number, workingDir: string): PRComment[] {
+  try {
+    // Get repo owner/name
+    const repoInfo = execSync('gh repo view --json owner,name', {
+      encoding: 'utf-8',
+      cwd: workingDir,
+    });
+    const { owner, name } = JSON.parse(repoInfo);
+
+    // Get issue comments (top-level PR comments)
+    const commentsJson = execSync(
+      `gh api repos/${owner.login}/${name}/issues/${prNumber}/comments --jq '[.[] | {id: .id, body: .body, author: {login: .user.login}, createdAt: .created_at}]'`,
+      {
+        encoding: 'utf-8',
+        cwd: workingDir,
+      }
+    );
+    return JSON.parse(commentsJson);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Update a specific comment on a PR
+ */
+function updatePRComment(
+  commentId: number,
+  body: string,
+  workingDir: string
+): boolean {
+  try {
+    // Get repo owner/name
+    const repoInfo = execSync('gh repo view --json owner,name', {
+      encoding: 'utf-8',
+      cwd: workingDir,
+    });
+    const { owner, name } = JSON.parse(repoInfo);
+
+    execSync(
+      `gh api --method PATCH repos/${owner.login}/${name}/issues/comments/${commentId} -f body=@-`,
+      {
+        encoding: 'utf-8',
+        cwd: workingDir,
+        input: body,
+      }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Update existing PR comments (review steps and E2E test plan)
+ * Finds comments by pattern matching and updates them
+ */
+function updatePRComments(
+  prNumber: number,
+  reviewSteps: string | undefined,
+  spec: string,
+  workingDir: string
+): void {
+  const comments = getPRComments(prNumber, workingDir);
+  if (comments.length === 0) {
+    // No existing comments, post new ones
+    postPRComments(prNumber, reviewSteps, spec, workingDir);
+    return;
+  }
+
+  // Find and update review steps comment (first comment or one with ## File Walkthrough)
+  if (reviewSteps) {
+    // Look for comment containing file walkthrough patterns
+    const reviewComment = comments.find(c =>
+      c.body.includes('## File Walkthrough') ||
+      c.body.includes('## Review Steps') ||
+      c.body.includes('## Changes Overview')
+    );
+
+    if (reviewComment) {
+      updatePRComment(reviewComment.id, reviewSteps, workingDir);
+    } else {
+      // No matching comment found, post new one
+      try {
+        execSync(
+          `gh pr comment ${prNumber} --body-file -`,
+          {
+            encoding: 'utf-8',
+            cwd: workingDir,
+            input: reviewSteps,
+          }
+        );
+      } catch {
+        console.error('Warning: Could not add review steps comment to PR');
+      }
+    }
+  }
+
+  // Find and update E2E test plan comment
+  const planningPaths = getPlanningPaths(spec, workingDir);
+  const e2eTestPlanPath = join(planningPaths.root, 'e2e-test-plan.md');
+  if (existsSync(e2eTestPlanPath)) {
+    let e2eTestPlan = readFileSync(e2eTestPlanPath, 'utf-8');
+    // Strip YAML frontmatter if present
+    e2eTestPlan = e2eTestPlan.replace(/^---\n[\s\S]*?\n---\n*/, '').trim();
+    const e2eBody = `## E2E Test Plan\n\n${e2eTestPlan}`;
+
+    // Look for existing E2E comment
+    const e2eComment = comments.find(c => c.body.includes('## E2E Test Plan'));
+
+    if (e2eComment) {
+      // Check if content is different (compare without the header)
+      const existingContent = e2eComment.body.replace(/^## E2E Test Plan\s*\n*/, '').trim();
+      if (existingContent !== e2eTestPlan) {
+        updatePRComment(e2eComment.id, e2eBody, workingDir);
+      }
+    } else {
+      // No E2E comment exists, post new one
+      try {
+        execSync(
+          `gh pr comment ${prNumber} --body-file -`,
+          {
+            encoding: 'utf-8',
+            cwd: workingDir,
+            input: e2eBody,
+          }
+        );
+      } catch {
+        console.error('Warning: Could not add e2e test plan comment to PR');
+      }
+    }
   }
 }

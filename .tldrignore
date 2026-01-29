@@ -83,3 +83,8 @@ Thumbs.db
 # large_test_fixtures/
 # data/
 bin/
+
+.reposearch/
+dist
+.planning/
+

@@ -11,7 +11,7 @@ Query the simple memory file for relevant learnings from past sessions. Per **Kn
 </outputs>
 
 <constraints>
-- MUST use memories from `.allhands/memories.md` only
+- MUST use memories from `docs/memories.md` only
 - MUST filter by domain relevance when provided
 - NEVER fabricate memories - only return what exists in the file
 </constraints>
@@ -31,7 +31,7 @@ The memory file uses a simple table format:
 
 ## Recall Process
 
-1. Read `.allhands/memories.md`
+1. Read `docs/memories.md`
 2. If domain filter provided, narrow to matching rows
 3. Scan descriptions for keyword relevance
 4. Return matching memories with context

@@ -2,7 +2,7 @@
  * Event Loop Daemon
  *
  * Non-blocking event loop that monitors external state:
- * 1. Greptile PR feedback polling
+ * 1. PR review feedback polling (configurable reviewer)
  * 2. Git branch change detection (and associated spec changes)
  * 3. Agent window status monitoring
  * 4. Prompt execution loop (when enabled)
@@ -13,18 +13,18 @@
  * - No separate "active spec" tracking needed
  */
 
-import { getCurrentBranch, updateGreptileStatus, sanitizeBranchForDir } from './planning.js';
+import { getCurrentBranch, updatePRReviewStatus, sanitizeBranchForDir, readStatus } from './planning.js';
 import { loadProjectSettings } from '../hooks/shared.js';
 import { listWindows, SESSION_NAME, sessionExists, getCurrentSession, getSpawnedAgentRegistry, unregisterSpawnedAgent } from './tmux.js';
 import { pickNextPrompt, markPromptInProgress, loadAllPrompts, type PromptFile } from './prompts.js';
 import { shutdownDaemon } from './mcp-client.js';
 import { getSpecForBranch, type SpecFile } from './specs.js';
 import {
-  checkGreptileStatus,
+  checkPRReviewStatus,
   hasNewReview,
   parsePRUrl,
-  type GreptileReviewState,
-} from './greptile.js';
+  type PRReviewState,
+} from './pr-review.js';
 
 export interface PromptSnapshot {
   count: number;
@@ -40,8 +40,8 @@ export interface EventLoopState {
   currentSpec: SpecFile | null;
   planningKey: string | null;  // Sanitized branch name for .planning/ lookup
   prUrl: string | null;
-  greptileFeedbackAvailable: boolean;
-  greptileReviewState: GreptileReviewState;
+  prReviewFeedbackAvailable: boolean;
+  prReviewState: PRReviewState;
   activeAgents: string[];
   lastCheckTime: number;
   loopEnabled: boolean;
@@ -53,10 +53,12 @@ export interface EventLoopState {
   lastExecutorSpawnTime: number | null;
   /** Last known prompt state for change detection */
   promptSnapshot: PromptSnapshot | null;
+  /** Tick counter for modulus-based polling */
+  tickCount: number;
 }
 
 export interface EventLoopCallbacks {
-  onGreptileFeedback?: (available: boolean) => void;
+  onPRReviewFeedback?: (available: boolean) => void;
   onBranchChange?: (newBranch: string, spec: SpecFile | null) => void;
   onAgentsChange?: (agents: string[]) => void;
   onSpawnExecutor?: (prompt: PromptFile) => void;
@@ -69,9 +71,6 @@ export interface EventLoopCallbacks {
 
 // Note: Use isLockedBranch() from planning.ts for consistent branch checks
 
-// Greptile polling interval (separate from main event loop tick)
-const GREPTILE_POLL_INTERVAL_MS = 60 * 1000;  // Poll every 60 seconds
-
 export class EventLoop {
   private intervalId: NodeJS.Timeout | null = null;
   private pollIntervalMs: number;
@@ -79,17 +78,25 @@ export class EventLoop {
   private callbacks: EventLoopCallbacks;
   private cwd: string;
 
-  // Greptile polling state - only check every GREPTILE_POLL_INTERVAL_MS
-  private greptileLastPollTime: number = 0;
+  // PR review settings from .allhands/settings.json
+  private prReviewCheckFrequency: number;
+  private reviewDetectionString: string;
+  private rerunComment: string;
 
   constructor(
     cwd: string,
     callbacks: EventLoopCallbacks = {},
-    pollIntervalMs: number = 5000
+    pollIntervalMs?: number
   ) {
     this.cwd = cwd;
     this.callbacks = callbacks;
-    this.pollIntervalMs = pollIntervalMs;
+
+    // Load settings from .allhands/settings.json
+    const settings = loadProjectSettings();
+    this.pollIntervalMs = pollIntervalMs ?? settings?.eventLoop?.tickIntervalMs ?? 5000;
+    this.prReviewCheckFrequency = settings?.prReview?.checkFrequency ?? 3;
+    this.reviewDetectionString = settings?.prReview?.reviewDetectionString ?? 'greptile';
+    this.rerunComment = settings?.prReview?.rerunComment ?? '@greptile';
 
     // Initialize state based on current branch
     const currentBranch = getCurrentBranch(cwd);
@@ -101,8 +108,8 @@ export class EventLoop {
       currentSpec,
       planningKey,
       prUrl: null,
-      greptileFeedbackAvailable: false,
-      greptileReviewState: {
+      prReviewFeedbackAvailable: false,
+      prReviewState: {
         status: 'none',
         lastCommentId: null,
         lastCommentTime: null,
@@ -116,6 +123,7 @@ export class EventLoop {
       activeExecutorPrompts: [],
       lastExecutorSpawnTime: null,
       promptSnapshot: null,
+      tickCount: 0,
     };
   }
 
@@ -150,11 +158,11 @@ export class EventLoop {
   }
 
   /**
-   * Set the PR URL to monitor for Greptile feedback
+   * Set the PR URL to monitor for PR review feedback
    */
   setPRUrl(url: string | null): void {
     this.state.prUrl = url;
-    this.state.greptileFeedbackAvailable = false;
+    this.state.prReviewFeedbackAvailable = false;
   }
 
   /**
@@ -216,9 +224,10 @@ export class EventLoop {
    */
   private async tick(): Promise<void> {
     this.state.lastCheckTime = Date.now();
+    this.state.tickCount++;
 
     await Promise.all([
-      this.checkGreptileFeedback(),
+      this.checkPRReviewFeedback(),
       this.checkGitBranch(),
       this.checkAgentWindows(),
       this.checkPromptFiles(),
@@ -229,27 +238,25 @@ export class EventLoop {
   }
 
   /**
-   * Check for Greptile PR feedback
+   * Check for PR review feedback
    *
-   * Uses the greptile library to:
+   * Uses the pr-review library to:
    * - Track review cycles (not just presence)
    * - Compare comment timestamps with last check
    * - Update status.yaml with current state
    *
-   * Polls at a slower rate than the main event loop since Greptile
-   * reviews can take several minutes to complete.
+   * Polls at a configurable frequency (every N ticks) since reviews
+   * can take several minutes to complete.
    */
-  private async checkGreptileFeedback(): Promise<void> {
+  private async checkPRReviewFeedback(): Promise<void> {
     if (!this.state.prUrl) {
       return;
     }
 
-    // Only poll Greptile every GREPTILE_POLL_INTERVAL_MS (not every tick)
-    const now = Date.now();
-    if (now - this.greptileLastPollTime < GREPTILE_POLL_INTERVAL_MS) {
+    // Only poll every prReviewCheckFrequency ticks (not every tick)
+    if (this.state.tickCount % this.prReviewCheckFrequency !== 0) {
       return;
     }
-    this.greptileLastPollTime = now;
 
     // Validate PR URL
     const prInfo = parsePRUrl(this.state.prUrl);
@@ -258,23 +265,39 @@ export class EventLoop {
     }
 
     try {
-      // Get current Greptile review state
-      const currentState = await checkGreptileStatus(this.state.prUrl, this.cwd);
+      // Get lastReviewRunTime from status.yaml to filter comments
+      let afterTime: string | undefined;
+      if (this.state.planningKey) {
+        try {
+          const status = readStatus(this.state.planningKey, this.cwd);
+          afterTime = status?.prReview?.lastReviewRunTime ?? undefined;
+        } catch {
+          // Status file might not exist - ignore
+        }
+      }
+
+      // Get current PR review state
+      const currentState = await checkPRReviewStatus(
+        this.state.prUrl,
+        this.reviewDetectionString,
+        afterTime,
+        this.cwd
+      );
 
       // Check if there's a new review
-      const isNewReview = hasNewReview(this.state.greptileReviewState, currentState);
+      const isNewReview = hasNewReview(this.state.prReviewState, currentState);
 
       // Update feedback available flag
-      const hasGreptileComment = currentState.status === 'completed';
+      const hasReviewComment = currentState.status === 'completed';
 
-      if (hasGreptileComment !== this.state.greptileFeedbackAvailable || isNewReview) {
-        this.state.greptileFeedbackAvailable = hasGreptileComment;
-        this.state.greptileReviewState = currentState;
+      if (hasReviewComment !== this.state.prReviewFeedbackAvailable || isNewReview) {
+        this.state.prReviewFeedbackAvailable = hasReviewComment;
+        this.state.prReviewState = currentState;
 
-        // Update status.yaml with Greptile state (use planning key)
+        // Update status.yaml with PR review state (use planning key)
         if (this.state.planningKey) {
           try {
-            updateGreptileStatus(
+            updatePRReviewStatus(
               {
                 reviewCycle: currentState.reviewCycle,
                 lastReviewTime: currentState.lastCommentTime,
@@ -290,7 +313,7 @@ export class EventLoop {
 
         // Notify if there's a new review
         if (isNewReview) {
-          this.callbacks.onGreptileFeedback?.(hasGreptileComment);
+          this.callbacks.onPRReviewFeedback?.(hasReviewComment);
         }
       }
     } catch {
@@ -459,6 +482,30 @@ export class EventLoop {
         this.state.activeAgents = agentWindows;
         this.callbacks.onAgentsChange?.(agentWindows);
       }
+
+      // Reconcile activeExecutorPrompts with actual running agents
+      // This handles cases where an agent dies before being detected in activeAgents
+      // (e.g., immediate compaction after spawn)
+      if (this.state.activeExecutorPrompts.length > 0) {
+        const runningPromptNums = new Set<number>();
+        for (const name of agentWindows) {
+          if (name.startsWith('executor') || name.startsWith('emergent')) {
+            const match = name.match(/-(\d+)$/);
+            if (match) {
+              runningPromptNums.add(parseInt(match[1], 10));
+            }
+          }
+        }
+        // Keep only prompts that have a running agent
+        const before = this.state.activeExecutorPrompts.length;
+        this.state.activeExecutorPrompts = this.state.activeExecutorPrompts.filter(
+          (n) => runningPromptNums.has(n)
+        );
+        // If we cleaned up stale prompts, also clear spawn timestamp
+        if (this.state.activeExecutorPrompts.length < before) {
+          this.state.lastExecutorSpawnTime = null;
+        }
+      }
     } catch (err) {
       console.error('[EventLoop] checkAgentWindows failed:', err);
     }
@@ -493,9 +540,9 @@ export class EventLoop {
       return;
     }
 
-    // Need a spec and planning directory to pick prompts
-    if (!this.state.currentSpec || !this.state.planningKey) {
-      this.callbacks.onLoopStatus?.('No spec for this branch - loop paused');
+    // Need a planning directory to pick prompts (spec file is optional metadata)
+    if (!this.state.planningKey) {
+      this.callbacks.onLoopStatus?.('No planning directory for this branch - loop paused');
       return;
     }
 

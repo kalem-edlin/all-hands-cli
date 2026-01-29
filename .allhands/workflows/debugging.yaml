@@ -1,0 +1,14 @@
+# Debugging Workflow Configuration
+# Used for specs focused on reproducing, diagnosing, and fixing issues
+
+name: debugging
+description: Issue diagnosis and resolution with hypothesis-driven debugging
+
+# Hypothesis domains available to emergent refinement agents
+# More constrained than milestone - focused on stability and diagnosis
+hypothesis_domains:
+  - reproduction  # Reliable reproduction steps, test cases
+  - diagnosis     # Root cause analysis, logging, tracing
+  - stability     # Error handling, edge case fixes
+  - testing       # Regression tests, coverage for fix
+  - integration   # System boundary validation

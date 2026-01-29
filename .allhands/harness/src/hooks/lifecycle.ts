@@ -6,8 +6,7 @@
  * - PreCompact: Summarize progress, append to prompt file, kill tmux window
  */
 
-import { execSync } from 'child_process';
-import { appendFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import type { Command } from 'commander';
 import {
   HookInput,
@@ -18,13 +17,12 @@ import {
   registerCategory,
   registerCategoryForDaemon,
 } from './shared.js';
-import { parseTranscript, buildCompactionMessage } from './transcript-parser.js';
+import { logHookSuccess } from '../lib/trace-store.js';
 import { sendNotification } from '../lib/notification.js';
 import { killWindow, SESSION_NAME, windowExists, getCurrentSession } from '../lib/tmux.js';
 import { getPromptByNumber } from '../lib/prompts.js';
 import { getCurrentBranch, sanitizeBranchForDir } from '../lib/planning.js';
-import { getSpecForBranch } from '../lib/specs.js';
-import { ask } from '../lib/llm.js';
+import { runCompaction } from '../lib/compaction.js';
 
 const HOOK_AGENT_STOP = 'lifecycle agent-stop';
 const HOOK_AGENT_COMPACT = 'lifecycle agent-compact';
@@ -77,88 +75,22 @@ export function handleAgentStop(_input: HookInput): void {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Get git status summary (changed/added/deleted files)
- */
-function getGitStatus(): string {
-  try {
-    const status = execSync('git status --porcelain', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    return status.trim() || 'No changes';
-  } catch {
-    return 'Unable to get git status';
-  }
-}
-
-/**
- * Generate compaction summary using oracle
- */
-async function generateCompactionSummary(
-  transcriptSummary: string,
-  gitStatus: string,
-  promptContent: string
-): Promise<string> {
-  const prompt = `You are summarizing an agent's work session that was interrupted due to context limits.
-
-## Original Prompt Requirements
-${promptContent}
-
-## Session Summary (from transcript)
-${transcriptSummary}
-
-## Git Status (file changes)
-${gitStatus}
-
-## Your Task
-Generate a concise summary to append to the prompt file. This will help the next agent run continue the work.
-
-Include:
-1. **Progress Made**: What was accomplished
-2. **Current State**: Where work stopped
-3. **Next Steps**: What should be done next
-4. **Decision**: One of:
-   - CONTINUE: Build on existing work
-   - RESTART: Start fresh (if approach was wrong)
-   - BLOCKED: Needs human intervention (explain why)
-
-Format your response as markdown that can be appended to the prompt file.
-Start with a timestamp header: ## Compaction Summary - [timestamp]`;
-
-  try {
-    const result = await ask(prompt, { timeout: 60000 });
-    return result.text;
-  } catch (error) {
-    // Fallback summary if oracle fails
-    return `## Compaction Summary - ${new Date().toISOString()}
-
-**Note**: Oracle unavailable, generated basic summary.
-
-### Session Info
-${transcriptSummary}
-
-### Git Status
-\`\`\`
-${gitStatus}
-\`\`\`
-
-### Decision
-CONTINUE - Proceed from current state.
-`;
-  }
-}
-
-/**
  * Handle pre-compaction lifecycle event.
  *
- * When context gets too long and compaction is triggered:
- * 1. If PROMPT_NUMBER is set:
- *    - Parse transcript for session summary
- *    - Get git status (file changes)
- *    - Call oracle to generate summary/decision
- *    - Append summary to prompt file
+ * When context gets too long and compaction is triggered for a prompt-scoped agent:
+ * 1. Run full compaction analysis via oracle:
+ *    - Analyze conversation for progress, learnings, blockers
+ *    - Recommend action: continue (keep code) or scratch (discard)
+ *    - Increment attempts counter in prompt frontmatter
+ *    - Append detailed progress update to prompt file
+ *    - Execute recommendation (commit or discard changes)
  * 2. Kill the tmux window (terminate the Claude instance)
  * 3. Event loop can then re-run the prompt with learnings
+ *
+ * Criteria to run full compaction:
+ * - PROMPT_SCOPED=true (agent is prompt-scoped)
+ * - PROMPT_NUMBER is set (we know which prompt file to update)
+ * - transcript_path exists (we have conversation logs to analyze)
  *
  * Triggered by: PreCompact matcher "*"
  */
@@ -172,81 +104,67 @@ export async function handleAgentCompact(input: HookInput): Promise<void> {
   // Non-prompt-scoped agents (like the main session) should just pass through
   // without killing windows or attempting to write summaries.
   if (!isPromptScoped || !promptNumber) {
-    // For non-prompt-scoped agents, just continue without intervention
-    return outputPreCompact(undefined, HOOK_AGENT_COMPACT);
+    logHookSuccess(HOOK_AGENT_COMPACT, {
+      action: 'skip',
+      reason: !isPromptScoped ? 'not_prompt_scoped' : 'no_prompt_number',
+    });
+    return outputPreCompact(undefined);
   }
 
   // Use current session (not hardcoded SESSION_NAME) since agents may be
   // spawned in whatever session is active, not necessarily 'ah-hub'
   const sessionName = getCurrentSession() || SESSION_NAME;
 
-  // Get the planning key from env or current branch
-  let spec = process.env.SPEC_NAME;
-  if (!spec) {
-    const branch = getCurrentBranch();
-    const currentSpec = getSpecForBranch(branch);
-    if (currentSpec) {
-      spec = sanitizeBranchForDir(branch);
-    }
-  }
-  if (!spec) {
-    // No spec, just kill the window
-    if (agentId && windowExists(sessionName, agentId)) {
-      killWindow(sessionName, agentId);
-    }
-    return outputPreCompact(undefined, HOOK_AGENT_COMPACT);
-  }
+  // Get the planning key (sanitized branch name) for directory lookups.
+  // The planning directory is .planning/<sanitized-branch>/ (e.g., "feature-core-taskflow-crud").
+  const branch = getCurrentBranch();
+  const planningKey = sanitizeBranchForDir(branch);
 
   // Get the prompt file
   const promptNum = parseInt(promptNumber, 10);
-  const prompt = getPromptByNumber(promptNum, spec);
+  const prompt = getPromptByNumber(promptNum, planningKey);
 
   if (!prompt) {
-    // Prompt file not found, just kill
+    // Prompt file not found, kill window and exit
+    logHookSuccess(HOOK_AGENT_COMPACT, { action: 'skip', reason: 'no_prompt', promptNum, planningKey });
+    if (agentId && windowExists(sessionName, agentId)) {
+      killWindow(sessionName, agentId);
+    }
+    return outputPreCompact(undefined);
+  }
+
+  // Need transcript to run compaction analysis
+  if (!transcriptPath || !existsSync(transcriptPath)) {
+    sendNotification({
+      title: 'Compaction Skipped',
+      message: `No transcript available for prompt ${promptNumber}`,
+      type: 'banner',
+    });
     if (agentId && windowExists(sessionName, agentId)) {
       killWindow(sessionName, agentId);
     }
     return outputPreCompact(undefined, HOOK_AGENT_COMPACT);
   }
 
+  // Notify that compaction is starting
+  sendNotification({
+    title: 'Compaction Starting',
+    message: `Analyzing prompt ${promptNumber}...`,
+    type: 'banner',
+  });
+
   try {
-    // Parse transcript
-    let transcriptSummary = '(No transcript available)';
-    if (transcriptPath && existsSync(transcriptPath)) {
-      const parsed = await parseTranscript(transcriptPath);
-      transcriptSummary = buildCompactionMessage(parsed);
-    }
-
-    // Get git status
-    const gitStatus = getGitStatus();
-
-    // Generate summary via oracle
-    const summary = await generateCompactionSummary(
-      transcriptSummary,
-      gitStatus,
-      prompt.body
-    );
-
-    // Append summary to prompt file
-    appendFileSync(prompt.path, `\n\n${summary}\n`);
-
-    // Send notification
-    sendNotification({
-      title: 'Compaction Complete',
-      message: `Prompt ${promptNumber} summary saved, terminating agent`,
-      type: 'banner',
+    // Run full compaction analysis (result written to prompt file)
+    await runCompaction({
+      conversationLogs: transcriptPath,
+      promptFile: prompt.path,
     });
-  } catch (error) {
-    // Log error but continue with termination
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    sendNotification({
-      title: 'Compaction Warning',
-      message: `Error saving summary: ${errorMsg.slice(0, 50)}`,
-      type: 'banner',
-    });
+  } catch {
+    // Compaction failed - error logged to trace store
   }
 
-  // Kill the tmux window
+  // Kill the tmux window after compaction completes.
+  // PreCompact hook does NOT stop the Claude session - we must explicitly kill it.
   if (agentId && windowExists(sessionName, agentId)) {
     killWindow(sessionName, agentId);
   }
@@ -278,6 +196,8 @@ export const category: HookCategory = {
       logPayload: () => ({
         agentId: process.env.AGENT_ID,
         promptNumber: process.env.PROMPT_NUMBER,
+        promptScoped: process.env.PROMPT_SCOPED,
+        specName: process.env.SPEC_NAME,
       }),
     },
   ],

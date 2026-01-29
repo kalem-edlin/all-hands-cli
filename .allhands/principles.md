@@ -15,6 +15,7 @@
 - **Tokens of coordination**: Other agents (planners, reviewers) speak in prompt files
 - **Iterative refinement**: Same prompt can be re-run with accumulated learnings
 - **Record of decisions**: Completed prompts document what was decided, not just done
+- **Novely Emerges**: Prompt tasking is optimal for agent hypothesis and implementation to validate
 
 ### 3. Ideation First
 **Why front-load exploration**:
@@ -32,7 +33,7 @@
 - Decision points: consolidate to convention, kill, or ship for A/B testing
 
 ### 5. Frontier Models are Capable
-**What agents need**:
+**What agents minimally need**:
 - Control flows as core direction (not micromanagement)
 - Critical motivations for their allocated responsibility
 - Knowledge of how/when to call harness tooling

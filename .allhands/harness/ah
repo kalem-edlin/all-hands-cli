@@ -64,7 +64,10 @@ fi
 
 # Fast path: Route hook commands through daemon if enabled and socket exists
 # Format: ah hooks <category> <name> (e.g., ah hooks context tldr-inject)
-if [ "$1" = "hooks" ] && [ "$DAEMON_ENABLED" = "true" ] && [ -S "$DAEMON_SOCKET" ]; then
+#
+# Use DISABLE_DAEMON=true to force slow path for hooks that need agent env vars
+# (e.g., lifecycle hooks need PROMPT_SCOPED, AGENT_ID which daemon doesn't have)
+if [ "$1" = "hooks" ] && [ "$DAEMON_ENABLED" = "true" ] && [ -S "$DAEMON_SOCKET" ] && [ "$DISABLE_DAEMON" != "true" ]; then
     CATEGORY="$2"
     NAME="$3"
 
@@ -79,9 +82,11 @@ if [ "$1" = "hooks" ] && [ "$DAEMON_ENABLED" = "true" ] && [ -S "$DAEMON_SOCKET"
         CMD=$(printf '{"cmd":"hook","category":"%s","name":"%s","input":%s}\n' "$CATEGORY" "$NAME" "${INPUT:-"{}"}")
 
         # Send to daemon via nc (netcat)
-        RESPONSE=$(echo "$CMD" | nc -U "$DAEMON_SOCKET" 2>/dev/null)
+        # Use || true to prevent set -e from exiting on nc failure (stale socket)
+        NC_OK=0
+        RESPONSE=$(printf '%s' "$CMD" | nc -U "$DAEMON_SOCKET" 2>/dev/null) || NC_OK=$?
 
-        if [ $? -eq 0 ] && [ -n "$RESPONSE" ]; then
+        if [ $NC_OK -eq 0 ] && [ -n "$RESPONSE" ]; then
             # Parse response using jq for proper JSON handling
             if command -v jq >/dev/null 2>&1; then
                 SUCCESS=$(echo "$RESPONSE" | jq -r '.success // false' 2>/dev/null)
@@ -110,4 +115,12 @@ if [ "$1" = "hooks" ] && [ "$DAEMON_ENABLED" = "true" ] && [ -S "$DAEMON_SOCKET"
 fi
 
 # Slow path: Use tsx for direct TypeScript execution
-exec "$SCRIPT_DIR/node_modules/.bin/tsx" "$SCRIPT_DIR/src/cli.ts" "$@"
+# If daemon path was entered but failed, $INPUT holds the consumed stdin - replay it
+if [ -n "$INPUT" ]; then
+    # Daemon path was entered but failed - replay consumed stdin
+    # Use printf to avoid echo interpreting escape sequences in JSON
+    printf '%s' "$INPUT" | "$SCRIPT_DIR/node_modules/.bin/tsx" "$SCRIPT_DIR/src/cli.ts" "$@"
+else
+    # Normal slow path - stdin is still available
+    exec "$SCRIPT_DIR/node_modules/.bin/tsx" "$SCRIPT_DIR/src/cli.ts" "$@"
+fi

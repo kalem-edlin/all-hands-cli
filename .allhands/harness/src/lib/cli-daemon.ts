@@ -11,7 +11,7 @@
  * Socket path: .allhands/harness/.cache/cli-daemon.sock
  */
 
-import { createServer, type Server, type Socket } from 'net';
+import { createServer, createConnection, type Server, type Socket } from 'net';
 import { existsSync, mkdirSync, unlinkSync } from 'fs';
 import { dirname, join } from 'path';
 import type { HookInput } from '../hooks/shared.js';
@@ -132,7 +132,12 @@ async function processCommand(command: DaemonCommand): Promise<unknown> {
       }
 
       try {
-        const output = await runWithInterceptedIO(handler, command.input || {});
+        const input: HookInput = command.input || {};
+        // Claude Code PostToolUse sends tool_response; normalize to tool_result
+        if (input.tool_response !== undefined && input.tool_result === undefined) {
+          input.tool_result = input.tool_response;
+        }
+        const output = await runWithInterceptedIO(handler, input);
         return { success: true, output };
       } catch (e) {
         return {
@@ -223,8 +228,15 @@ export class CLIDaemon {
       mkdirSync(cacheDir, { recursive: true });
     }
 
-    // Clean up stale socket
+    // Check if socket exists and is in use
     if (existsSync(this.socketPath)) {
+      const isInUse = await this.isSocketInUse();
+      if (isInUse) {
+        // Another daemon is running - don't start a second one
+        console.error('CLI daemon already running, skipping start');
+        return;
+      }
+      // Socket exists but is stale - clean it up
       try {
         unlinkSync(this.socketPath);
       } catch {
@@ -287,6 +299,39 @@ export class CLIDaemon {
         // Ignore
       }
     }
+  }
+
+  /**
+   * Check if the socket is currently in use by another daemon.
+   * Attempts to connect to the socket - if successful, it's in use.
+   */
+  private async isSocketInUse(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const client = createConnection(this.socketPath);
+
+      const timeout = setTimeout(() => {
+        client.destroy();
+        resolve(false); // Timed out - socket is stale
+      }, 500);
+
+      client.on('connect', () => {
+        clearTimeout(timeout);
+        // Send a ping to verify it's actually a daemon
+        client.write('{"cmd":"ping"}\n');
+      });
+
+      client.on('data', () => {
+        clearTimeout(timeout);
+        client.destroy();
+        resolve(true); // Got a response - daemon is running
+      });
+
+      client.on('error', () => {
+        clearTimeout(timeout);
+        client.destroy();
+        resolve(false); // Connection failed - socket is stale
+      });
+    });
   }
 
   /**

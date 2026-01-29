@@ -435,13 +435,34 @@ function handleTaskSpawn(input: HookInput): void {
  * Handle agent stop event
  */
 function handleAgentStop(input: HookInput): void {
-  logEvent('agent.stop', {
-    session_id: input.session_id,
-    transcript_path: input.transcript_path,
-    stop_hook_active: input.stop_hook_active,
-  });
+  try {
+    logEvent('agent.stop', {
+      session_id: input.session_id,
+      transcript_path: input.transcript_path,
+      stop_hook_active: input.stop_hook_active,
+    });
+  } catch {
+    // Silent failure - don't break the stop hook
+  }
 
   // Let the lifecycle hook handle the actual stop
+  process.exit(0);
+}
+
+/**
+ * Handle agent compact event
+ */
+function handleAgentCompact(input: HookInput): void {
+  try {
+    logEvent('agent.compact', {
+      session_id: input.session_id,
+      transcript_path: input.transcript_path,
+    });
+  } catch {
+    // Silent failure - don't break the compact hook
+  }
+
+  // Let the lifecycle hook handle the actual compaction
   process.exit(0);
 }
 
@@ -499,6 +520,12 @@ export const category: HookCategory = {
       name: 'agent-stop',
       description: 'Log agent stop event',
       handler: handleAgentStop,
+      errorFallback: { type: 'silent' },
+    },
+    {
+      name: 'agent-compact',
+      description: 'Log agent compact event',
+      handler: handleAgentCompact,
       errorFallback: { type: 'silent' },
     },
   ],

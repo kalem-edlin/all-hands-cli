@@ -7,11 +7,12 @@
  * [3] Planner
  * [4] Build E2E Test
  * [5] Review Jury
- * [6] Create PR / Greptile Reviewing / Address PR Review
- * [7] Compound
- * [8] Mark Completed
- * [9] Switch Spec
- * [0] Custom Flow
+ * [6] Create PR / Awaiting Review... / Rerun PR Review
+ * [7] Review PR (appears after first review detected)
+ * [8] Compound
+ * [9] Mark Completed
+ * [0] Switch Spec
+ * [-] Custom Flow
  * ─ Toggles ─
  * [ ] Loop
  * [ ] Emergent
@@ -41,6 +42,7 @@ export interface ToggleState {
   emergentEnabled: boolean;
   parallelEnabled: boolean;
   prActionState: PRActionState;
+  prReviewUnlocked: boolean;  // true after first PR review detected
   hasSpec: boolean;
   hasCompletedPrompts: boolean;
   compoundRun: boolean;
@@ -54,7 +56,8 @@ export function createActionsPane(
   toggleState: ToggleState,
   selectedIndex?: number
 ): blessed.Widgets.BoxElement {
-  const pane = blessed.box({
+  // Create outer container (non-scrollable, holds border and help text)
+  const container = blessed.box({
     parent: screen,
     top: HEADER_HEIGHT,
     left: 0,
@@ -72,9 +75,76 @@ export function createActionsPane(
     },
   });
 
+  // Calculate content area height (container minus borders minus help text lines)
+  const containerHeight = typeof container.height === 'number' ? container.height : (screen.height as number) - HEADER_HEIGHT;
+  const contentHeight = containerHeight - 4; // 2 for borders, 2 for help text lines
+
+  // Create scrollable content area inside the container
+  const scrollArea = blessed.box({
+    parent: container,
+    top: 0,
+    left: 0,
+    width: '100%-2',
+    height: contentHeight,
+    tags: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: {
+      ch: '┃',
+      track: {
+        bg: 'black',
+      },
+      style: {
+        fg: '#4A34C5',
+      },
+    },
+  });
+
   const items = buildActionItems(toggleState);
-  let y = 0;
+  const { content, selectedLineNumber } = formatActionsContent(items, selectedIndex);
+
+  scrollArea.setContent(content);
+
+  // Scroll to ensure selected item is visible
+  if (selectedLineNumber !== undefined && selectedLineNumber >= 0) {
+    const visibleHeight = contentHeight;
+
+    // Only scroll if selected line would be outside visible area
+    if (selectedLineNumber >= visibleHeight) {
+      // Scroll to put selected line in the middle of visible area when possible
+      const scrollOffset = Math.max(0, selectedLineNumber - Math.floor(visibleHeight / 2));
+      scrollArea.scrollTo(scrollOffset);
+    }
+  }
+
+  // Add help text at bottom of container (fixed position, outside scroll area)
+  blessed.text({
+    parent: container,
+    bottom: 1,
+    left: 1,
+    content: '{#5c6370-fg}Tab: Switch Pane{/#5c6370-fg}',
+    tags: true,
+  });
+  blessed.text({
+    parent: container,
+    bottom: 0,
+    left: 1,
+    content: '{#5c6370-fg}j/k: Navigate{/#5c6370-fg}',
+    tags: true,
+  });
+
+  return container;
+}
+
+interface ActionsContentResult {
+  content: string;
+  selectedLineNumber?: number;
+}
+
+function formatActionsContent(items: ActionItem[], selectedIndex?: number): ActionsContentResult {
+  const lines: string[] = [];
   let selectableIndex = 0;
+  let selectedLineNumber: number | undefined;
 
   for (const item of items) {
     // Skip hidden items entirely
@@ -83,32 +153,19 @@ export function createActionsPane(
     }
 
     if (item.type === 'separator') {
-      // Separator line
-      blessed.text({
-        parent: pane,
-        top: y,
-        left: 1,
-        width: PANE_WIDTH - 4,
-        content: `{#6366f1-fg}${item.label}{/#6366f1-fg}`,
-        tags: true,
-      });
-      y += 1;
+      lines.push(`{#6366f1-fg}${item.label}{/#6366f1-fg}`);
     } else {
       // Selectable item - only count non-disabled items for selection index
       const isSelectable = !item.disabled;
       const isSelected = isSelectable && selectedIndex === selectableIndex;
+
+      if (isSelected) {
+        selectedLineNumber = lines.length;
+      }
+
       const content = formatItemContent(item, isSelected);
+      lines.push(content);
 
-      blessed.text({
-        parent: pane,
-        top: y,
-        left: 1,
-        width: PANE_WIDTH - 4,
-        content,
-        tags: true,
-      });
-
-      y += 1;
       // Only increment selectableIndex for non-disabled items
       if (isSelectable) {
         selectableIndex++;
@@ -116,30 +173,14 @@ export function createActionsPane(
     }
   }
 
-  // Add help text at bottom
-  blessed.text({
-    parent: pane,
-    bottom: 1,
-    left: 1,
-    content: '{#5c6370-fg}Tab: Switch Pane{/#5c6370-fg}',
-    tags: true,
-  });
-  blessed.text({
-    parent: pane,
-    bottom: 0,
-    left: 1,
-    content: '{#5c6370-fg}j/k: Navigate{/#5c6370-fg}',
-    tags: true,
-  });
-
-  return pane;
+  return { content: lines.join('\n'), selectedLineNumber };
 }
 
 function buildActionItems(toggleState: ToggleState): ActionItem[] {
   const prLabel = getPRActionLabel(toggleState.prActionState);
-  const prDisabled = toggleState.prActionState === 'greptile-reviewing';
+  const prDisabled = toggleState.prActionState === 'awaiting-review';
 
-  const { hasSpec, hasCompletedPrompts, compoundRun } = toggleState;
+  const { hasSpec, hasCompletedPrompts, compoundRun, prReviewUnlocked } = toggleState;
 
   // Dynamic label for switch/choose spec
   const specLabel = hasSpec ? 'Switch Spec' : 'Choose Spec';
@@ -153,14 +194,18 @@ function buildActionItems(toggleState: ToggleState): ActionItem[] {
     // These require at least 1 completed prompt
     { id: 'e2e-test-planner', label: 'Build E2E Test', key: '4', type: 'action', hidden: !hasCompletedPrompts },
     { id: 'review-jury', label: 'Review Jury', key: '5', type: 'action', hidden: !hasCompletedPrompts },
+    // PR action row (Create PR / Awaiting Review... / Rerun PR Review)
     { id: 'pr-action', label: prLabel, key: '6', type: 'action', disabled: prDisabled, hidden: !hasCompletedPrompts },
-    { id: 'compound', label: 'Compound', key: '7', type: 'action', hidden: !hasCompletedPrompts },
-    // Mark completed - only visible if compound has been run
-    { id: 'mark-completed', label: 'Mark Completed', key: '8', type: 'action', hidden: !compoundRun },
-    // Switch/Choose spec - always visible, label changes
-    { id: 'switch-spec', label: specLabel, key: '9', type: 'action' },
+    // Review PR - only visible after first PR review detected
+    { id: 'review-pr', label: 'Review PR', key: '7', type: 'action', hidden: !prReviewUnlocked },
+    // Compound (shifted from 7 to 8)
+    { id: 'compound', label: 'Compound', key: '8', type: 'action', hidden: !hasCompletedPrompts },
+    // Mark completed - only visible if compound has been run (shifted from 8 to 9)
+    { id: 'mark-completed', label: 'Mark Completed', key: '9', type: 'action', hidden: !compoundRun },
+    // Switch/Choose spec - always visible, label changes (shifted from 9 to 0)
+    { id: 'switch-spec', label: specLabel, key: '0', type: 'action' },
     // Custom Flow - always visible, allows running any flow with custom message
-    { id: 'custom-flow', label: 'Custom Flow', key: '0', type: 'action' },
+    { id: 'custom-flow', label: 'Custom Flow', key: '-', type: 'action' },
     // Spacing before toggles
     { id: 'spacer-1', label: '', type: 'separator' },
     { id: 'separator-toggles', label: '━━ Toggles ━━', type: 'separator' },
@@ -181,10 +226,10 @@ function getPRActionLabel(state: PRActionState): string {
   switch (state) {
     case 'create-pr':
       return 'Create PR';
-    case 'greptile-reviewing':
-      return 'Greptile Reviewing';
-    case 'address-pr':
-      return 'Address PR Review';
+    case 'awaiting-review':
+      return 'Awaiting Review...';
+    case 'rerun-pr-review':
+      return 'Rerun PR Review';
   }
 }
 

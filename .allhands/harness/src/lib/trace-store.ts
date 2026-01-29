@@ -74,6 +74,7 @@ export interface TraceEvent {
   specName: string | null;
   branch: string | null;
   toolName: string | null;
+  viaDaemon: boolean;  // true if executed via CLI daemon, false if via tsx
   payload: Record<string, unknown>;
 }
 
@@ -189,13 +190,14 @@ export function sanitizePayload(payload: unknown): Record<string, unknown> {
 /**
  * Get agent context from environment variables
  */
-export function getAgentContext(): Pick<TraceEvent, 'agentId' | 'agentType' | 'promptNumber' | 'specName' | 'branch'> {
+export function getAgentContext(): Pick<TraceEvent, 'agentId' | 'agentType' | 'promptNumber' | 'specName' | 'branch' | 'viaDaemon'> {
   return {
     agentId: process.env.AGENT_ID || null,
     agentType: process.env.AGENT_TYPE || null,
     promptNumber: process.env.PROMPT_NUMBER || null,
     specName: process.env.SPEC_NAME || null,
     branch: process.env.BRANCH || null,
+    viaDaemon: process.env.AH_VIA_DAEMON === '1',
   };
 }
 
@@ -252,6 +254,7 @@ function getDb(cwd?: string): BetterSqlite3.Database {
       branch TEXT,
       tool_name TEXT,
       is_error INTEGER DEFAULT 0,
+      via_daemon INTEGER DEFAULT 0,
       payload TEXT NOT NULL
     );
 
@@ -304,8 +307,8 @@ export function logEvent(
   try {
     const database = getDb(cwd);
     const stmt = database.prepare(`
-      INSERT INTO events (timestamp, event_type, agent_id, agent_type, prompt_number, spec_name, branch, tool_name, is_error, payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO events (timestamp, event_type, agent_id, agent_type, prompt_number, spec_name, branch, tool_name, is_error, via_daemon, payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       event.timestamp,
@@ -317,6 +320,7 @@ export function logEvent(
       event.branch,
       event.toolName,
       isError,
+      event.viaDaemon ? 1 : 0,
       JSON.stringify(event.payload)
     );
   } catch (err) {
@@ -605,6 +609,7 @@ export function queryEvents(options: TraceQueryOptions = {}, cwd?: string): (Tra
     branch: string | null;
     tool_name: string | null;
     is_error: number;
+    via_daemon: number;
     payload: string;
   }>;
 
@@ -619,6 +624,7 @@ export function queryEvents(options: TraceQueryOptions = {}, cwd?: string): (Tra
     branch: row.branch,
     toolName: row.tool_name,
     isError: row.is_error === 1,
+    viaDaemon: row.via_daemon === 1,
     payload: JSON.parse(row.payload),
   }));
 }

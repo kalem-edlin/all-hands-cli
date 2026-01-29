@@ -6,4 +6,5 @@ model: opus
 color: green
 ---
 
-Read and follow the instructions in `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` (or `.allhands/flows/shared/IDEATION_CODEBASE_GROUNDING.md` if explicitly told to do so).
+You MUST follow the rules in:
+@.allhands/flows/shared/CODEBASE_UNDERSTANDING.md

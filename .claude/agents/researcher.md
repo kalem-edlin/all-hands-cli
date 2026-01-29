@@ -7,4 +7,5 @@ model: opus
 color: blue
 ---
 
-Read and follow the instructions in `.allhands/flows/shared/RESEARCH_GUIDANCE.md`.
+You MUST follow the rules in:
+@.allhands/flows/shared/RESEARCH_GUIDANCE.md

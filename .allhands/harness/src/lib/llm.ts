@@ -5,11 +5,12 @@
  * This is the foundation layer - provider configs and raw inference.
  *
  * Supported Providers:
- * - Gemini (Google) - VERTEX_API_KEY
+ * - Gemini (Google) - GEMINI_API_KEY (uses @google/genai SDK)
  * - OpenAI (GPT) - OPENAI_API_KEY
  */
 
 import { existsSync, readFileSync } from 'fs';
+import { GoogleGenAI } from '@google/genai';
 import { loadProjectSettings } from '../hooks/shared.js';
 
 // ============================================================================
@@ -46,7 +47,7 @@ export interface AskOptions {
 export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   gemini: {
     name: 'gemini',
-    apiKeyEnvVar: 'VERTEX_API_KEY',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
     defaultModel: 'gemini-3-pro-preview',
   },
   openai: {
@@ -72,6 +73,19 @@ export function getDefaultProvider(): ProviderName {
     return provider;
   }
   return 'gemini';
+}
+
+/**
+ * Get the compaction provider from settings or fallback to gemini.
+ * Compaction uses gemini by default due to its large context window (1M+ tokens).
+ */
+export function getCompactionProvider(): ProviderName {
+  const settings = loadProjectSettings();
+  const provider = settings?.oracle?.compactionProvider;
+  if (provider === 'openai' || provider === 'gemini') {
+    return provider;
+  }
+  return 'gemini'; // Default to gemini for large context handling
 }
 
 /**
@@ -153,37 +167,30 @@ async function callProvider(
   }
 }
 
+/**
+ * Call Gemini API using the official @google/genai SDK.
+ * Uses API key authentication (Gemini Developer API, not Vertex AI).
+ */
 async function callGemini(
   apiKey: string,
   prompt: string,
   model: string,
   timeout: number
 ): Promise<ProviderResult> {
+  // Initialize with API key only - this uses Gemini Developer API, not Vertex AI
+  const ai = new GoogleGenAI({ apiKey });
+
+  // Create abort controller for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-      signal: controller.signal,
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-    }
-
-    const data = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-
+    const text = response.text ?? '';
     return { text, model };
   } finally {
     clearTimeout(timeoutId);

@@ -7,24 +7,4 @@ frontmatter:
     required: true
     description: "1-2 sentence summary enabling semantic search discovery / understanding of this document's purpose"
 
-body:
-  description: "Markdown document capturing architectural decisions, patterns, and use cases"
-  sections:
-    - name: "Overview"
-      required: true
-      description: "High-level context and purpose. Why this system/feature exists and what problem it solves."
-
-    - name: "Key Decisions"
-      required: true
-      description: "Architectural choices. Each decision includes rationale."
-
-    - name: "Patterns"
-      required: false
-      description: "Recurring approaches and conventions. How the system behaves consistently across scenarios."
-
-    - name: "Use Cases"
-      required: false
-      description: "Concrete scenarios demonstrating how the system is used in practice. Real-world workflows and outcomes."
-  rules:
-    - "file references can go in any section where they are relevant to provide a link to snippets of the codebase"
-    - "this file will be indexed, so try not to be too verbose - being concise and impactful is key "
+body: "No strict schema - just ensure code references are done via format: [ref:<file_path>:<symbol_name>] or [ref:<file_path>] (if no symbol is possible to include for the reference). Ensure that file references are used INSTEAD of code snippets."

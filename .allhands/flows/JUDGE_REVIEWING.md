@@ -12,6 +12,7 @@ Orchestrate a jury of specialized reviewers to judge implementation against plan
 - MUST spawn parallel jury subtasks for comprehensive review
 - MUST present engineer with actionable options, not mandates
 - MUST create `type: review-fix` prompts for accepted fixes
+- NEVER read jury review files (`.allhands/flows/shared/jury/*`) directly - subtasks load their own flows per **Context is Precious**
 </constraints>
 
 ## Context Gathering

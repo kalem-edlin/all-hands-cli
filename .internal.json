@@ -23,11 +23,13 @@
     ".claude/envoy/**",
     ".claude/backup-skills/**",
     ".claude/settings.local.json",
-    ".tldr/**",
     ".git/**",
     "scripts/**",
     "target-lines.json",
-    ".reposearch/**"
+    ".reposearch/**",
+    "concerns.md",
+    "specs/**",
+    "docs.json"
   ],
   "$distribution_comment": "What DOES get distributed: .allhands/ (flows, harness, agents, skills, schemas, validation), .claude/ (agents)"
 }

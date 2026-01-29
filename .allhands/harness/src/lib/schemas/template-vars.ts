@@ -29,6 +29,12 @@ export const TemplateVars = {
 
   // Branch/context variables
   BRANCH: z.string().describe('Current git branch name'),
+
+  // Workflow configuration variables
+  HYPOTHESIS_DOMAINS: z
+    .string()
+    .describe('Comma-separated list of hypothesis domains available to emergent agents'),
+  WORKFLOW_TYPE: z.string().describe('Workflow type for the current spec (milestone, debugging, etc.)'),
 } as const;
 
 /**

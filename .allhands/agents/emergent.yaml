@@ -8,7 +8,15 @@ non_coding: false
 message_template: |
   DO NOT ask for any user input for this task.
   Alignment doc: ${ALIGNMENT_PATH}
-  Your prompt number: ${PROMPT_NUMBER}
+  Prompts folder: ${PROMPTS_FOLDER}
+  Your assigned prompt number: ${PROMPT_NUMBER}
+
+  Available hypothesis domains for this workflow:
+  ${HYPOTHESIS_DOMAINS}
+
+  Create your prompt file in the prompts folder using your assigned number. Select a domain that diversifies from prior prompts. More tangential domains require feature flags.
 template_vars:
   - ALIGNMENT_PATH
+  - PROMPTS_FOLDER
   - PROMPT_NUMBER
+  - HYPOTHESIS_DOMAINS

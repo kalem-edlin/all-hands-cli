@@ -43,6 +43,24 @@
         ]
       },
       {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context search-router"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context signature"
+          }
+        ]
+      },
+      {
         "matcher": "(WebFetch|Bash)",
         "hooks": [
           {
@@ -83,31 +101,12 @@
         ]
       },
       {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "ah hooks context signature"
-          }
-        ]
-      },
-      {
         "matcher": "Read",
         "hooks": [
           {
             "type": "command",
             "command": "ah hooks context read-enforcer",
             "timeout": 20
-          }
-        ]
-      },
-      {
-        "matcher": "Grep",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "ah hooks context search-router",
-            "timeout": 10
           }
         ]
       },
@@ -147,6 +146,16 @@
             "command": "ah hooks context edit-notify"
           }
         ]
+      },
+      {
+        "matcher": "TaskOutput",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context transcript-safeguard",
+            "timeout": 90
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -170,7 +179,7 @@
           },
           {
             "type": "command",
-            "command": "ah hooks lifecycle agent-stop"
+            "command": "DISABLE_DAEMON=true ah hooks lifecycle agent-stop"
           }
         ]
       }
@@ -181,7 +190,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ah hooks lifecycle agent-stop"
+            "command": "DISABLE_DAEMON=true ah hooks lifecycle agent-stop"
           }
         ]
       }
@@ -192,17 +201,25 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ah hooks lifecycle agent-compact"
+            "command": "ah hooks observability agent-compact"
+          },
+          {
+            "type": "command",
+            "command": "DISABLE_DAEMON=true ah hooks lifecycle agent-compact"
           }
         ]
       }
     ]
   },
-  "env":{
+  "env": {
     "ENABLE_LSP_TOOL": "1"
   },
   "permissions": {
-    "deny": ["Task(claude-code-guide)", "Task(Plan)", "Task(Explore)"],
+    "deny": [
+      "Task(claude-code-guide)",
+      "Task(Plan)",
+      "Task(Explore)"
+    ],
     "ask": []
   },
   "enableAllProjectMcpServers": false,
