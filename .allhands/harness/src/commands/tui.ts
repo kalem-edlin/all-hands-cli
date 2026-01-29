@@ -48,6 +48,7 @@ import { getProfilesByTuiAction } from '../lib/opencode/index.js';
 import { buildPR } from '../lib/oracle.js';
 import type { PromptFile } from '../lib/prompts.js';
 import { findSpecById, getSpecForBranch, type SpecFile } from '../lib/specs.js';
+import { updateSpecStatus, reindexAfterMove } from './specs.js';
 import { logTuiError, logTuiAction, logTuiLifecycle } from '../lib/trace-store.js';
 
 /**
@@ -411,18 +412,17 @@ async function handleAction(
         return;
       }
 
-      // Check for uncommitted changes before proceeding
+      // Warn about uncommitted changes — gives user a chance to cancel and commit first
       try {
         const statusOut = execSync('git status --porcelain', { encoding: 'utf-8', cwd }).trim();
         if (statusOut.length > 0) {
-          await tui.showConfirmation(
+          const proceed = await tui.showConfirmation(
             'Uncommitted Changes',
-            'You have uncommitted changes in your working tree. Please commit or discard them before marking the spec as completed.'
+            'You have uncommitted changes that will not be included in the final push. Proceed anyway?'
           );
-          break;
+          if (!proceed) break;
         }
       } catch {
-        // git status failed — warn and bail
         tui.log('Error: Could not check git status.');
         break;
       }
@@ -459,6 +459,9 @@ async function handleAction(
           }
         }
 
+        // Mark spec frontmatter as completed
+        updateSpecStatus(currentSpec.path, 'completed');
+
         // Move spec from roadmap to completed
         const completedDir = join(cwd, 'specs', 'completed');
         if (!existsSync(completedDir)) {
@@ -474,8 +477,11 @@ async function handleAction(
         renameSync(currentSpec.path, destPath);
         tui.log(`Moved spec to: specs/completed/${currentSpec.filename}`);
 
-        // Commit the move
-        execSync(`git add "${currentSpec.path}" "${destPath}" && git commit -m "chore: mark spec ${currentSpec.id} as completed"`, { stdio: 'pipe', cwd });
+        // Reindex roadmap and docs indexes after file move
+        await reindexAfterMove(cwd, currentSpec.path, destPath);
+
+        // Commit the move — use git add -A specs/ to stage both the deletion and addition
+        execSync(`git add -A specs/ && git commit -m "chore: mark spec ${currentSpec.id} as completed"`, { stdio: 'pipe', cwd });
 
         // Push the completion commit
         try {
@@ -556,10 +562,24 @@ async function handleAction(
             break;
           }
 
-          // Resurrect the spec using the ah command (handles reindexing)
+          // Resurrect the spec: update status, move to roadmap, reindex
           tui.log('Resurrecting spec to roadmap...');
           try {
-            execSync(`ah specs resurrect "${specFile.id}"`, { stdio: 'pipe', cwd });
+            if (!updateSpecStatus(specFile.path, 'roadmap')) {
+              tui.log('Error: Failed to update spec status');
+              break;
+            }
+
+            const roadmapDir = join(cwd, 'specs', 'roadmap');
+            const targetPath = join(roadmapDir, specFile.filename);
+            const wasNotInRoadmap = !specFile.path.includes('/roadmap/');
+
+            if (wasNotInRoadmap) {
+              mkdirSync(roadmapDir, { recursive: true });
+              renameSync(specFile.path, targetPath);
+              await reindexAfterMove(cwd, specFile.path, targetPath);
+            }
+
             tui.log('Spec resurrected and indexes updated ✓');
 
             // Re-find the spec since its path has changed

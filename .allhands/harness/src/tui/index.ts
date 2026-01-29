@@ -469,8 +469,10 @@ export class TUI {
       // Run docs validation
       this.log('Validating documentation...');
       this.render();
-      const docsPath = join(this.options.cwd, 'docs');
-      const validation = validateDocs(docsPath, this.options.cwd);
+      const cwd = this.options.cwd;
+      const docsPath = join(cwd, 'docs');
+      const excludePaths = ["docs/memories.md", "docs/solutions"].map((p) => join(cwd, p));
+      const validation = validateDocs(docsPath, cwd, { excludePaths });
 
       if (validation.frontmatter_error_count > 0) {
         this.log(`⚠ ${validation.frontmatter_error_count} frontmatter errors`);

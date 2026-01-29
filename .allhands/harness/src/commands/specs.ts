@@ -55,7 +55,7 @@ function parseSpecFrontmatter(filePath: string): SpecFrontmatter | null {
 /**
  * Update spec file frontmatter status
  */
-function updateSpecStatus(filePath: string, newStatus: 'roadmap' | 'in_progress' | 'completed'): boolean {
+export function updateSpecStatus(filePath: string, newStatus: 'roadmap' | 'in_progress' | 'completed'): boolean {
   if (!existsSync(filePath)) return false;
 
   try {
@@ -126,7 +126,7 @@ function findSpecByName(name: string): SpecInfo | null {
  * Reindex knowledge bases after spec file moves.
  * Updates both 'docs' and 'roadmap' indexes to reflect the file move.
  */
-async function reindexAfterMove(
+export async function reindexAfterMove(
   gitRoot: string,
   oldPath: string,
   newPath: string,
