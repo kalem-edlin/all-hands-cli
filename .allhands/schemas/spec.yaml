@@ -7,10 +7,16 @@ frontmatter:
     required: true
     description: "Spec name (used for branch naming, directory creation)"
 
-  domain_name: 
+  domain_name:
     type: string
     required: true
     description: "Domain name (used to group specs into initiatives)"
+
+  type:
+    type: enum
+    values: [milestone, investigation, optimization, refactor, documentation, triage]
+    default: milestone
+    description: "Spec type — determines workflow orchestration, scoping flows, and branch prefix conventions"
 
   status:
     type: enum

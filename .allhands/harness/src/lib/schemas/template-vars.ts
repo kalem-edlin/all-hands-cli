@@ -30,6 +30,11 @@ export const TemplateVars = {
   // Branch/context variables
   BRANCH: z.string().describe('Current git branch name'),
 
+  // Spec metadata variables
+  SPEC_TYPE: z
+    .string()
+    .describe('Spec type from frontmatter (milestone, investigation, optimization, refactor, documentation, triage)'),
+
   // Workflow configuration variables
   HYPOTHESIS_DOMAINS: z
     .string()

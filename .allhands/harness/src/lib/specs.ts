@@ -11,9 +11,12 @@ import { join, basename } from 'path';
 import { parse as parseYaml } from 'yaml';
 import { ensurePlanningDir, initializeStatus } from './planning.js';
 
+export type SpecType = 'milestone' | 'investigation' | 'optimization' | 'refactor' | 'documentation' | 'triage';
+
 export interface SpecFrontmatter {
   name?: string;
   domain_name?: string;
+  type?: SpecType;
   status?: 'roadmap' | 'in_progress' | 'completed';
   dependencies?: string[];
   branch?: string;  // Source of truth for spec's working branch
@@ -26,6 +29,7 @@ export interface SpecFile {
   title: string;
   category: 'roadmap' | 'active' | 'completed';
   domain_name: string;
+  type: SpecType;
   status: 'roadmap' | 'in_progress' | 'completed';
   dependencies: string[];
   branch?: string;  // Source of truth for spec's working branch
@@ -98,6 +102,7 @@ function scanSpecDir(
       title,
       category,
       domain_name: frontmatter?.domain_name || 'uncategorized',
+      type: frontmatter?.type || 'milestone',
       status: frontmatter?.status || (category === 'completed' ? 'completed' : category === 'roadmap' ? 'roadmap' : 'in_progress'),
       dependencies: frontmatter?.dependencies || [],
       branch: frontmatter?.branch,
@@ -304,6 +309,7 @@ export function getSpecForBranch(branch: string, cwd?: string): SpecFile | null 
           title: specId.replace(/-/g, ' '),
           category: 'active',
           domain_name: 'unknown',
+          type: 'milestone',
           status: 'in_progress',
           dependencies: [],
           branch: branch,

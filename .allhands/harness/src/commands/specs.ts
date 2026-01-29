@@ -19,9 +19,12 @@ import { KnowledgeService } from '../lib/knowledge.js';
 import { findSpecByBranch, getSpecForBranch } from '../lib/specs.js';
 import { logCommandStart, logCommandSuccess, logCommandError } from '../lib/trace-store.js';
 
+type SpecType = 'milestone' | 'investigation' | 'optimization' | 'refactor' | 'documentation' | 'triage';
+
 interface SpecFrontmatter {
   name: string;
   domain_name: string;
+  type?: SpecType;
   status: 'roadmap' | 'in_progress' | 'completed';
   dependencies: string[];
   branch?: string;  // Source of truth for spec's working branch
@@ -30,6 +33,7 @@ interface SpecFrontmatter {
 interface SpecInfo {
   name: string;
   domain_name: string;
+  type: SpecType;
   status: 'roadmap' | 'in_progress' | 'completed';
   path: string;
   dependencies: string[];
@@ -90,6 +94,7 @@ function scanSpecsDir(dir: string): SpecInfo[] {
       specs.push({
         name: frontmatter.name || file.replace('.spec.md', ''),
         domain_name: frontmatter.domain_name || 'uncategorized',
+        type: frontmatter.type || 'milestone',
         status: frontmatter.status || 'roadmap',
         path: filePath,
         dependencies: frontmatter.dependencies || [],
