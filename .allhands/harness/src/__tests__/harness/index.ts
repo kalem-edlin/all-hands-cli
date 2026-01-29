@@ -37,6 +37,8 @@
 export {
   createFixture,
   createSpecFixture,
+  createMilestoneFixture,
+  createMultiSpecFixture,
   getPooledFixture,
   cleanupPool,
   PROMPT_TEMPLATE,

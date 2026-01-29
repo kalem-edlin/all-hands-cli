@@ -335,9 +335,14 @@ export function createSpecFixture(
 }
 
 /**
- * Create a fixture with spec files.
+ * Alias for createSpecFixture (used in E2E tests).
  */
-export function createSpecFixture(specs: string[] = ['api', 'data-model']): TestFixture {
+export const createMilestoneFixture = createSpecFixture;
+
+/**
+ * Create a fixture with multiple spec files (no prompts).
+ */
+export function createMultiSpecFixture(specs: string[] = ['api', 'data-model']): TestFixture {
   const files: Record<string, string> = {};
 
   for (const spec of specs) {

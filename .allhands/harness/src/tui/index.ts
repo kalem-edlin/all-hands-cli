@@ -17,11 +17,11 @@
 import blessed from 'blessed';
 import { createActionsPane, ActionItem, ToggleState } from './actions.js';
 import { createPromptsPane, PromptItem } from './prompts-pane.js';
-import { createStatusPane, AgentInfo, FileStates, StatusPaneOptions, getSelectableItems } from './status-pane.js';
+import { createStatusPane, AgentInfo, getSelectableItems } from './status-pane.js';
 import { createModal, Modal } from './modal.js';
 import { createFileViewer, FileViewer, getPlanningFilePath, getSpecFilePath } from './file-viewer-modal.js';
 import { EventLoop } from '../lib/event-loop.js';
-import { killWindow, listWindows, getCurrentSession, spawnCustomFlow, getSpawnedAgentRegistry } from '../lib/tmux.js';
+import { killWindow, listWindows, getCurrentSession, spawnCustomFlow } from '../lib/tmux.js';
 import { getHubWindowId, clearTuiSession, getSpawnedWindows } from '../lib/session.js';
 import { KnowledgeService } from '../lib/knowledge.js';
 import { validateDocs } from '../lib/docs-validation.js';
@@ -65,7 +65,6 @@ export interface TUIState {
 
 export class TUI {
   private screen: blessed.Widgets.Screen;
-  private header: blessed.Widgets.BoxElement;
   private actionsPane: blessed.Widgets.BoxElement;
   private promptsPane: blessed.Widgets.BoxElement;
   private statusPane: blessed.Widgets.BoxElement;
@@ -180,8 +179,8 @@ export class TUI {
     this.originalConsoleLog = originalConsoleLog;
     this.originalConsoleError = originalConsoleError;
 
-    // Create header
-    this.header = this.createHeader();
+    // Create header (element attaches to screen via parent option)
+    this.createHeader();
 
     // Create panes
     this.actionsPane = createActionsPane(this.screen, this.getToggleState());
