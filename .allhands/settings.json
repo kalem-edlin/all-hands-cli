@@ -12,7 +12,7 @@
       "stability",
       "performance",
       "feature",
-      "ux",
+      "ui/ux",
       "integration"
     ]
   },
@@ -32,7 +32,8 @@
     "contextTokenLimit": 5000
   },
   "oracle": {
-    "defaultProvider": "openai"
+    "defaultProvider": "openai",
+    "compactionProvider": "gemini"
   },
   "opencodeSdk": {
     "model": "opencode/gpt-5-nano",
@@ -40,5 +41,17 @@
   },
   "spawn": {
     "promptScopedAutocompactAt": 65
-  }
+  },
+  "eventLoop": {
+    "tickIntervalMs": 5000
+  },
+  "prReview": {
+    "reviewDetectionString": "greptile-apps",
+    "rerunComment": "@greptileai",
+    "checkFrequency": 3
+  },
+  "disabledHooks": [
+    "context signature",
+    "context search-router"
+  ]
 }

@@ -19,6 +19,9 @@ export interface HookInput {
   session_id?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
+  /** Claude Code PostToolUse sends this as tool_response; normalized to tool_result in readHookInput */
+  tool_response?: unknown;
+  /** Normalized from tool_response for backward compat - handlers should read this field */
   tool_result?: unknown;
   transcript_path?: string;
   stop_hook_active?: boolean;
@@ -82,7 +85,12 @@ export async function readHookInput(): Promise<HookInput> {
           resolve({});
           return;
         }
-        resolve(JSON.parse(data));
+        const parsed = JSON.parse(data) as HookInput;
+        // Claude Code PostToolUse sends tool_response; normalize to tool_result
+        if (parsed.tool_response !== undefined && parsed.tool_result === undefined) {
+          parsed.tool_result = parsed.tool_response;
+        }
+        resolve(parsed);
       } catch (e) {
         reject(new Error(`Failed to parse hook input: ${e}`));
       }
@@ -521,6 +529,8 @@ export interface KnowledgeSettings {
 /** Oracle inference settings */
 export interface OracleSettings {
   defaultProvider?: 'gemini' | 'openai';
+  /** LLM provider for compaction analysis (defaults to gemini for large context) */
+  compactionProvider?: 'gemini' | 'openai';
 }
 
 /** OpenCode SDK agent execution settings */
@@ -534,6 +544,18 @@ export interface SpawnSettings {
   maxParallelPrompts?: number;
   /** Autocompact percentage threshold for prompt-scoped agents (1-100, default 65) */
   promptScopedAutocompactAt?: number;
+}
+
+/** Event loop timing settings */
+export interface EventLoopSettings {
+  tickIntervalMs?: number;
+}
+
+/** PR review detection and triggering settings */
+export interface PRReviewSettings {
+  reviewDetectionString?: string;
+  rerunComment?: string;
+  checkFrequency?: number;
 }
 
 /** Project settings structure (.allhands/settings.json) */
@@ -550,6 +572,9 @@ export interface ProjectSettings {
   oracle?: OracleSettings;
   opencodeSdk?: OpencodeSdkSettings;
   spawn?: SpawnSettings;
+  eventLoop?: EventLoopSettings;
+  prReview?: PRReviewSettings;
+  disabledHooks?: string[];
 }
 
 /**
@@ -711,6 +736,15 @@ function executeErrorFallback(fallback: ErrorFallback | undefined, hookName: str
 }
 
 /**
+ * Check if a hook is disabled via disabledHooks in settings.
+ * Disabled hooks pass through without executing.
+ */
+function isHookDisabled(hookName: string): boolean {
+  const settings = loadProjectSettings();
+  return settings?.disabledHooks?.includes(hookName) ?? false;
+}
+
+/**
  * Register a hook category to Commander.js.
  * Creates subcommands with consistent error handling and trace logging.
  */
@@ -726,6 +760,9 @@ export function registerCategory(parent: Command, category: HookCategory): void 
       .command(hook.name)
       .description(hook.description)
       .action(async () => {
+        if (isHookDisabled(hookName)) {
+          process.exit(0);
+        }
         try {
           const input = await readHookInput();
           const payload = hook.logPayload ? hook.logPayload(input) : { tool: input.tool_name };
@@ -744,7 +781,18 @@ export function registerCategory(parent: Command, category: HookCategory): void 
  */
 export function registerCategoryForDaemon(category: HookCategory, register: RegisterFn): void {
   for (const hook of category.hooks) {
-    register(category.name, hook.name, hook.handler);
+    const hookName = `${category.name} ${hook.name}`;
+    const wrappedHandler = async (input: HookInput): Promise<void> => {
+      if (isHookDisabled(hookName)) {
+        process.exit(0);
+      }
+      try {
+        await hook.handler(input);
+      } catch {
+        executeErrorFallback(hook.errorFallback, `${category.name}.${hook.name}`);
+      }
+    };
+    register(category.name, hook.name, wrappedHandler);
   }
 }
 

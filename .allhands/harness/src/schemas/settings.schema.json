@@ -100,6 +100,12 @@
           "enum": ["gemini", "openai"],
           "default": "gemini",
           "description": "Default LLM provider for oracle/inference calls"
+        },
+        "compactionProvider": {
+          "type": "string",
+          "enum": ["gemini", "openai"],
+          "default": "gemini",
+          "description": "LLM provider for compaction analysis (defaults to gemini for large context window)"
         }
       }
     },
@@ -161,6 +167,48 @@
           "description": "Enable the MCP daemon for background services"
         }
       }
+    },
+    "eventLoop": {
+      "type": "object",
+      "description": "Event loop timing settings",
+      "properties": {
+        "tickIntervalMs": {
+          "type": "integer",
+          "default": 5000,
+          "minimum": 1000,
+          "description": "Main event loop tick interval in milliseconds"
+        }
+      }
+    },
+    "prReview": {
+      "type": "object",
+      "description": "PR review detection and triggering settings",
+      "properties": {
+        "reviewDetectionString": {
+          "type": "string",
+          "default": "greptile",
+          "description": "String to match in PR comments to detect a review (case-insensitive)"
+        },
+        "rerunComment": {
+          "type": "string",
+          "default": "@greptile",
+          "description": "Comment to post on PR to trigger a re-review"
+        },
+        "checkFrequency": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "description": "Check for PR reviews every N event loop ticks"
+        }
+      }
+    },
+    "disabledHooks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Hook names to disable (pass through without executing). Format: 'category hookname' e.g. 'context signature', 'enforcement research-fetch'."
     }
   }
 }

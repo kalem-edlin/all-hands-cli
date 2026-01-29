@@ -10,7 +10,7 @@
 import { execSync } from 'child_process';
 import type { Command } from 'commander';
 import { existsSync, readFileSync } from 'fs';
-import { dirname, extname, join } from 'path';
+import { dirname, extname, join, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
 import { minimatch } from 'minimatch';
@@ -159,14 +159,17 @@ function runTscDiagnostics(filePath: string): DiagnosticResult | null {
   try {
     // Run tsc on the whole project and filter for this file's errors
     // This ensures we use the correct tsconfig settings (esModuleInterop, target, etc.)
+    // tsc outputs paths relative to tsconfig dir, so convert the absolute filePath to match
+    const tscDir = tsconfig ? dirname(tsconfig) : undefined;
+    const grepPath = tsconfig ? relative(dirname(tsconfig), filePath) : filePath;
     const tscCmd = tsconfig
-      ? `tsc --noEmit -p "${tsconfig}" 2>&1 | grep -E "^${filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" || true`
+      ? `tsc --noEmit -p "${tsconfig}" 2>&1 | grep -E "^${grepPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" || true`
       : `tsc --noEmit "${filePath}"`;
 
     const output = execSync(tscCmd, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: tsconfig ? dirname(tsconfig) : undefined,
+      cwd: tscDir,
     });
 
     if (output.trim()) {
