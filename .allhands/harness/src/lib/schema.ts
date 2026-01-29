@@ -187,6 +187,20 @@ function validateField(
           received: typeof value,
         };
       }
+      if (field.items) {
+        const itemType = field.items;
+        const invalidItems = itemType === 'integer'
+          ? value.some(item => typeof item !== 'number' || !Number.isInteger(item))
+          : value.some(item => typeof item !== itemType);
+        if (invalidItems) {
+          return {
+            field: fieldName,
+            message: `Array contains non-${itemType} items`,
+            expected: `${itemType}[]`,
+            received: `mixed array`,
+          };
+        }
+      }
       break;
 
     case 'object':

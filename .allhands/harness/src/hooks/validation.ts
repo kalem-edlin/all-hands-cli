@@ -412,6 +412,17 @@ function validateFrontmatter(
             field: fieldName,
             message: `Field '${fieldName}' must be an array`,
           });
+        } else if (fieldDef.items) {
+          const itemType = fieldDef.items;
+          const invalidItems = itemType === 'integer'
+            ? value.some(item => typeof item !== 'number' || !Number.isInteger(item))
+            : value.some(item => typeof item !== itemType);
+          if (invalidItems) {
+            errors.push({
+              field: fieldName,
+              message: `Field '${fieldName}' contains non-${itemType} items`,
+            });
+          }
         }
         break;
     }

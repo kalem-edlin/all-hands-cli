@@ -21,12 +21,14 @@ interface ValidationSuiteFrontmatter {
   name: string;
   description: string;
   globs: string[];
+  tools: string[];
 }
 
 interface ValidationSuiteEntry {
   name: string;
   description: string;
   globs: string[];
+  tools: string[];
   file: string;
 }
 
@@ -74,11 +76,12 @@ function listValidationSuites(): ValidationSuiteEntry[] {
     const content = readFileSync(filePath, 'utf-8');
     const frontmatter = extractFrontmatter(content) as ValidationSuiteFrontmatter | null;
 
-    if (frontmatter && frontmatter.name && frontmatter.description && frontmatter.globs) {
+    if (frontmatter && frontmatter.name && frontmatter.description && frontmatter.globs && Array.isArray(frontmatter.tools)) {
       suites.push({
         name: frontmatter.name,
         description: frontmatter.description,
         globs: frontmatter.globs,
+        tools: frontmatter.tools,
         file: `.allhands/validation/${file}`,
       });
     }
