@@ -46,6 +46,9 @@
 - Types of validation: tests, UI automation, profiling, script results
 - Makes engineering supervision redundant for routine checks
 - Validation tooling is infrastructure - assess gaps before planning, create via specs
+- **Two dimensions**: Every validation domain has a stochastic dimension (agent-driven exploratory testing using model intuition) and a deterministic dimension (binary pass/fail gating for CI/CD). Both are first-class.
+- **Crystallization lifecycle**: Stochastic exploration discovers patterns → patterns crystallize into deterministic checks → deterministic checks entrench in CI/CD → stochastic exploration shifts to the frontier. This is how validation compounds.
+- **Suite existence threshold**: A validation suite must have a meaningful stochastic dimension to justify existing. Deterministic-only tools (type checking, linting, formatting) are test commands referenced directly in acceptance criteria and CI/CD — they are not suites.
 
 ### 7. Knowledge Compounding
 **Everything feeds forward**:
