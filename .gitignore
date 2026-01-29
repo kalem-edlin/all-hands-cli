@@ -1,0 +1,14 @@
+.env
+.trees/
+node_modules/
+.DS_Store
+.trees/**
+.swp
+
+# ALLHANDS_SYNC
+.planning/
+.env.ai
+.tldr/*
+!.tldr/config.json
+.reposearch/
+docs/

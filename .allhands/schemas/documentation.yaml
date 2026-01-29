@@ -1,0 +1,10 @@
+# Documentation Doc Schema
+# Single source of truth for documentation document structure
+
+frontmatter:
+  description:
+    type: string
+    required: true
+    description: "1-2 sentence summary enabling semantic search discovery / understanding of this document's purpose"
+
+body: "No strict schema - just ensure code references are done via format: [ref:<file_path>:<symbol_name>] or [ref:<file_path>] (if no symbol is possible to include for the reference). Ensure that file references are used INSTEAD of code snippets."

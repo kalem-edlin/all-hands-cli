@@ -1,0 +1,44 @@
+# Alignment Doc Schema
+# Single source of truth for alignment document structure
+
+frontmatter:
+  spec_name:
+    type: string
+    required: true
+    description: "Name of the spec this alignment doc serves"
+
+  spec_path:
+    type: string
+    required: true
+    description: "Path to the spec file"
+
+  validation_gaps_accepted:
+    type: array
+    items: string
+    required: false
+    description: "Validation gaps engineer accepted (e.g., 'No E2E - manual UI testing')"
+
+body:
+  description: "Markdown document with header and append sections"
+  sections:
+    - name: "Overview"
+      required: true
+      description: "High-level overview of spec motivations and goals"
+
+    - name: "Hard User Requirements"
+      required: true
+      description: "Concise, immutable user requirements. Guidelines for emergent mode."
+
+    - name: "Engineer Decisions"
+      required: false
+      description: "ONLY deviations - do NOT record when engineer accepts recommendations. Captures: recommended → chosen instead → reasoning."
+
+    - name: "Prompt Summaries"
+      required: false
+      appended_by: "executor"
+      description: "Appended after prompt execution, not during planning."
+      format: |
+        ### ##-prompt-file-name.prompt.md
+        **Decision**: The most important decisions that were made during implementation
+        **Files**: List of key files of interest from the commit
+        **Summary**: Very brief explanation of implementation

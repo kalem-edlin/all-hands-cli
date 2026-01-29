@@ -1,0 +1,15 @@
+# Milestone Workflow Configuration
+# Used for feature development specs that follow the full planning → execution cycle
+
+name: milestone
+description: Feature development with full planning, execution, and emergent refinement cycles
+
+# Hypothesis domains available to emergent refinement agents
+# Agents infer consolidation vs creative phases from context and prior prompt summaries
+hypothesis_domains:
+  - testing
+  - stability
+  - performance
+  - feature
+  - ux
+  - integration

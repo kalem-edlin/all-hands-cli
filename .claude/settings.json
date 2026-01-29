@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks observability session-start"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks session tldr-warm"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks observability prompt-submit"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks context impact-refactor",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "(Task|Bash|Write|Edit|AskUserQuestion|EnterPlanMode|ExitPlanMode|LSP)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks observability tool-pre"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context search-router"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context signature"
+          }
+        ]
+      },
+      {
+        "matcher": "(WebFetch|Bash)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement github-url"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement research-fetch"
+          }
+        ]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks enforcement research-search"
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context tldr-inject"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks context arch-inject"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context read-enforcer",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "(Write|Edit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks validation schema-pre"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Task|Bash|Write|Edit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks observability tool-post"
+          }
+        ]
+      },
+      {
+        "matcher": "(Write|Edit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks validation diagnostics"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks validation format"
+          },
+          {
+            "type": "command",
+            "command": "ah hooks context edit-notify"
+          }
+        ]
+      },
+      {
+        "matcher": "TaskOutput",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context transcript-safeguard",
+            "timeout": 90
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks observability tool-failure"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks observability agent-stop"
+          },
+          {
+            "type": "command",
+            "command": "DISABLE_DAEMON=true ah hooks lifecycle agent-stop"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "DISABLE_DAEMON=true ah hooks lifecycle agent-stop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks observability agent-compact"
+          },
+          {
+            "type": "command",
+            "command": "DISABLE_DAEMON=true ah hooks lifecycle agent-compact"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "ENABLE_LSP_TOOL": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Task(claude-code-guide)",
+      "Task(Plan)",
+      "Task(Explore)"
+    ],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": false,
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": true
+  }
+}

@@ -1,0 +1,15 @@
+name: planner
+flow: SPEC_PLANNING.md
+prompt_scoped: false
+tui_action: planner
+tui_label: Planner
+tui_requires_spec: true
+non_coding: false
+message_template: |
+  Spec: ${SPEC_NAME}
+  Spec Path: ${SPEC_PATH}
+  Prompts Folder: ${PROMPTS_FOLDER}
+template_vars:
+  - SPEC_NAME
+  - SPEC_PATH
+  - PROMPTS_FOLDER

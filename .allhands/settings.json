@@ -1,0 +1,57 @@
+{
+  "$schema": "./harness/src/schemas/settings.schema.json",
+  "daemon": {
+    "enabled": true
+  },
+  "git": {
+    "baseBranch": "main"
+  },
+  "emergent": {
+    "hypothesisDomains": [
+      "testing",
+      "stability",
+      "performance",
+      "feature",
+      "ui/ux",
+      "integration"
+    ]
+  },
+  "validation": {
+    "format": {
+      "enabled": false,
+      "command": "pnpm format",
+      "patterns": []
+    }
+  },
+  "tldr": {
+    "enableForHarness": true
+  },
+  "knowledge": {
+    "similarityThreshold": 0.65,
+    "fullContextSimilarityThreshold": 0.82,
+    "contextTokenLimit": 5000
+  },
+  "oracle": {
+    "defaultProvider": "openai",
+    "compactionProvider": "gemini"
+  },
+  "opencodeSdk": {
+    "model": "opencode/gpt-5-nano",
+    "codesearchToolBudget": 12
+  },
+  "spawn": {
+    "promptScopedAutocompactAt": 65
+  },
+  "eventLoop": {
+    "tickIntervalMs": 5000
+  },
+  "prReview": {
+    "reviewDetectionString": "greptile-apps",
+    "rerunComment": "@greptileai",
+    "checkFrequency": 3
+  },
+  "disabledHooks": [
+    "context signature",
+    "context search-router"
+  ]
+}

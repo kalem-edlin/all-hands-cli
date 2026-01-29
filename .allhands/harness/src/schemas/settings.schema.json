@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://allhands.dev/schemas/settings.schema.json",
+  "title": "All-Hands Project Settings",
+  "description": "Repository-specific configuration for the all-hands harness",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "git": {
+      "type": "object",
+      "description": "Git-related settings",
+      "properties": {
+        "baseBranch": {
+          "type": "string",
+          "default": "main",
+          "description": "Base branch for diff comparisons (main, master, develop, etc.)"
+        }
+      }
+    },
+    "tldr": {
+      "type": "object",
+      "description": "TLDR semantic indexing settings",
+      "properties": {
+        "enableForHarness": {
+          "type": "boolean",
+          "default": false,
+          "description": "Index .allhands directory alongside the project root. Useful for harness development."
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "Validation and quality settings",
+      "properties": {
+        "format": {
+          "type": "object",
+          "description": "Auto-format configuration for edited files",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable auto-formatting after Write/Edit tool use"
+            },
+            "command": {
+              "type": "string",
+              "description": "Default format command (e.g., 'pnpm format', 'bun run format')"
+            },
+            "patterns": {
+              "type": "array",
+              "description": "File-specific format commands",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "match": {
+                    "type": "string",
+                    "description": "Glob pattern to match files (e.g., '*.py', 'src/**/*.ts')"
+                  },
+                  "command": {
+                    "type": "string",
+                    "description": "Format command for matched files"
+                  }
+                },
+                "required": ["match", "command"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "description": "Knowledge search and indexing settings",
+      "properties": {
+        "similarityThreshold": {
+          "type": "number",
+          "default": 0.65,
+          "description": "Minimum similarity score for knowledge search results (0.0-1.0)"
+        },
+        "fullContextSimilarityThreshold": {
+          "type": "number",
+          "default": 0.82,
+          "description": "Similarity threshold above which full file contents are included in results (0.0-1.0)"
+        },
+        "contextTokenLimit": {
+          "type": "integer",
+          "default": 5000,
+          "description": "Maximum cumulative token budget for search results"
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "description": "Oracle inference settings",
+      "properties": {
+        "defaultProvider": {
+          "type": "string",
+          "enum": ["gemini", "openai"],
+          "default": "gemini",
+          "description": "Default LLM provider for oracle/inference calls"
+        },
+        "compactionProvider": {
+          "type": "string",
+          "enum": ["gemini", "openai"],
+          "default": "gemini",
+          "description": "LLM provider for compaction analysis (defaults to gemini for large context window)"
+        }
+      }
+    },
+    "opencodeSdk": {
+      "type": "object",
+      "description": "OpenCode SDK agent execution settings",
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "Model identifier for agent execution (e.g., 'opencode/grok-code')"
+        },
+        "codesearchToolBudget": {
+          "type": "integer",
+          "default": 12,
+          "description": "Soft tool budget hint for codesearch agent"
+        }
+      }
+    },
+    "spawn": {
+      "type": "object",
+      "description": "Agent spawn settings",
+      "properties": {
+        "maxParallelPrompts": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum concurrent executor agents when parallel mode is enabled"
+        },
+        "promptScopedAutocompactAt": {
+          "type": "integer",
+          "default": 65,
+          "description": "Autocompact threshold percentage for prompt-scoped agents"
+        }
+      }
+    },
+    "emergent": {
+      "type": "object",
+      "description": "Emergent refinement agent settings",
+      "properties": {
+        "hypothesisDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Work domains available to emergent refinement agents. Agents diversify across these to discover valuable improvements.",
+          "examples": [
+            ["testing", "stability", "performance", "feature", "ux", "integration"],
+            ["reproduction", "diagnosis", "stability", "testing"]
+          ]
+        }
+      }
+    },
+    "daemon": {
+      "type": "object",
+      "description": "Background daemon settings",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the MCP daemon for background services"
+        }
+      }
+    },
+    "eventLoop": {
+      "type": "object",
+      "description": "Event loop timing settings",
+      "properties": {
+        "tickIntervalMs": {
+          "type": "integer",
+          "default": 5000,
+          "minimum": 1000,
+          "description": "Main event loop tick interval in milliseconds"
+        }
+      }
+    },
+    "prReview": {
+      "type": "object",
+      "description": "PR review detection and triggering settings",
+      "properties": {
+        "reviewDetectionString": {
+          "type": "string",
+          "default": "greptile",
+          "description": "String to match in PR comments to detect a review (case-insensitive)"
+        },
+        "rerunComment": {
+          "type": "string",
+          "default": "@greptile",
+          "description": "Comment to post on PR to trigger a re-review"
+        },
+        "checkFrequency": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "description": "Check for PR reviews every N event loop ticks"
+        }
+      }
+    },
+    "disabledHooks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Hook names to disable (pass through without executing). Format: 'category hookname' e.g. 'context signature', 'enforcement research-fetch'."
+    }
+  }
+}

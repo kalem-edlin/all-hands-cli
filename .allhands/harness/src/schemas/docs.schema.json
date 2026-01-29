@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Documentation Configuration",
+  "description": "Configuration for the documentation flow. If domains are not specified, the agent will infer them from codebase structure.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "domains": {
+      "type": "array",
+      "description": "Main domains to document. Each domain becomes a top-level folder in docs/. If empty or missing, agent will auto-detect and ask for confirmation.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Domain identifier used for docs folder naming"
+          },
+          "path": {
+            "type": "string",
+            "description": "Path to the source code for this domain"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brief description of what this domain contains"
+          }
+        },
+        "required": ["name", "path"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,126 @@
+#!/bin/bash
+# all-hands: Agentic harness CLI for model-first software development
+#
+# This script provides the `ah` CLI entry point:
+# - Auto-installs dependencies if missing
+# - Loads environment from .env.ai
+# - Routes hook commands through CLI daemon if TUI is running (fast path)
+# - Falls back to TypeScript CLI via tsx (slow path)
+
+set -e
+
+# SCRIPT_DIR = .allhands/harness/
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ALLHANDS_DIR = .allhands/
+ALLHANDS_DIR="$(dirname "$SCRIPT_DIR")"
+# PROJECT_ROOT = parent of .allhands/
+PROJECT_ROOT="$(dirname "$ALLHANDS_DIR")"
+
+# Load .env.ai from project root if exists
+if [ -f "$PROJECT_ROOT/.env.ai" ]; then
+    set -a
+    . "$PROJECT_ROOT/.env.ai"
+    set +a
+fi
+
+# Also check git root for .env.ai (may be different in worktrees)
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")
+if [ -f "$GIT_ROOT/.env.ai" ] && [ "$GIT_ROOT" != "$PROJECT_ROOT" ]; then
+    set -a
+    . "$GIT_ROOT/.env.ai"
+    set +a
+fi
+
+# Auto-install if node_modules missing or package.json changed
+if [ ! -d "$SCRIPT_DIR/node_modules" ] || ! cmp -s "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null; then
+    echo "Installing/updating allhands dependencies..." >&2
+    if ! npm install --prefix "$SCRIPT_DIR" --legacy-peer-deps 2>/dev/null; then
+        echo "ERROR: npm install failed for allhands CLI" >&2
+        exit 1
+    fi
+    cp "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null || true
+fi
+
+# CLI daemon socket path
+DAEMON_SOCKET="$SCRIPT_DIR/.cache/cli-daemon.sock"
+SETTINGS_FILE="$ALLHANDS_DIR/settings.json"
+
+# Check if daemon is enabled in settings (default: true)
+DAEMON_ENABLED=true
+if [ -f "$SETTINGS_FILE" ]; then
+    # Check daemon.enabled in settings.json using jq if available
+    if command -v jq >/dev/null 2>&1; then
+        # Use explicit check since jq's // operator treats false as falsy
+        if [ "$(jq -r 'if .daemon.enabled == false then "false" else "true" end' "$SETTINGS_FILE" 2>/dev/null)" = "false" ]; then
+            DAEMON_ENABLED=false
+        fi
+    else
+        # Fallback: look for "daemon".*"enabled": false pattern
+        if grep -zoP '"daemon"\s*:\s*\{[^}]*"enabled"\s*:\s*false' "$SETTINGS_FILE" >/dev/null 2>&1; then
+            DAEMON_ENABLED=false
+        fi
+    fi
+fi
+
+# Fast path: Route hook commands through daemon if enabled and socket exists
+# Format: ah hooks <category> <name> (e.g., ah hooks context tldr-inject)
+#
+# Use DISABLE_DAEMON=true to force slow path for hooks that need agent env vars
+# (e.g., lifecycle hooks need PROMPT_SCOPED, AGENT_ID which daemon doesn't have)
+if [ "$1" = "hooks" ] && [ "$DAEMON_ENABLED" = "true" ] && [ -S "$DAEMON_SOCKET" ] && [ "$DISABLE_DAEMON" != "true" ]; then
+    CATEGORY="$2"
+    NAME="$3"
+
+    if [ -n "$CATEGORY" ] && [ -n "$NAME" ]; then
+        # Mark this as a daemon-routed execution
+        export AH_VIA_DAEMON=1
+
+        # Read stdin (hook input JSON)
+        INPUT=$(cat)
+
+        # Build daemon command (use quoted default to avoid bash expansion issue with braces)
+        CMD=$(printf '{"cmd":"hook","category":"%s","name":"%s","input":%s}\n' "$CATEGORY" "$NAME" "${INPUT:-"{}"}")
+
+        # Send to daemon via nc (netcat)
+        # Use || true to prevent set -e from exiting on nc failure (stale socket)
+        NC_OK=0
+        RESPONSE=$(printf '%s' "$CMD" | nc -U "$DAEMON_SOCKET" 2>/dev/null) || NC_OK=$?
+
+        if [ $NC_OK -eq 0 ] && [ -n "$RESPONSE" ]; then
+            # Parse response using jq for proper JSON handling
+            if command -v jq >/dev/null 2>&1; then
+                SUCCESS=$(echo "$RESPONSE" | jq -r '.success // false' 2>/dev/null)
+                OUTPUT=$(echo "$RESPONSE" | jq -r '.output // empty' 2>/dev/null)
+
+                if [ "$SUCCESS" = "true" ]; then
+                    if [ -n "$OUTPUT" ]; then
+                        echo "$OUTPUT"
+                    fi
+                    exit 0
+                fi
+            else
+                # Fallback: basic parsing for simple outputs (may fail on complex JSON)
+                OUTPUT=$(echo "$RESPONSE" | sed -n 's/.*"output":"\([^"]*\)".*/\1/p')
+                if [ -n "$OUTPUT" ]; then
+                    echo "$OUTPUT" | sed 's/\\n/\n/g; s/\\"/"/g'
+                    exit 0
+                fi
+                if echo "$RESPONSE" | grep -q '"success":true'; then
+                    exit 0
+                fi
+            fi
+        fi
+        # Fall through to slow path if daemon failed
+    fi
+fi
+
+# Slow path: Use tsx for direct TypeScript execution
+# If daemon path was entered but failed, $INPUT holds the consumed stdin - replay it
+if [ -n "$INPUT" ]; then
+    # Daemon path was entered but failed - replay consumed stdin
+    # Use printf to avoid echo interpreting escape sequences in JSON
+    printf '%s' "$INPUT" | "$SCRIPT_DIR/node_modules/.bin/tsx" "$SCRIPT_DIR/src/cli.ts" "$@"
+else
+    # Normal slow path - stdin is still available
+    exec "$SCRIPT_DIR/node_modules/.bin/tsx" "$SCRIPT_DIR/src/cli.ts" "$@"
+fi

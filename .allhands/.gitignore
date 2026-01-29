@@ -1,0 +1,7 @@
+logs/*
+node_modules/
+.knowledge/
+.cache/
+.tldrignore
+.tldr/
+dist

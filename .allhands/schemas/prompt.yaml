@@ -1,0 +1,92 @@
+# Prompt File Schema
+# Single source of truth for prompt file structure
+
+frontmatter:
+  number:
+    type: integer
+    required: true
+    description: "Prompt execution order (01, 02, etc.)"
+
+  title:
+    type: string
+    required: true
+    description: "Human-readable task name"
+
+  type:
+    type: enum
+    required: true
+    values: [planned, emergent, user-patch, review-fix ]
+    default: planned
+    description: "Type of prompt (planned, emergent, user-patch, review-fix)"
+
+  status:
+    type: enum
+    required: true
+    values: [pending, in_progress, done]
+    default: pending
+    description: "Current execution state"
+
+  dependencies:
+    type: array
+    items: integer
+    default: []
+    description: "Prompt numbers that must complete first"
+
+  attempts:
+    type: integer
+    default: 0
+    description: "Number of execution attempts"
+
+  commits:
+    type: array
+    items: string
+    default: []
+    description: "Git commit hashes for work done on this prompt (chronological order, includes failed attempts)"
+
+  validation_suites:
+    type: array
+    items: string
+    default: []
+    description: "Paths to validation suite files elected for this prompt (e.g., .allhands/validation/typescript-typecheck.md)"
+
+  skills:
+    type: array
+    items: string
+    default: []
+    description: "Paths to skill files for domain expertise (e.g., .allhands/skills/building-expo-ui/SKILL.md)"
+
+  patches_prompts:
+    type: array
+    items: integer
+    default: []
+    description: "Prompt numbers this user-patch addresses (only valid for type: user-patch). References which prompts required user intervention."
+
+  uses_tdd_workflow:
+    type: boolean
+    default: false
+    description: "If true, this prompt used the TDD workflow"
+
+body:
+  description: "Markdown task instructions for the executing agent"
+  sections:
+    - name: "Tasks"
+      required: true
+      description: "List of 2-6 specific tasks to complete with implementation approach ideas and suggested instructions"
+
+    - name: "Acceptance Criteria"
+      required: true
+      description: "Validation requirements for completion"
+
+    - append_success_format: |
+        SUCCESS SUMMARY:
+        **Summary**: Brief explanation
+        **Limitations**: List of key limitations discovered that hindered implementation
+        **Decisions**: List of key decisions made that were open to make, or required to make in order to achieve the acceptance criteria
+        **Files**: List of key files affected
+        **Validation**: List of validation techniques that were used to achieve the acceptance criteria with detail on tests run, how they were run, and their results
+
+    - append_failure_format: |
+        FAILURE SUMMARY:
+        **Verdict**: Why the previous attempt was cleared for a blank slate, OR why the previous attempt was commited and expected to be built on top of
+        **Learnings**: What was learned in the attempt that failed
+        **Left to do**: Infered tips on how to keep going after failure

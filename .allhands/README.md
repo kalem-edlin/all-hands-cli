@@ -72,3 +72,4 @@ Project-specific configuration lives in `.allhands/settings.json`:
   "$schema": "./harness/src/schemas/settings.schema.json",
 }
 ```
+

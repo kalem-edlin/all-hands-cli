@@ -1,0 +1,17 @@
+name: e2e-test-planner
+flow: E2E_TEST_PLAN_BUILDING.md
+prompt_scoped: false
+tui_action: e2e-test-planner
+tui_label: E2E Tests
+tui_requires_spec: true
+non_coding: false
+message_template: |
+  Planning folder: ${PLANNING_FOLDER}
+  Spec path: ${SPEC_PATH}
+  Alignment doc path: ${ALIGNMENT_PATH}
+  E2E Test Plan Output Path: ${OUTPUT_PATH}
+template_vars:
+  - PLANNING_FOLDER
+  - SPEC_PATH
+  - ALIGNMENT_PATH
+  - OUTPUT_PATH

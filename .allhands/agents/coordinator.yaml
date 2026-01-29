@@ -1,0 +1,17 @@
+name: coordinator
+flow: COORDINATION.md
+prompt_scoped: false
+tui_action: coordinator
+tui_label: Coordinator
+tui_requires_spec: true
+non_coding: true
+message_template: |
+  Coordinating milestone: ${SPEC_NAME}
+  Spec: ${SPEC_PATH}
+  Alignment doc: ${ALIGNMENT_PATH}
+  Prompts folder: ${PROMPTS_FOLDER}
+template_vars:
+  - SPEC_NAME
+  - SPEC_PATH
+  - ALIGNMENT_PATH
+  - PROMPTS_FOLDER

@@ -1,0 +1,43 @@
+# Validation Suite Schema
+# Files in .allhands/validation/*.md
+# Single source of truth for validation tooling documentation
+
+frontmatter:
+  name:
+    type: string
+    required: true
+    description: "Unique suite identifier (matches filename without .md)"
+
+  description:
+    type: string
+    required: true
+    description: "Use case description - when/why to use this suite for validation"
+
+  globs:
+    type: array
+    items: string
+    required: true
+    description: "File patterns this suite validates (used for discovery and future hooks)"
+
+body:
+  description: "Validation tooling usage guide - how to use this suite for acceptance criteria"
+  sections:
+    - name: "Purpose"
+      required: true
+      description: "What quality aspects this validates (stability, performance, UX, etc.)"
+
+    - name: "When to Use"
+      required: true
+      description: "Task patterns and scenarios that need this validation"
+
+    - name: "Validation Commands"
+      required: true
+      description: "CLI commands, scripts, and programmatic invocations"
+
+    - name: "Interpreting Results"
+      required: true
+      description: "How to read output, what failures mean, common issues"
+
+    - name: "CICD Integration"
+      required: false
+      description: "Pipeline configuration to add (if applicable for automated validation)"

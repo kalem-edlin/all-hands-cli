@@ -1,0 +1,15 @@
+name: compounder
+flow: COMPOUNDING.md
+prompt_scoped: false
+tui_action: compound
+tui_label: Compounder
+tui_requires_spec: true
+non_coding: false
+message_template: |
+  Spec path: ${SPEC_PATH}
+  Alignment doc path: ${ALIGNMENT_PATH}
+  Prompt files path: ${PROMPTS_FOLDER}
+template_vars:
+  - SPEC_PATH
+  - ALIGNMENT_PATH
+  - PROMPTS_FOLDER

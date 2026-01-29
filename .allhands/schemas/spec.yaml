@@ -1,0 +1,54 @@
+# Spec Schema
+# Single source of truth for specification files
+
+frontmatter:
+  name:
+    type: string
+    required: true
+    description: "Spec name (used for branch naming, directory creation)"
+
+  domain_name: 
+    type: string
+    required: true
+    description: "Domain name (used to group specs into initiatives)"
+
+  status:
+    type: enum
+    values: [roadmap, in_progress, completed]
+    default: roadmap
+    description: "Spec implementation status"
+
+  dependencies:
+    type: array
+    items: string
+    default: []
+    description: "Other spec names this depends on"
+
+  branch:
+    type: string
+    required: true
+    default: "feature/{name}"
+    description: "Working branch for this spec"
+
+body:
+  description: "Markdown document capturing the spec vision"
+  sections:
+    - name: "Motivation"
+      required: true
+      description: "Why this spec matters. User goals and pain points."
+
+    - name: "Goals"
+      required: true
+      description: "What success looks like. Concrete outcomes."
+
+    - name: "Non-Goals"
+      required: false
+      description: "Explicit scope boundaries. What we're NOT doing."
+
+    - name: "Open Questions"
+      required: false
+      description: "Uncertainties to resolve during ideation/planning."
+
+    - name: "Technical Considerations"
+      required: false
+      description: "Known constraints, dependencies, risks."
