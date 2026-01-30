@@ -17,6 +17,8 @@ import { logHookStart, logHookSuccess } from '../lib/trace-store.js';
 /** Input from Claude Code hooks (stdin JSON) */
 export interface HookInput {
   session_id?: string;
+  /** Working directory of the Claude Code session */
+  cwd?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   /** Claude Code PostToolUse sends this as tool_response; normalized to tool_result in readHookInput */
@@ -136,19 +138,18 @@ export function allowTool(hookName?: string): never {
 
 /**
  * Output additional context for PostToolUse hooks.
- * Uses decision: 'block' with reason for reliable visibility to model.
- * (Since PostToolUse runs after the edit, 'block' just shows the message prominently)
+ * Uses hookSpecificOutput.additionalContext per Claude Code hooks spec.
  * Optionally logs to trace-store if hookName is provided.
  */
 export function outputContext(context: string, hookName?: string): never {
   if (hookName) {
     logHookSuccess(hookName, { action: 'context', hasContext: true });
   }
-  // Use decision: 'block' with reason for reliable visibility (like Continuous-Claude-v3)
-  // The edit already happened, so 'block' just ensures the message is shown prominently
   const output = {
-    decision: 'block',
-    reason: context,
+    hookSpecificOutput: {
+      hookEventName: 'PostToolUse',
+      additionalContext: context,
+    },
   };
   console.log(JSON.stringify(output));
   process.exit(0);
