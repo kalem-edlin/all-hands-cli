@@ -109,6 +109,14 @@ Follow `.allhands/flows/shared/WRITING_HARNESS_MCP_TOOLS.md` for the full proces
 1. Add to `TemplateVars` registry in `[ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:aa2cf15]`
 2. Include Zod schema and description
 
+## When to Update This Reference
+
+- Update when adding or modifying `ah` CLI commands or their design rules
+- Update when creating new hook categories or changing hook registration patterns
+- Update when adding or modifying MCP server configurations or the `_template.ts` convention
+- Update when the auto-discovery `register()` export pattern changes
+- Update when modifying hook event matchers in `.claude/settings.json`. For project settings structure changes, see `core-architecture.md` instead
+
 ## Related References
 
 - [`core-architecture.md`](core-architecture.md) — When your hook or command integrates with TUI lifecycle or platform settings

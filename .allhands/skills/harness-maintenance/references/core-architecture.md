@@ -180,6 +180,14 @@ Connection point between harness and Claude Code:
 1. Create YAML in `schemas/` for agent-facing
 2. Create Zod schema in `[ref:.allhands/harness/src/lib/schemas]` for internal
 
+## When to Update This Reference
+
+- Update when changing the `.allhands/` directory structure or adding new top-level directories
+- Update when modifying the TUI lifecycle, pane layout, or EventLoop behavior
+- Update when adding or modifying schema definitions (agent-facing YAML or internal Zod)
+- Update when changing agent profile format, spawn configuration fields, or template variables
+- Update when modifying project settings structure or hypothesis domain configuration. For hook event matchers, see `tools-commands-mcp-hooks.md` instead
+
 ## Related References
 
 - [`tools-commands-mcp-hooks.md`](tools-commands-mcp-hooks.md) — When modifying hooks, CLI commands, or MCP server integration

@@ -41,6 +41,19 @@ Read `.allhands/principles.md` first. Every harness change should be motivated b
 | Validation tooling | [`references/validation-tooling.md`](references/validation-tooling.md) | Creating validation suites, crystallization lifecycle, suite writing philosophy |
 | Knowledge & docs | [`references/knowledge-compounding.md`](references/knowledge-compounding.md) | Documentation schemas, solutions, memories, knowledge indexes, compounding patterns |
 
+## Maintenance Triggers
+
+When you've just changed something and need to know which reference to update:
+
+| Change Type | Update Reference |
+|-------------|-----------------|
+| Flow XML tags, structure conventions, or progressive disclosure patterns | [`references/writing-flows.md`](references/writing-flows.md) |
+| CLI commands, hooks, MCP servers, or auto-discovery registration | [`references/tools-commands-mcp-hooks.md`](references/tools-commands-mcp-hooks.md) |
+| Directory structure, TUI lifecycle, schemas, agent profiles, or settings | [`references/core-architecture.md`](references/core-architecture.md) |
+| Skill schema, discovery mechanism, or hub-and-spoke conventions | [`references/harness_skills.md`](references/harness_skills.md) |
+| Validation suites, crystallization lifecycle, or stochastic/deterministic methodology | [`references/validation-tooling.md`](references/validation-tooling.md) |
+| Documentation schemas, knowledge indexes, or compounding flows | [`references/knowledge-compounding.md`](references/knowledge-compounding.md) |
+
 ## Cross-Cutting Patterns
 
 ### Key Design Patterns
@@ -59,3 +72,37 @@ Read `.allhands/principles.md` first. Every harness change should be motivated b
 - [ ] Update relevant reference doc if structural changes made
 - [ ] Run `ah validate agents` after profile changes
 - [ ] Test hook behavior with Claude Code runner
+
+<!--
+Knowledge Completeness Audit — 2026-01-30
+
+Source: Pre-refactor monolithic SKILL.md (v1.0.0, 374 lines, commit ef3e35c^)
+Target: Hub-and-spoke decomposition (v2.0.0, 7 files)
+
+Total knowledge units audited: 47
+- Preserved: 45 (95.7%)
+- Intentionally Omitted: 2 (4.3%)
+- Missing: 0 (0%)
+- Restored: 0
+
+Intentionally Omitted:
+1. First Principles Applied cross-reference table — each reference doc now covers
+   its own principles contextually; consolidated table redundant in routing hub
+2. "Workflow Constraints" design pattern label — concept preserved in
+   core-architecture.md §Dynamic Actions; omitted from hub patterns as
+   TUI-specific detail, not cross-cutting
+
+Coverage by destination:
+- SKILL.md hub: frontmatter, goal, constraints, 6 design patterns, maintainer checklist
+- core-architecture.md: directory structure, settings, TUI lifecycle, schemas,
+  agent profiles, hypothesis domains, platform integration, 4 extension points
+- tools-commands-mcp-hooks.md: hooks system, commands architecture, hook events,
+  3 extension points
+- writing-flows.md: progressive disclosure, flow organization, inputs/outputs
+- harness_skills.md: new content (hub-and-spoke pattern documentation)
+- validation-tooling.md: new content (crystallization lifecycle, suite philosophy)
+- knowledge-compounding.md: new content (knowledge indexes, compounding patterns)
+
+Conclusion: No knowledge loss. Spec hard requirement "No knowledge loss from
+current SKILL.md content" systematically validated.
+-->

@@ -71,6 +71,13 @@ Prompt files reference validation suites in their `validation_suites` frontmatte
 2. Agent runs suite's **Deterministic Integration** section for acceptance criteria gating
 3. Validation review (`PROMPT_VALIDATION_REVIEW.md`) confirms pass/fail
 
+## When to Update This Reference
+
+- Update when creating new validation suites or modifying the suite YAML schema
+- Update when changing the crystallization lifecycle stages or suite existence threshold
+- Update when modifying the stochastic/deterministic methodology or section conventions
+- Update when changing how prompt files reference or integrate validation suites
+
 ## Related References
 
 - [`tools-commands-mcp-hooks.md`](tools-commands-mcp-hooks.md) — When validation uses hooks, CLI commands, or MCP research tools

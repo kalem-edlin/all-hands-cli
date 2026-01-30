@@ -72,6 +72,13 @@ This manifests in:
 - **Validation suites**: Crystallized quality checks that compound
 - **Skills**: Domain expertise packages that deepen over time
 
+## When to Update This Reference
+
+- Update when adding or modifying documentation schemas (`ah schema` types)
+- Update when changing knowledge index commands (`ah solutions`, `ah memories`, `ah knowledge`)
+- Update when modifying the prompt completion cycle or summary compounding flow
+- Update when changing compaction summary behavior or knowledge preservation patterns. For compaction hook mechanics, see `tools-commands-mcp-hooks.md` instead
+
 ## Related References
 
 - [`validation-tooling.md`](validation-tooling.md) — When knowledge artifacts involve validation suites or crystallization
