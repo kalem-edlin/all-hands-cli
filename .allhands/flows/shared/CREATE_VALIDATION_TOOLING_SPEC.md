@@ -19,6 +19,11 @@ Create a validation tooling spec for a new domain. Per **Prompt Files as Units o
 - MUST verify the validation domain has a meaningful stochastic dimension before creating a suite spec. Per **Agentic Validation Tooling**, deterministic-only tools (type checking, linting, formatting) are test commands — NOT suites.
 </constraints>
 
+## Domain Knowledge
+
+- Run `ah skills list` to discover the `harness-maintenance` skill
+- Read the skill's `references/validation-tooling.md` for suite writing philosophy, crystallization lifecycle, evidence capture patterns, and tool validation guidance
+
 ## Research
 
 Read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` and investigate:
@@ -36,7 +41,6 @@ Per **Agentic Validation Tooling**, research produces assumptions; running the t
 - Install and verify the tool responds to `--help` — internalize the full command vocabulary before anything else
 - Create a minimal test target (temp directory, not committed)
 - Execute representative stochastic workflows — discover commands, chaining, and the observe-act-verify loop
-- Systematically try commands from `--help` against codebase-relevant scenarios — this exploration directly produces the command/use-case pairs that belong in the suite documentation
 - Document divergences from researched documentation — informs spec and engineer interview
 
 ## Engineer Interview
@@ -44,26 +48,6 @@ Per **Agentic Validation Tooling**, research produces assumptions; running the t
 Present: recommended approach, alternatives, CICD impact, effort, MCP availability. Include divergences discovered during Tool Validation.
 
 Confirm engineer agrees and understands this creates a blocking dependency.
-
-## Suite Writing Philosophy
-
-<constraints>
-- MUST instruct agents to pull `<tool> --help` as prerequisite before any exploration — command vocabulary shapes exploration quality. This is a directive in the suite, not just a reference. Per **Knowledge Compounding**, `--help` is the authoritative source; the suite MUST NOT replicate full command docs.
-- MUST weave brief inline command examples into use-case motivations as calibration anchors — not exhaustive catalogs, not separated command reference sections. Per **Frontier Models are Capable**, inline examples seed the right approach while `--help` reveals the full picture.
-- MUST frame motivations around harness value: reducing human-in-loop supervision, verifying code quality, confirming implementation matches expectations. Inline commands back up motivations with concrete tool direction.
-- MUST describe exploration categories with enough command specificity to orient, not prescriptive sequences that constrain. Per **Frontier Models are Capable**, agents extrapolate deeper investigation from seeded examples + `--help`.
-</constraints>
-
-Per **Context is Precious**, target the density of `WRITING_HARNESS_FLOWS.md`. The formula: **motivations backed by inline command examples + `--help` as prerequisite and progressive disclosure**. Commands woven into use cases give direction; `--help` reveals depth. Leave `--help` with things to reveal — don't overfit tool specifics to use cases.
-
-## Evidence Capture
-
-Per **Quality Engineering**, two audiences require different artifacts:
-
-- **Agent (self-verification)** — primitives used during the observe-act-verify loop (state checks, assertions, console output). Real-time, not recorded.
-- **Engineer (review artifacts)** — trust evidence produced after exploration (recordings, screenshots, traces, reports).
-
-Pattern: explore first, capture second.
 
 ## Spec Creation
 
