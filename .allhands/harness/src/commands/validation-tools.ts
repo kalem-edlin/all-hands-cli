@@ -11,8 +11,8 @@ import { Command } from 'commander';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { parse as parseYaml } from 'yaml';
 import { tracedAction } from '../lib/base-command.js';
+import { extractFrontmatter } from '../lib/schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,24 +30,6 @@ interface ValidationSuiteEntry {
   globs: string[];
   tools: string[];
   file: string;
-}
-
-/**
- * Extract frontmatter from markdown content
- */
-function extractFrontmatter(content: string): Record<string, unknown> | null {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
-  const match = content.match(frontmatterRegex);
-
-  if (!match) {
-    return null;
-  }
-
-  try {
-    return parseYaml(match[1]) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -74,14 +56,15 @@ function listValidationSuites(): ValidationSuiteEntry[] {
   for (const file of files) {
     const filePath = join(dir, file);
     const content = readFileSync(filePath, 'utf-8');
-    const frontmatter = extractFrontmatter(content) as ValidationSuiteFrontmatter | null;
+    const { frontmatter: rawFm } = extractFrontmatter(content);
+    const fm = rawFm as ValidationSuiteFrontmatter | null;
 
-    if (frontmatter && frontmatter.name && frontmatter.description && frontmatter.globs && Array.isArray(frontmatter.tools)) {
+    if (fm && fm.name && fm.description && Array.isArray(fm.globs) && Array.isArray(fm.tools)) {
       suites.push({
-        name: frontmatter.name,
-        description: frontmatter.description,
-        globs: frontmatter.globs,
-        tools: frontmatter.tools,
+        name: fm.name,
+        description: fm.description,
+        globs: fm.globs,
+        tools: fm.tools,
         file: `.allhands/validation/${file}`,
       });
     }

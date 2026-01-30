@@ -11,10 +11,15 @@ import { execSync } from 'child_process';
 import type { Command } from 'commander';
 import { existsSync, readFileSync } from 'fs';
 import { dirname, extname, join, relative } from 'path';
-import { fileURLToPath } from 'url';
-import { parse as parseYaml } from 'yaml';
 import { minimatch } from 'minimatch';
-import { detectSchemaType, type SchemaType } from '../lib/schema.js';
+import {
+  detectSchemaType,
+  type SchemaType,
+  loadSchema as loadSchemaFromLib,
+  extractFrontmatter,
+  validateFrontmatter as validateFrontmatterFromLib,
+  type ValidationError,
+} from '../lib/schema.js';
 import {
   HookInput,
   HookCategory,
@@ -255,70 +260,11 @@ function formatDiagnosticsContext(results: DiagnosticResult[]): string {
 // Schema Validation
 // ─────────────────────────────────────────────────────────────────────────────
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-interface SchemaDefinition {
-  frontmatter: Record<string, {
-    type: string;
-    required?: boolean;
-    default?: unknown;
-    values?: string[];
-    items?: string;
-    description?: string;
-  }>;
-  body?: {
-    description?: string;
-    sections?: Array<{
-      name: string;
-      required?: boolean;
-      description?: string;
-    }>;
-  };
-}
-
-interface ValidationError {
-  field: string;
-  message: string;
-}
-
 /**
  * Detect which schema applies to a file path (wrapper for shared function)
  */
 function detectSchemaTypeLocal(filePath: string): SchemaType | null {
   return detectSchemaType(filePath, getProjectDir());
-}
-
-/**
- * Load schema definition from YAML file
- */
-function loadSchema(schemaType: string): SchemaDefinition | null {
-  // Path: harness/src/hooks/ -> harness/src/ -> harness/ -> .allhands/ -> schemas/
-  const schemaPath = join(__dirname, '..', '..', '..', 'schemas', `${schemaType}.yaml`);
-  if (!existsSync(schemaPath)) {
-    return null;
-  }
-
-  try {
-    const content = readFileSync(schemaPath, 'utf-8');
-    return parseYaml(content) as SchemaDefinition;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Parse frontmatter from a markdown file
- */
-function parseFrontmatter(content: string): Record<string, unknown> | null {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return null;
-
-  try {
-    return parseYaml(match[1]) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -351,88 +297,8 @@ function validateSkillSpecificRules(
 }
 
 /**
- * Validate frontmatter against schema
- */
-function validateFrontmatter(
-  frontmatter: Record<string, unknown>,
-  schema: SchemaDefinition
-): ValidationError[] {
-  const errors: ValidationError[] = [];
-
-  if (!schema.frontmatter) return errors;
-
-  // Check required fields
-  for (const [fieldName, fieldDef] of Object.entries(schema.frontmatter)) {
-    const value = frontmatter[fieldName];
-
-    // Check required
-    if (fieldDef.required && (value === undefined || value === null)) {
-      errors.push({
-        field: fieldName,
-        message: `Required field '${fieldName}' is missing`,
-      });
-      continue;
-    }
-
-    // Skip validation if not present and not required
-    if (value === undefined || value === null) continue;
-
-    // Type validation
-    switch (fieldDef.type) {
-      case 'string':
-        if (typeof value !== 'string') {
-          errors.push({
-            field: fieldName,
-            message: `Field '${fieldName}' must be a string`,
-          });
-        }
-        break;
-
-      case 'integer':
-        if (typeof value !== 'number' || !Number.isInteger(value)) {
-          errors.push({
-            field: fieldName,
-            message: `Field '${fieldName}' must be an integer`,
-          });
-        }
-        break;
-
-      case 'enum':
-        if (fieldDef.values && !fieldDef.values.includes(value as string)) {
-          errors.push({
-            field: fieldName,
-            message: `Field '${fieldName}' must be one of: ${fieldDef.values.join(', ')}`,
-          });
-        }
-        break;
-
-      case 'array':
-        if (!Array.isArray(value)) {
-          errors.push({
-            field: fieldName,
-            message: `Field '${fieldName}' must be an array`,
-          });
-        } else if (fieldDef.items) {
-          const itemType = fieldDef.items;
-          const invalidItems = itemType === 'integer'
-            ? value.some(item => typeof item !== 'number' || !Number.isInteger(item))
-            : value.some(item => typeof item !== itemType);
-          if (invalidItems) {
-            errors.push({
-              field: fieldName,
-              message: `Field '${fieldName}' contains non-${itemType} items`,
-            });
-          }
-        }
-        break;
-    }
-  }
-
-  return errors;
-}
-
-/**
  * Run schema validation on a file.
+ * Delegates to lib/schema.ts for parsing and validation.
  * Returns validation errors or null if valid.
  */
 function runSchemaValidation(filePath: string): ValidationError[] | null {
@@ -443,8 +309,8 @@ function runSchemaValidation(filePath: string): ValidationError[] | null {
     return null;
   }
 
-  // Load schema
-  const schema = loadSchema(schemaType);
+  // Load schema (cached in lib)
+  const schema = loadSchemaFromLib(schemaType);
   if (!schema) {
     return null;
   }
@@ -456,8 +322,8 @@ function runSchemaValidation(filePath: string): ValidationError[] | null {
 
   const content = readFileSync(filePath, 'utf-8');
 
-  // Parse frontmatter
-  const frontmatter = parseFrontmatter(content);
+  // Parse frontmatter using lib
+  const { frontmatter } = extractFrontmatter(content);
   if (!frontmatter) {
     return [{
       field: 'frontmatter',
@@ -465,8 +331,9 @@ function runSchemaValidation(filePath: string): ValidationError[] | null {
     }];
   }
 
-  // Validate against schema
-  const errors = validateFrontmatter(frontmatter, schema);
+  // Validate against schema using lib
+  const result = validateFrontmatterFromLib(frontmatter, schema);
+  const errors: ValidationError[] = [...result.errors];
 
   // Add skill-specific validation
   if (schemaType === 'skill') {
@@ -478,6 +345,7 @@ function runSchemaValidation(filePath: string): ValidationError[] | null {
 
 /**
  * Run schema validation on content (for PreToolUse before file is written).
+ * Delegates to lib/schema.ts for parsing and validation.
  * Returns validation errors or null if valid/not schema-managed.
  */
 function runSchemaValidationOnContent(filePath: string, content: string): ValidationError[] | null {
@@ -488,14 +356,14 @@ function runSchemaValidationOnContent(filePath: string, content: string): Valida
     return null;
   }
 
-  // Load schema
-  const schema = loadSchema(schemaType);
+  // Load schema (cached in lib)
+  const schema = loadSchemaFromLib(schemaType);
   if (!schema) {
     return null;
   }
 
-  // Parse frontmatter from content
-  const frontmatter = parseFrontmatter(content);
+  // Parse frontmatter from content using lib
+  const { frontmatter } = extractFrontmatter(content);
   if (!frontmatter) {
     return [{
       field: 'frontmatter',
@@ -503,8 +371,9 @@ function runSchemaValidationOnContent(filePath: string, content: string): Valida
     }];
   }
 
-  // Validate against schema
-  const errors = validateFrontmatter(frontmatter, schema);
+  // Validate against schema using lib
+  const result = validateFrontmatterFromLib(frontmatter, schema);
+  const errors: ValidationError[] = [...result.errors];
 
   // Add skill-specific validation
   if (schemaType === 'skill') {
@@ -575,17 +444,17 @@ export function runFormat(input: HookInput): void {
 
   // Check if formatting is enabled
   if (!formatConfig?.enabled) {
-    allowTool(HOOK_FORMAT);
+    return allowTool(HOOK_FORMAT);
   }
 
   const filePath = input.tool_input?.file_path as string | undefined;
   if (!filePath) {
-    allowTool(HOOK_FORMAT);
+    return allowTool(HOOK_FORMAT);
   }
 
   const command = getFormatCommand(formatConfig!, filePath!);
   if (!command) {
-    allowTool(HOOK_FORMAT);
+    return allowTool(HOOK_FORMAT);
   }
 
   try {
@@ -613,7 +482,7 @@ export function validateSchema(input: HookInput): void {
   const filePath = input.tool_input?.file_path as string | undefined;
 
   if (!filePath) {
-    allowTool(HOOK_SCHEMA);
+    return allowTool(HOOK_SCHEMA);
   }
 
   const errors = runSchemaValidation(filePath!);

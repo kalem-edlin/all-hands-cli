@@ -136,50 +136,43 @@ Artifacts produced specifically for human review after stochastic exploration is
 
 ## Deterministic Integration
 
-CI-gated browser regression testing using Playwright directly. Deterministic tests don't need LLM reasoning — they run as scripted assertions.
+CI-gated browser regression testing using Playwright directly. Deterministic tests don't need LLM reasoning — they run as scripted assertions. Per **Frontier Models are Capable**, this section teaches the agent WHAT to validate deterministically — Playwright's documentation and `npx playwright --help` teach specific APIs.
 
 ### Visual Regression
 
-- Use `toHaveScreenshot()` with configuration: `threshold: 0.2`, `maxDiffPixelRatio: 0.1`, `animations: 'disabled'`, `caret: 'hide'`
-- Mask dynamic content (timestamps, ads) with `mask: [locator]`
-- Baseline storage: committed to repo at `__screenshots__/{projectName}/{testFilePath}/{arg}{ext}`
-- Update baselines: `npx playwright test --update-snapshots`
-- Run on consistent environment (Ubuntu + Chromium in CI) to avoid OS-level rendering differences
+Catch unintended visual changes before they reach production. The core idea: capture baseline screenshots of known-good states, then fail CI when screenshots drift beyond acceptable thresholds.
+
+- **Baseline management** — commit baselines to the repo so changes are code-reviewed. Update baselines explicitly when visual changes are intentional.
+- **Dynamic content masking** — timestamps, ads, avatars, and other non-deterministic content must be masked to avoid false positives. Masking is the primary source of flaky visual tests.
+- **Environment consistency** — visual comparison is OS-sensitive (font rendering, anti-aliasing). Run on a single OS + browser combination in CI to avoid cross-platform drift.
 
 ### Multi-Device Execution
 
-- Playwright projects configuration for desktop (`Desktop Chrome`), mobile (`Pixel 5`), tablet (custom 768x1024 viewport)
-- All projects use Chromium for consistency (cross-browser testing is a separate concern)
+Responsive regressions are among the most common front-end bugs. Test across viewport breakpoints to catch layout issues that only appear at specific screen sizes.
+
+- Configure Playwright projects for desktop, mobile, and tablet viewports
+- Use a single browser engine (Chromium) for consistency — cross-browser testing is a separate concern from responsive testing
 
 ### Accessibility Scanning
 
-- Use `@axe-core/playwright` with `AxeBuilder`
-- Target WCAG 2.1 AA: `.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])`
-- Create reusable fixture for consistent configuration across test files
-- Scope scans to specific components when testing individual features
+Automated accessibility scanning catches low-hanging WCAG violations that manual review misses. Per **Quality Engineering**, accessibility is a quality dimension, not a feature.
+
+- Integrate `@axe-core/playwright` for WCAG 2.1 AA scanning
+- Create a reusable fixture so every test file gets consistent accessibility configuration
+- Scope scans to individual components when testing feature changes — full-page scans for integration tests
 
 ### Artifact Capture
 
-- Trace: `trace: 'on-first-retry'` — captures full trace on first retry for debugging
-- Screenshot: `screenshot: 'only-on-failure'` with `fullPage: true`
-- Video: `video: 'on-first-retry'`
-- Upload artifacts in CI: `actions/upload-artifact@v4` with `playwright-report/`
+CI artifacts close the debugging gap when tests fail remotely. Capture enough context to diagnose failures without reproducing locally.
 
-### CI Configuration (GitHub Actions pattern)
-
-```yaml
-- npx playwright install chromium --with-deps
-- npx playwright test
-- Upload playwright-report/ as artifact (if: !cancelled())
-```
+- **Traces on failure** — full execution traces (network, DOM, screenshots) for post-mortem debugging
+- **Screenshots on failure** — full-page captures for visual comparison
+- **Video on retry** — captures the retry attempt to show what the test saw during failure recovery
+- Upload all artifacts so they survive ephemeral CI runners
 
 ### Test Organization
 
-- `tests/visual/*.visual.spec.ts` — visual regression tests
-- `tests/accessibility/*.a11y.spec.ts` — accessibility scans
-- `tests/e2e/*.e2e.spec.ts` — end-to-end flow tests
-- `tests/fixtures/axe-fixture.ts` — shared accessibility fixture
-- Retries: `retries: process.env.CI ? 2 : 0`
+Organize tests by validation concern so CI can run subsets independently. Separate visual regression, accessibility, and e2e flow tests into distinct directories. Configure retries for CI (flaky network, slow rendering) but not locally (fast feedback).
 
 ## ENV Configuration
 

@@ -79,6 +79,6 @@ If validation needs have no matching suite:
 
 When used via PROMPT_TASKS_CURATION:
 - Add suite file paths to prompt's `validation_suites` frontmatter
-- Use the `file` field from list output (e.g., `.allhands/validation/typescript-typecheck.md`)
+- Use the `file` field from `ah validation-tools list` output
 - Makes validation approach explicit and reviewable
 - Executors can read referenced suite files directly
