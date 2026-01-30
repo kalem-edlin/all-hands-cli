@@ -11,15 +11,22 @@ Workflow definitions that guide agents through tasks. Flows follow a lifecycle f
 | Phase | Flow | Doc |
 |---|---|---|
 | Foundation | Core harness integration | `docs/flows/core-harness-integration.md` |
-| Ideation | Spec planning (ideation + planning) | `docs/flows/spec-planning.md` |
+| Ideation | Spec planning (ideation + type-aware planning) | `docs/flows/spec-planning.md` |
+| Scoping | Type-specific scoping flows (5 initiative types) | `docs/flows/type-specific-scoping-flows.md` |
 | Pre-execution | Plan review jury | `docs/flows/plan-review-jury.md` |
 | Research | Plan deepening and research | `docs/flows/plan-deepening-and-research.md` |
 | Execution | Prompt task execution | `docs/flows/prompt-task-execution.md` |
-| Refinement | Emergent refinement | `docs/flows/emergent-refinement.md` |
+| Refinement | Emergent refinement (hypothesis planner, plan-only) | `docs/flows/emergent-refinement.md` |
 | Post-execution | Judge reviewing | `docs/flows/judge-reviewing.md` |
 | Feedback | PR reviewing | `docs/flows/pr-reviewing.md` |
 | Coordination | Coordination services | `docs/flows/coordination.md` |
 | Knowledge | Compounding | `docs/flows/compounding.md` |
+
+## Initiative Scoping Flows
+
+| Topic | Doc |
+|---|---|
+| Type-specific scoping (investigation, optimization, refactor, documentation, triage) | `docs/flows/type-specific-scoping-flows.md` |
 
 ## Supporting Flows
 

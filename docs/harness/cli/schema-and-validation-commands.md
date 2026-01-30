@@ -1,5 +1,5 @@
 ---
-description: "Schema definitions and validation pipeline: how YAML schemas enforce file structure for prompts, specs, alignments, validation suites (with tools field and body sections), and agent profiles, with runtime Zod validation for workflows and templates. Includes array item-type enforcement."
+description: "Schema definitions and validation pipeline: how YAML schemas enforce file structure for prompts, specs, alignments, validation suites (with tools field and body sections), and agent profiles, with runtime Zod validation for template variables. Includes array item-type enforcement and the SPEC_TYPE template variable registry."
 ---
 
 # Schema and Validation Commands
@@ -19,7 +19,7 @@ The codebase uses two complementary validation strategies depending on the file 
 flowchart TD
     File["Input File"] --> Detect{"Detect schema type"}
     Detect -->|YAML schema exists| Static["Static YAML Schema<br/>prompt, spec, alignment,<br/>documentation, validation-suite"]
-    Detect -->|Zod schema| Runtime["Runtime Zod Schema<br/>workflow, agent-profile,<br/>template-vars"]
+    Detect -->|Zod schema| Runtime["Runtime Zod Schema<br/>agent-profile, template-vars"]
     Static --> FrontmatterParse["Extract frontmatter"]
     FrontmatterParse --> FieldValidation["Validate each field<br/>against SchemaField rules"]
     Runtime --> ZodParse["Zod safeParse"]
@@ -28,9 +28,9 @@ flowchart TD
 
 ### Static YAML Schemas
 
-YAML schema files in `.allhands/schemas/` define frontmatter field requirements. [ref:.allhands/harness/src/lib/schema.ts:loadSchema:047c119] reads and caches these definitions. [ref:.allhands/harness/src/lib/schema.ts:listSchemas:047c119] discovers available types by scanning the schema directory.
+YAML schema files in `.allhands/schemas/` define frontmatter field requirements. [ref:.allhands/harness/src/lib/schema.ts:loadSchema:4eddba4] reads and caches these definitions. [ref:.allhands/harness/src/lib/schema.ts:listSchemas:4eddba4] discovers available types by scanning the schema directory.
 
-[ref:.allhands/harness/src/lib/schema.ts:validateField:047c119] checks individual values against their field definition, supporting these types:
+[ref:.allhands/harness/src/lib/schema.ts:validateField:4eddba4] checks individual values against their field definition, supporting these types:
 
 | Type | Validation Rule |
 |------|----------------|
@@ -42,23 +42,39 @@ YAML schema files in `.allhands/schemas/` define frontmatter field requirements.
 | `array` | `Array.isArray()`, plus item-type enforcement when schema specifies `items` |
 | `object` | Recursive property validation via nested `properties` |
 
-When a schema field declares `items` (e.g., `items: string`), [ref:.allhands/harness/src/lib/schema.ts:validateField:047c119] enforces that every element matches the declared type. For example, `tools: [123]` is rejected when the schema specifies `items: string`. Integer item validation also catches floats -- `[1, 2.5]` fails against `items: integer`. Arrays without an `items` constraint accept mixed types.
+When a schema field declares `items` (e.g., `items: string`), [ref:.allhands/harness/src/lib/schema.ts:validateField:4eddba4] enforces that every element matches the declared type. For example, `tools: [123]` is rejected when the schema specifies `items: string`. Integer item validation also catches floats -- `[1, 2.5]` fails against `items: integer`. Arrays without an `items` constraint accept mixed types.
 
 ### Runtime Zod Schemas
 
 For types requiring cross-field validation or normalization from YAML snake_case to TypeScript camelCase:
 
-**Workflow configs**: [ref:.allhands/harness/src/lib/schemas/workflow.ts:parseWorkflowConfig:047c119] validates workflow YAML against a Zod schema (`name`, `description`, `hypothesis_domains`) and normalizes to a `WorkflowConfig` TypeScript interface.
+**Agent profiles**: [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:validateProfileSemantics:aa2cf15] performs semantic validation beyond schema checks -- verifying that template variables referenced in `message_template` match the declared `template_vars` list, and that no unknown variables are used.
 
-**Agent profiles**: [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:validateProfileSemantics:047c119] performs semantic validation beyond schema checks -- verifying that template variables referenced in `message_template` match the declared `template_vars` list, and that no unknown variables are used.
+**Template variables**: [ref:.allhands/harness/src/lib/schemas/template-vars.ts:validateTemplateString:aa2cf15] extracts `${VAR_NAME}` references from templates and validates each against the registry of known variables. [ref:.allhands/harness/src/lib/schemas/template-vars.ts:validateContext:aa2cf15] checks that all required variables have valid values at resolution time.
 
-**Template variables**: [ref:.allhands/harness/src/lib/schemas/template-vars.ts:validateTemplateString:047c119] extracts `${VAR_NAME}` references from templates and validates each against the registry of known variables (SPEC_PATH, ALIGNMENT_PATH, BRANCH, etc.). [ref:.allhands/harness/src/lib/schemas/template-vars.ts:validateContext:047c119] checks that all required variables have valid values at resolution time.
+The template variable registry [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:aa2cf15] defines all valid variables with individual Zod schemas:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `SPEC_PATH` | `string` | Path to spec file |
+| `ALIGNMENT_PATH` | `string` | Path to alignment doc |
+| `PROMPTS_FOLDER` | `string` | Path to prompts directory |
+| `PROMPT_PATH` | `string` | Path to specific prompt file |
+| `OUTPUT_PATH` | `string` | Output file path |
+| `PLANNING_FOLDER` | `string` | Path to `.planning/{branch}` directory |
+| `SPEC_NAME` | `string` | Current spec name |
+| `PROMPT_NUMBER` | `string` (regex: `/^\d{2}$/`) | Two-digit prompt number |
+| `BRANCH` | `string` | Current git branch name |
+| `SPEC_TYPE` | `string` | Spec type from frontmatter (milestone, investigation, optimization, refactor, documentation, triage) |
+| `HYPOTHESIS_DOMAINS` | `string` | Comma-separated hypothesis domains from settings.json |
+
+[ref:.allhands/harness/src/lib/schemas/template-vars.ts:TEMPLATE_VAR_NAMES:aa2cf15] exports the full variable name list for runtime validation.
 
 ## Schema Type Detection
 
 The system can automatically determine which schema applies to a file:
 
-[ref:.allhands/harness/src/lib/schema.ts:detectSchemaType:047c119] uses glob pattern matching against known paths:
+[ref:.allhands/harness/src/lib/schema.ts:detectSchemaType:4eddba4] uses glob pattern matching against known paths:
 
 | Pattern | Schema Type |
 |---------|-------------|
@@ -69,29 +85,29 @@ The system can automatically determine which schema applies to a file:
 | `.allhands/validation/*.md` | `validation-suite` |
 | `.allhands/skills/*/SKILL.md` | `skill` |
 
-[ref:.allhands/harness/src/lib/schema.ts:inferSchemaType:047c119] provides a string-matching fallback when glob patterns fail, using path segments and file name patterns.
+[ref:.allhands/harness/src/lib/schema.ts:inferSchemaType:4eddba4] provides a string-matching fallback when glob patterns fail, using path segments and file name patterns.
 
 ## CLI Commands
 
 ### `ah schema <type> [property]`
 
-[ref:.allhands/harness/src/commands/schema.ts:register:047c119] exposes schema definitions to agents. Given a type name, it reads the corresponding YAML schema and outputs it. The optional `property` argument extracts a single top-level key, reducing output for agents that only need to understand one aspect of a schema.
+[ref:.allhands/harness/src/commands/schema.ts:register:4eddba4] exposes schema definitions to agents. Given a type name, it reads the corresponding YAML schema and outputs it. The optional `property` argument extracts a single top-level key, reducing output for agents that only need to understand one aspect of a schema.
 
-[ref:.allhands/harness/src/commands/schema.ts:getAvailableSchemas:047c119] lists all `.yaml` files in the schemas directory when an unknown type is requested, guiding agents toward valid types.
+[ref:.allhands/harness/src/commands/schema.ts:getAvailableSchemas:4eddba4] lists all `.yaml` files in the schemas directory when an unknown type is requested, guiding agents toward valid types.
 
 ### `ah validate <file>`
 
-[ref:.allhands/harness/src/commands/validate.ts:register:047c119] validates a file against its detected or inferred schema. The validation pipeline:
+[ref:.allhands/harness/src/commands/validate.ts:register:4eddba4] validates a file against its detected or inferred schema. The validation pipeline:
 
 1. Read the file
 2. Detect schema type from path (glob match, then string inference)
 3. Extract frontmatter
 4. Validate against schema fields
-5. Format errors with [ref:.allhands/harness/src/lib/schema.ts:formatErrors:047c119]
+5. Format errors with [ref:.allhands/harness/src/lib/schema.ts:formatErrors:4eddba4]
 
 ### `ah validation-tools list`
 
-[ref:.allhands/harness/src/commands/validation-tools.ts:register:047c119] discovers validation suite definitions in `.allhands/validation/`. Each suite is a markdown file with frontmatter declaring:
+[ref:.allhands/harness/src/commands/validation-tools.ts:register:4eddba4] discovers validation suite definitions in `.allhands/validation/`. Each suite is a markdown file with frontmatter declaring:
 
 | Field | Type | Purpose |
 |-------|------|---------|
@@ -100,11 +116,11 @@ The system can automatically determine which schema applies to a file:
 | `globs` | `string[]` | File patterns the suite validates (used for discovery) |
 | `tools` | `string[]` | CLI tools and packages the suite uses (e.g., `agent-browser`, `playwright`) |
 
-The `tools` field enables agent-to-suite mapping -- agents can find which validation suites are relevant based on the tools they have available. [ref:.allhands/harness/src/commands/validation-tools.ts:listValidationSuites:047c119] delegates frontmatter validation to [ref:.allhands/harness/src/lib/schema.ts:validateFrontmatter:047c119], ensuring suites with invalid or incomplete frontmatter are silently excluded from the listing rather than causing errors. This delegation keeps schema enforcement centralized in `lib/schema.ts` rather than duplicated in command files.
+The `tools` field enables agent-to-suite mapping -- agents can find which validation suites are relevant based on the tools they have available. [ref:.allhands/harness/src/commands/validation-tools.ts:listValidationSuites:4eddba4] delegates frontmatter validation to [ref:.allhands/harness/src/lib/schema.ts:validateFrontmatter:4eddba4], ensuring suites with invalid or incomplete frontmatter are silently excluded from the listing rather than causing errors. This delegation keeps schema enforcement centralized in `lib/schema.ts` rather than duplicated in command files.
 
 ## Validation Suite Schema
 
-The `validation-suite` schema type ([ref:.allhands/schemas/validation-suite.yaml:047c119:6668667]) defines the structure for two-dimensional validation playbooks in `.allhands/validation/`. Per **Agentic Validation Tooling**, every suite has both a stochastic dimension (agent-driven exploratory testing) and a deterministic dimension (CI-gated binary pass/fail).
+The `validation-suite` schema type ([ref:.allhands/schemas/validation-suite.yaml::6668667]) defines the structure for two-dimensional validation playbooks in `.allhands/validation/`. Per **Agentic Validation Tooling**, every suite has both a stochastic dimension (agent-driven exploratory testing) and a deterministic dimension (CI-gated binary pass/fail).
 
 ### Frontmatter Fields
 
@@ -134,5 +150,5 @@ This structure reflects the crystallization lifecycle from principles: stochasti
 ## Key Design Decisions
 
 - **YAML for static schemas, Zod for runtime**: YAML schemas are agent-readable (via `ah schema`) and work for simple field-level checks. Zod schemas handle normalization and cross-field logic that YAML cannot express.
-- **Schema caching**: [ref:.allhands/harness/src/lib/schema.ts:loadSchema:047c119] caches parsed schemas in memory, avoiding repeated filesystem reads during validation of multiple files.
-- **Defaults via schema**: [ref:.allhands/harness/src/lib/schema.ts:applyDefaults:047c119] fills missing frontmatter fields from schema defaults, enabling minimal frontmatter in files while maintaining complete data.
+- **Schema caching**: [ref:.allhands/harness/src/lib/schema.ts:loadSchema:4eddba4] caches parsed schemas in memory, avoiding repeated filesystem reads during validation of multiple files.
+- **Defaults via schema**: [ref:.allhands/harness/src/lib/schema.ts:applyDefaults:4eddba4] fills missing frontmatter fields from schema defaults, enabling minimal frontmatter in files while maintaining complete data.

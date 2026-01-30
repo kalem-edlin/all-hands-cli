@@ -65,7 +65,7 @@ flowchart TD
 
 ### Discovery Phase
 
-One discovery sub-agent per domain, each following [ref:.allhands/flows/shared/DOCUMENTATION_DISCOVERY.md::79b9873]. Discovery identifies all documentable approaches/features, groups them intelligently, and checks existing coverage. Key constraint: stay under 20 approaches per domain, grouping aggressively.
+One discovery sub-agent per domain, each following [ref:.allhands/flows/shared/DOCUMENTATION_DISCOVERY.md::4eddba4]. Discovery identifies all documentable approaches/features, groups them intelligently, and checks existing coverage. Key constraint: stay under 20 approaches per domain, grouping aggressively.
 
 ### Aggregate and Plan
 
@@ -73,7 +73,7 @@ The orchestrator merges discovery results, filters out fully-covered approaches,
 
 ### Writing Phase
 
-Writer sub-agents follow [ref:.allhands/flows/shared/DOCUMENTATION_WRITER.md::79b9873]. Each writer receives its approaches with file lists, symbols, the target directory, any existing docs to edit, and session knowledge (in incremental mode). The `group` field controls subdirectory placement.
+Writer sub-agents follow [ref:.allhands/flows/shared/DOCUMENTATION_WRITER.md::4eddba4]. Each writer receives its approaches with file lists, symbols, the target directory, any existing docs to edit, and session knowledge (in incremental mode). The `group` field controls subdirectory placement.
 
 ### Post-Processing
 
@@ -93,6 +93,6 @@ The orchestrator handles cross-domain concerns that individual writers lack cont
 
 ## Source Flows
 
-- [ref:.allhands/flows/DOCUMENTATION.md::79b9873]
-- [ref:.allhands/flows/shared/DOCUMENTATION_DISCOVERY.md::79b9873]
-- [ref:.allhands/flows/shared/DOCUMENTATION_WRITER.md::79b9873]
+- [ref:.allhands/flows/DOCUMENTATION.md::4eddba4]
+- [ref:.allhands/flows/shared/DOCUMENTATION_DISCOVERY.md::4eddba4]
+- [ref:.allhands/flows/shared/DOCUMENTATION_WRITER.md::4eddba4]

@@ -8,7 +8,7 @@ The coordinator is the only agent explicitly designed for **cross-phase orchestr
 
 ## Configuration
 
-[ref:.allhands/agents/coordinator.yaml::79b9873]
+[ref:.allhands/agents/coordinator.yaml::48bd111]
 
 | Field | Value |
 |-------|-------|
@@ -31,7 +31,7 @@ This four-variable context gives the coordinator full situational awareness acro
 
 ## Why Non-Coding Orchestration
 
-The coordinator is one of two `non_coding: true` agents (alongside the judge). This constraint is architectural, not incidental:
+The coordinator is one of three `non_coding: true` agents (alongside the judge and emergent). This constraint is architectural, not incidental:
 
 - **Separation of concerns** -- coordination decisions (what to run next, what's blocked, what's done) must not be entangled with implementation
 - **Context preservation** -- a non-coding agent avoids accumulating code-level context that would dilute its orchestration judgment, per **Context is Precious**
@@ -44,14 +44,14 @@ flowchart TD
     Coordinator["Coordinator\n(non-coding)"]
     Coordinator -->|"triggers"| Planner["Planner"]
     Coordinator -->|"monitors"| Executors["Executors"]
-    Coordinator -->|"monitors"| Emergent["Emergent"]
+    Coordinator -->|"monitors output"| Emergent["Emergent Planner\n(creates prompts)"]
     Coordinator -->|"triggers"| Judge["Judge"]
 
     Planner -->|"produces"| Prompts["Prompt Files"]
+    Emergent -->|"produces"| Prompts
     Prompts -->|"consumed by"| Executors
     Executors -->|"complete"| Coordinator
-    Emergent -->|"complete"| Coordinator
     Judge -->|"verdict"| Coordinator
 ```
 
-The coordinator is the hub that connects phases. It does not directly control other agents -- the TUI handles spawning -- but it provides the decision-making layer for when phases transition. This maps to the **Quality Engineering** principle: the coordinator's role is judgment about sequencing, not implementation.
+The coordinator is the hub that connects phases. It does not directly control other agents -- the TUI handles spawning -- but it provides the decision-making layer for when phases transition. The coordinator monitors the emergent planner's output (new prompt files appearing in the prompts folder) rather than monitoring it as an executor, since the emergent agent now produces planning artifacts, not code changes. This maps to the **Quality Engineering** principle: the coordinator's role is judgment about sequencing, not implementation.

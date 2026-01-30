@@ -1,5 +1,5 @@
 ---
-description: "Post-spec knowledge extraction flow that captures learnings, solutions, memories, and harness improvements from completed specifications"
+description: "Post-spec knowledge extraction flow that captures learnings, solutions, memories, and harness improvements from completed specifications, with type-aware completion assessment for milestone vs exploratory specs"
 ---
 
 # Compounding Flow
@@ -23,17 +23,29 @@ The flow is idempotent -- running it again on a spec with no new changes produce
 
 ## Phase Progression
 
-The flow progresses through five ordered phases, each building on the previous. The final phase (Harness Improvement) is intentionally last so that all other compounding artifacts are complete before any diversion into structural changes.
+The flow progresses through ordered phases, each building on the previous. Completion Assessment runs early to establish the evaluation frame for the spec type. The final phase (Harness Improvement) is intentionally last so that all other compounding artifacts are complete before any diversion into structural changes.
 
 ```mermaid
 flowchart TD
-    CG[Context Gathering] --> SA[Signal Analysis]
+    CG[Context Gathering] --> CA[Completion Assessment]
+    CA --> SA[Signal Analysis]
     SA --> ME[Memory Extraction]
     SA --> SD[Solution Documentation]
     ME --> SF[Spec Finalization]
     SD --> SF
     SF --> HI[Harness Improvement Handling]
 ```
+
+## Completion Assessment by Spec Type
+
+Per **Frontier Models are Capable**, completion means different things depending on the spec type:
+
+| Spec Type | Completion Criteria |
+|-----------|-------------------|
+| **Milestone** (or missing) | Spec acceptance criteria met, all prompts complete, thorough knowledge extraction |
+| **Exploratory** (investigation, optimization, refactor, documentation, triage) | Problem resolution assessed against original hypothesis, learnings extracted from experiment outcomes, unresolved questions documented for future work |
+
+Milestone completion is binary -- acceptance criteria are either met or not. Exploratory completion is evaluated against hypothesis outcomes: did the experiments answer the questions posed? What was learned? What remains open? This distinction shapes how subsequent Signal Analysis interprets prompt results.
 
 ## Signal Analysis
 
@@ -57,7 +69,7 @@ Per **Agentic Validation Tooling**, the tooling signals phase also evaluates eac
 - Should new deterministic tests be added to the suite's Deterministic Integration section?
 - Are there stochastic exploration patterns that should be documented for future agents?
 
-This evaluation feeds directly into the Harness Improvement phase as evidence for suite refinement per [ref:.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md::c0bdef0].
+This evaluation feeds directly into the Harness Improvement phase as evidence for suite refinement per [ref:.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md::4eddba4].
 
 A key design decision: emergent prompts are never framed as "scope creep." Per **Quality Engineering**, emergent work discovers valuable variants. Reverted emergent work is expected experimentation cost per **Software is Cheap**.
 
@@ -100,15 +112,15 @@ Inline updates (skills, validation suites) require engineer approval. Structural
 
 ### Crystallization Promotion
 
-Per [ref:.allhands/flows/COMPOUNDING.md::29f9dfe], validation suite refinements include **crystallization promotion**: stable stochastic patterns discovered during execution are promoted into deterministic checks in the suite's Deterministic Integration section. This shifts stochastic exploration to the frontier -- agents no longer need to rediscover patterns that have been automated. The crystallization lifecycle ensures validation compounds across spec executions.
+Per [ref:.allhands/flows/COMPOUNDING.md::4eddba4], validation suite refinements include **crystallization promotion**: stable stochastic patterns discovered during execution are promoted into deterministic checks in the suite's Deterministic Integration section. This shifts stochastic exploration to the frontier -- agents no longer need to rediscover patterns that have been automated. The crystallization lifecycle ensures validation compounds across spec executions.
 
 ## Key Design Decisions
 
 - **Engineer interview is mandatory** before finalizing the compounding summary -- the flow must not finalize without sign-off on classified issues
-- **Harness modification requires first principle justification** -- changes must trace back to principles in [ref:.allhands/principles.md::79b9873]
+- **Harness modification requires first principle justification** -- changes must trace back to principles in [ref:.allhands/principles.md::6668667]
 - **Spec finalization preserves original Goals and Non-Goals** unmodified for historical contrast against the new Implementation Reality section
 - **The per-tool impact map is evidence, not a stored artifact** -- it feeds directly into harness improvement specs rather than being persisted separately
 
 ## Source Flow
 
-[ref:.allhands/flows/COMPOUNDING.md::79b9873]
+[ref:.allhands/flows/COMPOUNDING.md::4eddba4]

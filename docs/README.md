@@ -22,7 +22,7 @@ Workflow definitions that guide agents through tasks. Covers the full lifecycle:
 
 ### Agents
 
-Agent configuration profiles and workflow orchestration. Defines agent types (planning, execution, quality review, orchestration, knowledge), the YAML configuration system, and how workflow configs shape agent behavior.
+Agent configuration profiles and initiative orchestration. Defines agent types (planning, execution, quality review, orchestration, knowledge), the YAML configuration system, and how initiative types and settings.json shape agent behavior.
 
 `docs/agents/README.md`
 
