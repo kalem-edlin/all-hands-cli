@@ -54,6 +54,10 @@ export interface EventLoopState {
   promptSnapshot: PromptSnapshot | null;
   /** Tick counter for modulus-based polling */
   tickCount: number;
+  /** Consecutive HP spawns without new prompt creation (resets when new pending prompts appear) */
+  hpSpawnCount: number;
+  /** Total prompt count at last HP spawn, used to detect whether HP produced new prompts */
+  hpLastPromptCount: number | null;
 }
 
 export interface EventLoopCallbacks {
@@ -122,6 +126,8 @@ export class EventLoop {
       lastExecutorSpawnTime: null,
       promptSnapshot: null,
       tickCount: 0,
+      hpSpawnCount: 0,
+      hpLastPromptCount: null,
     };
   }
 
@@ -168,6 +174,7 @@ export class EventLoop {
    */
   setLoopEnabled(enabled: boolean): void {
     this.state.loopEnabled = enabled;
+    this.state.hpSpawnCount = 0;
     if (!enabled) {
       this.state.activeExecutorPrompts = [];
       this.state.lastExecutorSpawnTime = null;
@@ -360,6 +367,10 @@ export class EventLoop {
         snapshot.hash !== this.state.promptSnapshot.hash;
 
       if (hasChanged) {
+        // Reset HP backoff when new pending prompts appear (external prompt creation)
+        if (this.state.promptSnapshot && snapshot.pending > this.state.promptSnapshot.pending) {
+          this.state.hpSpawnCount = 0;
+        }
         this.state.promptSnapshot = snapshot;
         this.callbacks.onPromptsChange?.(prompts, snapshot);
       }
@@ -595,10 +606,37 @@ export class EventLoop {
         result.stats.pending === 0 &&
         result.stats.inProgress === 0
       ) {
-        // No pending, no in_progress → spawn hypothesis planner to create new prompts
-        this.state.lastExecutorSpawnTime = Date.now();
+        // Track whether prior HP spawn was productive (created new prompts)
+        const currentPromptCount = this.state.promptSnapshot?.count ?? 0;
+        if (this.state.hpLastPromptCount !== null) {
+          if (currentPromptCount <= this.state.hpLastPromptCount) {
+            // HP spawned but didn't produce new prompts — unproductive
+            this.state.hpSpawnCount++;
+          } else {
+            // HP produced work — reset backoff
+            this.state.hpSpawnCount = 0;
+          }
+        }
 
-        this.callbacks.onLoopStatus?.('Spawning hypothesis planner — no pending or in-progress prompts');
+        // Apply exponential backoff for unproductive spawns
+        const cooldownMs = SPAWN_COOLDOWN_MS * Math.pow(2, Math.min(this.state.hpSpawnCount, 4));
+        if (
+          this.state.lastExecutorSpawnTime &&
+          Date.now() - this.state.lastExecutorSpawnTime < cooldownMs
+        ) {
+          this.callbacks.onLoopStatus?.(
+            `Hypothesis planner backoff: waiting ${cooldownMs / 1000}s (${this.state.hpSpawnCount} unproductive spawns)`
+          );
+          return;
+        }
+
+        // Spawn hypothesis planner
+        this.state.lastExecutorSpawnTime = Date.now();
+        this.state.hpLastPromptCount = currentPromptCount;
+
+        this.callbacks.onLoopStatus?.(
+          `Spawning hypothesis planner (attempt ${this.state.hpSpawnCount + 1})`
+        );
         this.callbacks.onSpawnHypothesisPlanner?.();
         return;
       }
