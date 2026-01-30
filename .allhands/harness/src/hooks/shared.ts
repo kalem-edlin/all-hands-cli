@@ -554,7 +554,7 @@ export interface EventLoopSettings {
 
 /** PR review detection and triggering settings */
 export interface PRReviewSettings {
-  reviewDetectionString?: string;
+  reviewMatchPattern?: string;
   rerunComment?: string;
   checkFrequency?: number;
 }

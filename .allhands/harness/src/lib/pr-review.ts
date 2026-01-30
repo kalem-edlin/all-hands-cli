@@ -45,17 +45,17 @@ export function parsePRUrl(url: string): PRInfo | null {
 /**
  * Check the current PR review status
  *
- * Examines PR comments to find those containing the detection string,
- * optionally filtering to only include comments after a specific time.
+ * Examines PR comments to find those matching the pattern against
+ * comment author name or body, optionally filtering by time.
  *
  * @param prUrl - The PR URL to check
- * @param reviewDetectionString - String to match in comment body (case-insensitive)
+ * @param reviewMatchPattern - Pattern to match against comment author name and body (case-insensitive)
  * @param afterTime - Only consider comments created after this ISO timestamp
  * @param cwd - Working directory for gh CLI
  */
 export async function checkPRReviewStatus(
   prUrl: string,
-  reviewDetectionString: string,
+  reviewMatchPattern: string,
   afterTime?: string,
   cwd?: string
 ): Promise<PRReviewState> {
@@ -73,7 +73,7 @@ export async function checkPRReviewStatus(
     // Fetch all PR comments (both review comments and issue comments)
     // We need to check both endpoints since reviewers may post to either
     const reviewCommentsOutput = execSync(
-      `gh api repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.number}/comments --jq '.[] | {id: .id, body: .body, created_at: .created_at}'`,
+      `gh api repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.number}/comments --jq '.[] | {id: .id, body: .body, user: .user.login, created_at: .created_at}'`,
       {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -82,7 +82,7 @@ export async function checkPRReviewStatus(
     );
 
     const issueCommentsOutput = execSync(
-      `gh api repos/${prInfo.owner}/${prInfo.repo}/issues/${prInfo.number}/comments --jq '.[] | {id: .id, body: .body, created_at: .created_at}'`,
+      `gh api repos/${prInfo.owner}/${prInfo.repo}/issues/${prInfo.number}/comments --jq '.[] | {id: .id, body: .body, user: .user.login, created_at: .created_at}'`,
       {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -101,16 +101,16 @@ export async function checkPRReviewStatus(
       .filter(Boolean)
       .map((line) => {
         try {
-          return JSON.parse(line) as { id: number; body: string; created_at: string };
+          return JSON.parse(line) as { id: number; body: string; user: string; created_at: string };
         } catch {
           return null;
         }
       })
-      .filter((c): c is { id: number; body: string; created_at: string } => c !== null);
+      .filter((c): c is { id: number; body: string; user: string; created_at: string } => c !== null);
 
-    // Filter comments that contain the detection string (case-insensitive)
-    const detectionRegex = new RegExp(reviewDetectionString, 'i');
-    let matchingComments = allComments.filter((c) => detectionRegex.test(c.body));
+    // Filter comments where author name or body matches the pattern (case-insensitive)
+    const matchRegex = new RegExp(reviewMatchPattern, 'i');
+    let matchingComments = allComments.filter((c) => matchRegex.test(c.user) || matchRegex.test(c.body));
 
     // Filter by afterTime if provided
     if (afterTime) {

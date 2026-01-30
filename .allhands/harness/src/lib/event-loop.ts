@@ -83,7 +83,7 @@ export class EventLoop {
 
   // PR review settings from .allhands/settings.json
   private prReviewCheckFrequency: number;
-  private reviewDetectionString: string;
+  private reviewMatchPattern: string;
   private rerunComment: string;
 
   constructor(
@@ -98,7 +98,7 @@ export class EventLoop {
     const settings = loadProjectSettings();
     this.pollIntervalMs = pollIntervalMs ?? settings?.eventLoop?.tickIntervalMs ?? 5000;
     this.prReviewCheckFrequency = settings?.prReview?.checkFrequency ?? 3;
-    this.reviewDetectionString = settings?.prReview?.reviewDetectionString ?? 'greptile';
+    this.reviewMatchPattern = settings?.prReview?.reviewMatchPattern ?? 'greptile';
     this.rerunComment = settings?.prReview?.rerunComment ?? '@greptile';
 
     // Initialize state based on current branch
@@ -277,7 +277,7 @@ export class EventLoop {
       // Get current PR review state
       const currentState = await checkPRReviewStatus(
         this.state.prUrl,
-        this.reviewDetectionString,
+        this.reviewMatchPattern,
         afterTime,
         this.cwd
       );

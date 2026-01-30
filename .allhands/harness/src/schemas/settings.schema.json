@@ -184,10 +184,10 @@
       "type": "object",
       "description": "PR review detection and triggering settings",
       "properties": {
-        "reviewDetectionString": {
+        "reviewMatchPattern": {
           "type": "string",
           "default": "greptile",
-          "description": "String to match in PR comments to detect a review (case-insensitive)"
+          "description": "Pattern to match against PR comment author name and body to detect a review (case-insensitive)"
         },
         "rerunComment": {
           "type": "string",

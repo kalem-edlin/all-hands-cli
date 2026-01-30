@@ -46,7 +46,7 @@
     "tickIntervalMs": 5000
   },
   "prReview": {
-    "reviewDetectionString": "greptile-apps",
+    "reviewMatchPattern": "greptile-apps",
     "rerunComment": "@greptileai",
     "checkFrequency": 3
   },
