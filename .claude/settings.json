@@ -118,6 +118,16 @@
             "command": "ah hooks validation schema-pre"
           }
         ]
+      },
+      {
+        "matcher": "TaskOutput",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ah hooks context transcript-safeguard-pre",
+            "timeout": 90
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -144,16 +154,6 @@
           {
             "type": "command",
             "command": "ah hooks context edit-notify"
-          }
-        ]
-      },
-      {
-        "matcher": "TaskOutput",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "ah hooks context transcript-safeguard",
-            "timeout": 90
           }
         ]
       }

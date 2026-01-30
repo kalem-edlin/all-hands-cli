@@ -26,9 +26,8 @@ import {
   registerCategory,
   registerCategoryForDaemon,
 } from './shared.js';
-import { logHookSuccess, logEvent } from '../lib/trace-store.js';
+import { logHookSuccess } from '../lib/trace-store.js';
 import { sendNotification } from '../lib/notification.js';
-import { ask, getCompactionProvider } from '../lib/llm.js';
 import {
   isTldrInstalled,
   isTldrDaemonRunning,
@@ -56,7 +55,7 @@ const HOOK_IMPORT_VALIDATE = 'context import-validate';
 const HOOK_EDIT_NOTIFY = 'context edit-notify';
 const HOOK_READ_ENFORCER = 'context read-enforcer';
 const HOOK_SEARCH_ROUTER = 'context search-router';
-const HOOK_TRANSCRIPT_SAFEGUARD = 'context transcript-safeguard';
+const HOOK_TRANSCRIPT_SAFEGUARD_PRE = 'context transcript-safeguard-pre';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Intent Detection
@@ -1304,204 +1303,27 @@ function impactRefactor(input: HookInput): void {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PostToolUse: transcript-safeguard (TaskOutput)
+// PreToolUse: transcript-safeguard-pre (TaskOutput)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Minimum length in chars to consider checking for transcript dump */
-const TRANSCRIPT_MIN_LENGTH = 5000;
-
-/** Threshold above which we definitely have a transcript dump */
-const TRANSCRIPT_DEFINITE_LENGTH = 15000;
-
-/** Transcript marker fields that indicate JSONL conversation format */
-const TRANSCRIPT_MARKERS = ['parentUuid', 'sessionId', 'agentId', 'isSidechain', 'type', 'message', 'uuid', 'timestamp'];
 
 /**
- * Check if a string looks like a Claude Code transcript dump.
+ * PreToolUse transcript safeguard — blocks all TaskOutput calls.
  *
- * Transcript dumps have these characteristics:
- * - Multiple JSON objects (JSONL format)
- * - Each line contains conversation metadata: parentUuid, sessionId, agentId, etc.
- * - Very long content (thousands of characters)
+ * Background tasks broadcast a completion notification with their result
+ * when they finish. Calling TaskOutput is redundant and risks dumping
+ * a massive raw transcript into context. Always deny.
  */
-function isTranscriptDump(content: string): boolean {
-  if (!content || content.length < TRANSCRIPT_MIN_LENGTH) {
-    return false;
-  }
-
-  // If it's extremely long, it's almost certainly a dump
-  if (content.length > TRANSCRIPT_DEFINITE_LENGTH) {
-    // Quick check for any transcript marker
-    const hasMarker = TRANSCRIPT_MARKERS.some(marker => content.includes(`"${marker}"`));
-    if (hasMarker) {
-      return true;
-    }
-  }
-
-  // Count transcript markers in the content
-  let markerCount = 0;
-  for (const marker of TRANSCRIPT_MARKERS) {
-    // Count occurrences - multiple occurrences indicate JSONL lines
-    const regex = new RegExp(`"${marker}"\\s*:`, 'g');
-    const matches = content.match(regex);
-    if (matches && matches.length >= 3) {
-      markerCount++;
-    }
-  }
-
-  // If we have multiple markers appearing multiple times, it's a transcript
-  return markerCount >= 4;
-}
-
-/**
- * Extract the original prompt/question from the TaskOutput tool_input.
- * This helps Gemini understand what the agent was trying to accomplish.
- */
-function extractOriginalPrompt(input: HookInput): string {
-  // TaskOutput may have task_id but not the original prompt
-  // The prompt would be in the parent Task call, not TaskOutput
-  // For now, we'll work with what we have
-  const taskId = input.tool_input?.task_id as string;
-  return taskId ? `Task ID: ${taskId}` : 'Unknown task';
-}
-
-/**
- * Summarize a transcript dump using Gemini.
- *
- * Extracts the key information from the transcript:
- * - What task was being performed
- * - Key findings/results
- * - Final conclusion/recommendation
- */
-async function summarizeTranscriptDump(transcript: string, originalPrompt: string): Promise<string> {
-  // Truncate transcript for Gemini (it has large context but we don't need everything)
-  const maxChars = 100000; // 100k chars should be plenty for summarization
-  const truncatedTranscript = transcript.length > maxChars
-    ? transcript.slice(0, maxChars) + '\n\n... (transcript truncated for summarization)'
-    : transcript;
-
-  const prompt = `You are summarizing the output of a Claude Code agent task.
-
-## Original Task
-${originalPrompt}
-
-## Agent Transcript (JSONL format)
-The following is the full conversation transcript from the agent. Extract the key results and findings.
-
-${truncatedTranscript}
-
-## Instructions
-Summarize the agent's work into a concise result that answers the original task. Focus on:
-1. What was accomplished
-2. Key findings or results
-3. Any recommendations or conclusions
-4. Files examined or modified (if any)
-
-Keep the summary concise (under 2000 characters) but include all essential information.
-Format the response as clean markdown that can be displayed to another agent.
-
-## Summary`;
-
-  try {
-    const result = await ask(prompt, {
-      provider: getCompactionProvider(),
-      context: 'You are summarizing an agent transcript. Be concise but thorough.',
-    });
-
-    return result.text;
-  } catch (error) {
-    // If summarization fails, return a truncated version
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    return `## Summarization Failed
-
-Error: ${errorMsg}
-
-## Partial Transcript (first 3000 chars)
-\`\`\`
-${transcript.slice(0, 3000)}
-\`\`\`
-
-... (${transcript.length} total characters)`;
-  }
-}
-
-/** Size threshold (chars) above which TaskOutput results are summarized to prevent context explosion */
-const TASK_OUTPUT_SUMMARIZE_THRESHOLD = 50000; // 50KB
-
-/**
- * Transcript Safeguard - intercepts oversized TaskOutput results.
- *
- * TaskOutput regularly returns massive results (hundreds of KB to over 1MB)
- * that explode the parent agent's context. This hook summarizes any result
- * exceeding TASK_OUTPUT_SUMMARIZE_THRESHOLD via the compaction provider,
- * regardless of content shape (transcript dumps, large agent output, etc.).
- */
-async function transcriptSafeguard(input: HookInput): Promise<void> {
-  // Only process TaskOutput
+function transcriptSafeguardPre(input: HookInput): void {
   if (input.tool_name !== 'TaskOutput') {
-    return allowTool(HOOK_TRANSCRIPT_SAFEGUARD);
+    return allowTool(HOOK_TRANSCRIPT_SAFEGUARD_PRE);
   }
 
-  // Get the tool result
-  const toolResult = input.tool_result;
-  if (!toolResult) {
-    return allowTool(HOOK_TRANSCRIPT_SAFEGUARD);
-  }
-
-  // Convert to string for analysis
-  const resultStr = typeof toolResult === 'string'
-    ? toolResult
-    : JSON.stringify(toolResult);
-
-  // Allow small results through without summarization
-  if (resultStr.length <= TASK_OUTPUT_SUMMARIZE_THRESHOLD) {
-    return allowTool(HOOK_TRANSCRIPT_SAFEGUARD);
-  }
-
-  const isTranscript = isTranscriptDump(resultStr);
-
-  // Guard logging + notification so they cannot crash the handler before summarization
-  try {
-    logEvent('harness.error', {
-      source: 'context.transcript-safeguard',
-      action: 'summarize',
-      isTranscript,
-      resultLength: resultStr.length,
-    });
-
-    logHookSuccess(HOOK_TRANSCRIPT_SAFEGUARD, {
-      action: 'summarize',
-      originalLength: resultStr.length,
-      isTranscript,
-    });
-
-    sendNotification({
-      title: 'Transcript Safeguard',
-      message: `Compacting oversized TaskOutput (${Math.round(resultStr.length / 1024)}KB) — summarizing...`,
-      type: 'alert',
-    });
-  } catch {
-    // Logging/notification failure must not prevent summarization
-  }
-
-  // Summarize using compaction provider
-  const originalPrompt = extractOriginalPrompt(input);
-  const summary = await summarizeTranscriptDump(resultStr, originalPrompt);
-
-  // Build the response like read-enforcer does
-  const parts: string[] = [
-    '## TaskOutput Result (Summarized)',
-    '',
-    `**Note**: The agent result was ${Math.round(resultStr.length / 1024)}KB and has been`,
-    'automatically summarized to prevent context explosion.',
-    '',
-    '---',
-    '',
-    summary,
-  ];
-
-  // Use outputContext to return the summary (blocks original and shows this instead)
-  outputContext(parts.join('\n'), HOOK_TRANSCRIPT_SAFEGUARD);
+  denyTool(
+    'TaskOutput is not needed — background task completion notifications already include agent results. ' +
+    'Continue executing your current flow.',
+    HOOK_TRANSCRIPT_SAFEGUARD_PRE,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1556,6 +1378,13 @@ export const category: HookCategory = {
       errorFallback: { type: 'allowTool' },
       logPayload: (input) => ({ tool: input.tool_name, pattern: input.tool_input?.pattern }),
     },
+    {
+      name: 'transcript-safeguard-pre',
+      description: 'Intercept oversized TaskOutput before execution (PreToolUse:TaskOutput)',
+      handler: transcriptSafeguardPre,
+      errorFallback: { type: 'allowTool' },
+      logPayload: (input) => ({ tool: input.tool_name, taskId: input.tool_input?.task_id }),
+    },
     // PostToolUse hooks
     {
       name: 'diagnostics',
@@ -1577,18 +1406,6 @@ export const category: HookCategory = {
       handler: editNotify,
       errorFallback: { type: 'allowTool' },
       logPayload: (input) => ({ tool: input.tool_name, file: input.tool_input?.file_path }),
-    },
-    {
-      name: 'transcript-safeguard',
-      description: 'Summarize transcript dumps in TaskOutput (PostToolUse:TaskOutput)',
-      handler: transcriptSafeguard,
-      errorFallback: { type: 'allowTool' },
-      logPayload: (input) => ({
-        tool: input.tool_name,
-        resultLength: typeof input.tool_result === 'string'
-          ? input.tool_result.length
-          : JSON.stringify(input.tool_result || '').length,
-      }),
     },
     // UserPromptSubmit hooks
     {
