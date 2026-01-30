@@ -19,25 +19,31 @@ frontmatter:
     required: true
     description: "File patterns this suite validates (used for discovery and future hooks)"
 
+  tools:
+    type: array
+    items: string
+    required: true
+    description: "CLI tools and packages used by this validation suite (e.g., agent-browser, playwright, axe-core)"
+
 body:
-  description: "Validation tooling usage guide - how to use this suite for acceptance criteria"
+  description: "Validation tooling usage guide — two-dimensional (stochastic + deterministic) validation playbook"
   sections:
     - name: "Purpose"
       required: true
-      description: "What quality aspects this validates (stability, performance, UX, etc.)"
+      description: "What quality aspects this suite validates (stability, performance, UX, accessibility, etc.)"
 
-    - name: "When to Use"
+    - name: "Tooling"
       required: true
-      description: "Task patterns and scenarios that need this validation"
+      description: "Tools used by this suite, installation instructions, and configuration"
 
-    - name: "Validation Commands"
+    - name: "Stochastic Validation"
       required: true
-      description: "CLI commands, scripts, and programmatic invocations"
+      description: "Agent-driven exploratory validation playbook. Exploratory patterns, edge case probing strategies, and escape hatches for death spirals (max retries, fallback patterns, when to stop and report)"
 
-    - name: "Interpreting Results"
+    - name: "Deterministic Integration"
       required: true
-      description: "How to read output, what failures mean, common issues"
+      description: "CI-gated scripted validation. Test scripts, CI configuration, success/failure criteria, and artifact capture"
 
-    - name: "CICD Integration"
+    - name: "ENV Configuration"
       required: false
-      description: "Pipeline configuration to add (if applicable for automated validation)"
+      description: "Environment variables and configuration needed for both dimensions. Only present when the suite requires external configuration (base URLs, credentials, providers)"

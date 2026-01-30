@@ -31,7 +31,7 @@ If the E2E test plan already exists:
 
 - Read the alignment doc for goal, objectives, acceptance criteria, and prompt execution summaries
 - Review changed files from base branch (avoid information overload on full diffs)
-- Run `ah validation-tools list` to identify available validation suites
+- Run `ah validation-tools list` to identify available validation suites — the `tools` field in suite output helps identify which tooling is available for both stochastic and deterministic dimensions
 - Examine implementation artifacts for infrastructure setup information:
   - Commit messages describing setup/configuration changes
   - Prompt summaries mentioning services, dependencies, or environment setup
@@ -43,6 +43,8 @@ If the E2E test plan already exists:
 Per **Context is Precious**, structure the plan as progressive sections - each building on the previous.
 
 ### Section 1: Deterministic Test Summary
+
+This section corresponds to the **Deterministic Integration** dimension of referenced validation suites. Commands here should be drawn from suite Deterministic Integration sections where suites are referenced.
 
 Per **Context is Precious**, present as a concise command list with inline comments:
 
@@ -96,8 +98,10 @@ This section validates documentation quality - if setup cannot be derived from i
 
 ### Section 3: AI-Coordinated Validation (Conditional)
 
+This section corresponds to the **Stochastic Validation** dimension. Agent-driven validation tasks here should reference suite Stochastic Validation playbooks for structured exploration patterns.
+
 **Only include if validation tooling supports agentic testing.** Types of tooling that qualify:
-- UI automation (Playwright MCP, simulator automation, browser MCPs)
+- UI automation (Playwright MCP, agent-browser, simulator automation, browser MCPs)
 - Load testing tools (k6, artillery, locust with agent coordination)
 - Performance profiling (flamegraphs, memory profilers, bundle analyzers)
 - Database inspection/scripting (query tools, migration validators, data generators)

@@ -23,9 +23,9 @@ Execute prompt tasks with full context, validate thoroughly, and document your w
 ## Implementation
 
 - Follow tasks and break them down into Todos if necessary
-- After implementation, 
-  - Read `validation_suites` frontmatter entries for validation commands and result interpretation
-  - use validation tooling to acquire test data meeting acceptance criteria
+- After implementation,
+  - Read `validation_suites` frontmatter entries. During implementation, follow the **Stochastic Validation** section for exploratory validation — use model intuition to probe edge cases, test user flows, and verify quality beyond what deterministic checks cover.
+  - Use validation tooling to acquire test data meeting acceptance criteria
 
 ### Deviation Handling
 
@@ -42,6 +42,7 @@ If architectural deviation is needed, document the blocker and set `status: bloc
 
 ## Validation
 
+- Acceptance criteria validation uses the **Deterministic Integration** section of referenced suites — these are binary pass/fail commands that gate completion. Stochastic exploration during implementation informs quality but does not replace deterministic acceptance criteria.
 - Spawn subtask to read `.allhands/flows/shared/PROMPT_VALIDATION_REVIEW.md` and follow its instructions
   - Include validation results and `validation_suites` file paths in subtask inputs
 - Act on feedback until it passes

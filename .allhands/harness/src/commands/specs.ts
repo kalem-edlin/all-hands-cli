@@ -544,7 +544,7 @@ export function register(program: Command): void {
       // Read current frontmatter to check for existing branch
       const frontmatter = parseSpecFrontmatter(absolutePath);
 
-      // Handle branch creation if not disabled
+      // Resolve branch name before committing (needed for frontmatter update)
       if (options.branch !== false) {
         // Use existing branch from frontmatter, or use the default
         if (frontmatter?.branch) {
@@ -560,22 +560,6 @@ export function register(program: Command): void {
           specBranch = `${baseBranchName}-${suffix}`;
           existingSpec = findSpecByBranch(specBranch, gitRoot);
         }
-
-        // Create the branch from base without checkout
-        const branchResult = createBranchWithoutCheckout(specBranch, baseBranch, gitRoot);
-
-        if (!branchResult.success) {
-          const error = `Failed to create branch: ${branchResult.error}`;
-          logCommandError(commandName, error, commandArgs);
-          if (options.json) {
-            console.log(JSON.stringify({ success: false, error }));
-          } else {
-            console.error(error);
-          }
-          process.exit(1);
-        }
-
-        branchCreated = branchResult.created;
 
         // Update spec frontmatter with branch if missing or changed due to collision
         if (!frontmatter?.branch || frontmatter.branch !== specBranch) {
@@ -602,7 +586,8 @@ export function register(program: Command): void {
         }
       }
 
-      // Use generic git utility to commit to base branch
+      // Commit spec to base branch BEFORE creating feature branch
+      // so the feature branch includes the spec file
       const result = commitFilesToBranch({
         files: [absolutePath],
         branch: baseBranch,
@@ -619,6 +604,24 @@ export function register(program: Command): void {
           console.error(`Failed to persist spec: ${error}`);
         }
         process.exit(1);
+      }
+
+      // Create feature branch from base AFTER commit, so it includes the spec file
+      if (options.branch !== false) {
+        const branchResult = createBranchWithoutCheckout(specBranch, baseBranch, gitRoot);
+
+        if (!branchResult.success) {
+          const error = `Failed to create branch: ${branchResult.error}`;
+          logCommandError(commandName, error, commandArgs);
+          if (options.json) {
+            console.log(JSON.stringify({ success: false, error }));
+          } else {
+            console.error(error);
+          }
+          process.exit(1);
+        }
+
+        branchCreated = branchResult.created;
       }
 
       // Log success

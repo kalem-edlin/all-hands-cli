@@ -1,10 +1,42 @@
 ---
-description: "Three shared flows for discovering validation suites, extracting domain skills, and applying TDD methodology during prompt execution"
+description: "Validation practice model (stochastic vs deterministic dimensions, crystallization lifecycle, suite existence threshold), suite discovery, domain skills extraction, and TDD methodology during prompt execution"
 ---
 
 # Validation and Skills Integration
 
 These three shared flows form the quality infrastructure that prompt curation and execution depend on. They are invoked as sub-flows -- typically from prompt curation -- to ensure every prompt carries the right validation suites, domain expertise, and testing methodology.
+
+## Two-Dimensional Validation Practice Model
+
+Per **Agentic Validation Tooling**, every validation domain has two first-class dimensions:
+
+| Dimension | Nature | Phase | Purpose |
+|-----------|--------|-------|---------|
+| **Stochastic** | Agent-driven exploratory testing using model intuition | During implementation | Probe edge cases, test user flows, verify quality beyond deterministic checks |
+| **Deterministic** | Binary pass/fail gating | Acceptance criteria | CI/CD-enforceable commands that gate completion |
+
+These dimensions map to suite body sections: **Stochastic Validation** teaches agents how to explore; **Deterministic Integration** provides the commands that gate acceptance criteria.
+
+### Suite Existence Threshold
+
+A validation suite MUST have a meaningful stochastic dimension to justify existing. Per [ref:.allhands/principles.md::6668667], deterministic-only tools (type checking, linting, formatting) are test commands referenced directly in acceptance criteria and CI/CD -- they are NOT suites.
+
+### Crystallization Lifecycle
+
+Stochastic exploration and deterministic gating are connected by a compounding lifecycle:
+
+```mermaid
+stateDiagram-v2
+    [*] --> StochasticExploration: Agent discovers patterns
+    StochasticExploration --> PatternStabilization: Repeatable pattern emerges
+    PatternStabilization --> DeterministicCheck: Crystallization promotion
+    DeterministicCheck --> CICD: Entrenched in pipeline
+    CICD --> StochasticExploration: Exploration shifts to frontier
+```
+
+Per [ref:.allhands/flows/COMPOUNDING.md::29f9dfe], the compounding flow evaluates crystallization during its Tooling Signals phase and promotes stable stochastic patterns into deterministic checks during Harness Improvement.
+
+---
 
 ## How These Flows Connect
 
@@ -33,19 +65,24 @@ This flow matches implementation tasks to existing validation suites. Per **Agen
 
 ### Discovery Pipeline
 
-1. **Discover**: Run `ah validation-tools list` to get available suites (name, description, globs, file path)
+1. **Discover**: Run `ah validation-tools list` to get available suites (name, description, globs, file path, `tools`)
 2. **Match**: Two parallel approaches:
    - Glob pattern matching against files being touched
    - Semantic inference from suite descriptions against task nature
-3. **Read**: For each matched suite, read its purpose, validation commands, and result interpretation
-4. **Integrate**: Derive acceptance criteria from validation commands; add suite paths to `validation_suites` frontmatter
+   - The `tools` field identifies which tooling each suite wraps -- useful for matching against available MCP tools and installed CLI commands
+3. **Read**: For each matched suite, read its body sections:
+   - **Stochastic Validation** -- how agents explore quality during implementation
+   - **Deterministic Integration** -- CI-gated commands for acceptance criteria
+4. **Integrate**: Derive acceptance criteria from **Deterministic Integration** commands; use **Stochastic Validation** during implementation. Add suite paths to `validation_suites` frontmatter.
 5. **Gap analysis**: Document unmatched validation needs for future `CREATE_VALIDATION_TOOLING`
 
 ### Validation Ordering
 
-Acceptance criteria are ordered progressively to fail fast:
+Acceptance criteria (deterministic dimension) are ordered progressively to fail fast:
 
 > Compiles --> Unit tests --> Integration tests --> E2E
+
+Stochastic exploration during implementation is not ordered -- agents follow model intuition to probe quality.
 
 ---
 

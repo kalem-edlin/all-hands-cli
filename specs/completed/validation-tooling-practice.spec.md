@@ -1,7 +1,7 @@
 ---
 name: validation-tooling-practice
 domain_name: validation
-status: roadmap
+status: completed
 dependencies: []
 branch: feature/validation-tooling-practice
 ---
@@ -63,3 +63,36 @@ Engineer desires a two-dimensional validation model where every suite covers the
 - **Pillar 10 in `pillars.md`**: The newly created `pillars.md` describes Agentic Validation Tooling as the 10th pillar. The practices established in this milestone are the concrete realization of that pillar. No changes to `pillars.md` are needed — it already captures the two-dimensional model at the pillar level
 - **Stochastic terminology**: Engineer deliberately chose "stochastic" over "heuristic" — deterministic/stochastic is an established CS pair. All flows and documentation should use this terminology consistently
 - **Suite existence threshold enforcement**: Assuming the CREATE_VALIDATION_TOOLING_SPEC flow update is sufficient to enforce the threshold during suite creation. No programmatic enforcement needed — per **Frontier Models are Capable**, the flow guidance is sufficient
+
+## Implementation Reality
+
+### What was actually implemented vs planned
+
+All 7 Goals were achieved, with one significant pivot and substantial emergent work:
+
+**Goal 6 pivoted**: Spec planned `supabase-database.md` but implementation created `browser-automation.md` instead. The engineer chose browser automation as the first suite — it demonstrated the stochastic/deterministic model more clearly with agent-browser (stochastic) and Playwright (deterministic) as distinct tools for each dimension. Open Questions about Supabase CLI setup and data seeding became moot.
+
+**Goal 7 resolved by design**: Deterministic-only tools were defined as "not suites" through principle/flow updates. No separate schema or directory was needed.
+
+**Open Question on hook validation**: Resolved — `validateFrontmatter()` only checks frontmatter fields, not body sections. Body section definitions in the schema YAML are documentation-only, not hook-enforced. Accepted per **Frontier Models are Capable**.
+
+### How engineer desires evolved
+
+1. **Documentation philosophy reversal (Prompt 05→09)**: Engineer initially chose detailed CLI commands for browser-automation suite, then reversed after hands-on agent-browser testing. Discovery: commands are discoverable via `--help`; suite value is teaching agents HOW TO THINK about using a tool. This spawned Prompt 08 (suite creation flow refinement with documentation principles) before Prompt 09 applied it.
+
+2. **Pillar terminology override**: Engineer overrode spec instruction to "leave pillars.md as-is" and updated "heuristic" → "stochastic" for cross-document consistency.
+
+3. **validation-playwright.spec.md**: Engineer deleted directly rather than marking superseded through the review process.
+
+### Emergent work (all kept)
+
+- **147 new tests** across 3 emergent testing prompts (06, 07, 10) for previously untested schema validation infrastructure
+- **Suite creation flow refinement** (Prompt 08) — Tool Validation phase, documentation principles, evidence capture guidance, 6-subsection stochastic structure
+- **Dual validation path consolidation** — Emergent testing (Prompt 10) documented 4 divergences between `hooks/validation.ts` and `lib/schema.ts`, enabling Jury Review to consolidate both paths into single-source-of-truth delegation
+
+### Key technical decisions
+
+- **Schema enforcement is frontmatter-only**: Body section validation is documentation-only in schema YAML, not hook-enforced. Per **Frontier Models are Capable**, flow guidance suffices.
+- **Triple extractFrontmatter consolidation**: `hooks/validation.ts`, `commands/validation-tools.ts`, and `lib/schema.ts` all had independent implementations. Consolidated to lib as single source of truth.
+- **Array item-type validation**: Added to both validation paths — `tools: [123]` now rejected when `items: string` specified in schema.
+- **blockTool format mismatch**: Discovered `blockTool()` outputs `{ decision: 'block' }` while hook-runner expects `{ continue: false }`. Documented as known harness inconsistency.

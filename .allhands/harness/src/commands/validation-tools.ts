@@ -11,8 +11,8 @@ import { Command } from 'commander';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { parse as parseYaml } from 'yaml';
 import { tracedAction } from '../lib/base-command.js';
+import { extractFrontmatter, loadSchema, validateFrontmatter } from '../lib/schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,31 +21,15 @@ interface ValidationSuiteFrontmatter {
   name: string;
   description: string;
   globs: string[];
+  tools: string[];
 }
 
 interface ValidationSuiteEntry {
   name: string;
   description: string;
   globs: string[];
+  tools: string[];
   file: string;
-}
-
-/**
- * Extract frontmatter from markdown content
- */
-function extractFrontmatter(content: string): Record<string, unknown> | null {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
-  const match = content.match(frontmatterRegex);
-
-  if (!match) {
-    return null;
-  }
-
-  try {
-    return parseYaml(match[1]) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -66,19 +50,26 @@ function listValidationSuites(): ValidationSuiteEntry[] {
     return [];
   }
 
+  const schema = loadSchema('validation-suite');
+  if (!schema) {
+    return [];
+  }
+
   const files = readdirSync(dir).filter(f => f.endsWith('.md'));
   const suites: ValidationSuiteEntry[] = [];
 
   for (const file of files) {
     const filePath = join(dir, file);
     const content = readFileSync(filePath, 'utf-8');
-    const frontmatter = extractFrontmatter(content) as ValidationSuiteFrontmatter | null;
+    const { frontmatter: rawFm } = extractFrontmatter(content);
 
-    if (frontmatter && frontmatter.name && frontmatter.description && frontmatter.globs) {
+    if (rawFm && validateFrontmatter(rawFm, schema).valid) {
+      const fm = rawFm as unknown as ValidationSuiteFrontmatter;
       suites.push({
-        name: frontmatter.name,
-        description: frontmatter.description,
-        globs: frontmatter.globs,
+        name: fm.name,
+        description: fm.description,
+        globs: fm.globs,
+        tools: fm.tools,
         file: `.allhands/validation/${file}`,
       });
     }

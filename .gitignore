@@ -12,3 +12,7 @@ node_modules/
 !.tldr/config.json
 .reposearch/
 docs/
+
+# Orphaned planning artifacts at repo root
+supabase-validation-ideas.md
+validation-tooling-practice.md

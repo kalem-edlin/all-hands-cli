@@ -29,36 +29,46 @@ For TypeScript, [ref:.allhands/harness/src/hooks/validation.ts:findTsConfig:d7e4
 
 Schema validation targets frontmatter in markdown files used by the harness (prompts, specs, alignment docs, flow files).
 
+### Delegation Architecture
+
+Schema parsing and validation logic lives in [ref:.allhands/harness/src/lib/schema.ts::a79f0ca]. The hooks layer (`validation.ts`) delegates all core operations there:
+
+- **Frontmatter extraction** -- [ref:.allhands/harness/src/lib/schema.ts:extractFrontmatter:a79f0ca] (imported into hooks)
+- **Schema loading** -- [ref:.allhands/harness/src/lib/schema.ts:loadSchema:a79f0ca] (imported as `loadSchemaFromLib`)
+- **Frontmatter validation** -- [ref:.allhands/harness/src/lib/schema.ts:validateFrontmatter:a79f0ca] (imported as `validateFrontmatterFromLib`)
+
+This consolidation eliminated 4 behavioral divergences that existed when hooks had their own implementations:
+
+1. Frontmatter parsing regex required a trailing newline after the closing `---` in hooks but not in lib
+2. Hooks were missing `boolean`, `date`, and `object` type validation branches
+3. Return type shape differences between hooks and lib validation results
+4. Schema field fallback behavior (`schema.fields` vs `schema.frontmatter`) was inconsistent
+
 ```mermaid
 flowchart TD
-    A[File written] --> B{Detect schema type}
-    B -->|prompt| C[Load prompt schema]
-    B -->|spec| D[Load spec schema]
-    B -->|flow| E[Load flow schema]
+    A[File written] --> B{detectSchemaTypeLocal}
+    B -->|prompt| C[lib/schema.ts: loadSchema]
+    B -->|spec| C
+    B -->|flow| C
     B -->|unknown| F[Skip validation]
-    C --> G[Parse YAML frontmatter]
-    D --> G
-    E --> G
+    C --> G[lib/schema.ts: extractFrontmatter]
     G --> H{Valid YAML?}
     H -->|No| I[Report parse error]
-    H -->|Yes| J[Validate required fields]
-    J --> K{Skill-specific rules?}
+    H -->|Yes| J[lib/schema.ts: validateFrontmatter]
+    J --> K{Skill file?}
     K -->|Yes| L[validateSkillSpecificRules]
-    K -->|No| M[Format errors]
+    K -->|No| M[formatSchemaErrors]
     L --> M
     M --> N[Return to agent]
 ```
 
 ### Key Functions
 
-- [ref:.allhands/harness/src/hooks/validation.ts:parseFrontmatter:d7e4a93] -- Extracts YAML frontmatter from markdown content between `---` delimiters
-- [ref:.allhands/harness/src/hooks/validation.ts:detectSchemaTypeLocal:d7e4a93] -- Determines which schema applies based on file path patterns
-- [ref:.allhands/harness/src/hooks/validation.ts:loadSchema:d7e4a93] -- Loads the schema definition for a given type
-- [ref:.allhands/harness/src/hooks/validation.ts:validateFrontmatter:d7e4a93] -- Checks parsed frontmatter against schema field requirements (type, required, enum values)
-- [ref:.allhands/harness/src/hooks/validation.ts:validateSkillSpecificRules:d7e4a93] -- Additional validation for skill folders via [ref:.allhands/harness/src/hooks/validation.ts:extractSkillFolderName:d7e4a93]
-- [ref:.allhands/harness/src/hooks/validation.ts:runSchemaValidation:d7e4a93] -- Full pipeline: detect type, load schema, parse frontmatter, validate
-- [ref:.allhands/harness/src/hooks/validation.ts:runSchemaValidationOnContent:d7e4a93] -- Same pipeline but accepts content string instead of reading from disk (used for PreToolUse interception before the file is written)
-- [ref:.allhands/harness/src/hooks/validation.ts:formatSchemaErrors:d7e4a93] -- Formats validation errors with the schema type for agent display
+- [ref:.allhands/harness/src/hooks/validation.ts:detectSchemaTypeLocal:c0bdef0] -- Thin wrapper over [ref:.allhands/harness/src/lib/schema.ts:detectSchemaType:a79f0ca], determines which schema applies based on file path patterns
+- [ref:.allhands/harness/src/hooks/validation.ts:validateSkillSpecificRules:c0bdef0] -- Additional validation for skill folders via [ref:.allhands/harness/src/hooks/validation.ts:extractSkillFolderName:c0bdef0] (skill name must match containing folder)
+- [ref:.allhands/harness/src/hooks/validation.ts:runSchemaValidation:c0bdef0] -- Full pipeline: detect type, delegate to lib for schema load/parse/validate, then apply skill-specific rules
+- [ref:.allhands/harness/src/hooks/validation.ts:runSchemaValidationOnContent:c0bdef0] -- Same pipeline but accepts content string instead of reading from disk (used for PreToolUse interception before the file is written)
+- [ref:.allhands/harness/src/hooks/validation.ts:formatSchemaErrors:c0bdef0] -- Formats validation errors with the schema type for agent display
 
 ### Pre vs Post Validation
 
@@ -78,3 +88,10 @@ The pre-validation path is stricter -- it can prevent invalid content from being
 ## Design Decision: Deny vs Context
 
 Schema validation uses [ref:.allhands/harness/src/hooks/shared.ts:denyTool:d7e4a93] for pre-write validation (prevents the tool call) and [ref:.allhands/harness/src/hooks/shared.ts:outputContext:d7e4a93] for post-write diagnostics (informs the agent). This distinction matters: pre-write denial is cheap (no disk I/O wasted), while post-write context lets the agent decide how to remediate.
+
+## Test Coverage
+
+Two e2e test suites verify schema validation behavior:
+
+- [ref:.allhands/harness/src/__tests__/e2e/validation-hooks.test.ts::e059860] -- **28 tests** covering PreToolUse (Write/Edit interception), PostToolUse (file-on-disk validation), and the contract suite verifying hook registration and schema discovery.
+- [ref:.allhands/harness/src/__tests__/e2e/validation-path-consistency.test.ts::e059860] -- **17 tests** documenting the 4 behavioral divergences that existed before delegation consolidation. These tests pin the now-unified behavior: trailing newline handling, boolean/date/object type validation, return type shapes, and schema field fallback paths. Both the lib path and hooks path are exercised to confirm they produce identical results.

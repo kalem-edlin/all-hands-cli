@@ -6,7 +6,8 @@ Extract learnings from completed specs to improve the harness, skills, and valid
 - MUST ask the engineer before modifying harness files
 - MUST write compounding summary to `.planning/<spec>/compounding_summary.md`
 - MUST write non-trivial solutions to `docs/solutions/<category>/`
-- MUST finalize spec in-place before completing
+- MUST add Implementation Reality section to spec in-place before completing
+- NEVER set spec frontmatter `status` — spec lifecycle is engineer-controlled
 - MUST interview engineer before finalizing compounding summary
 - NEVER modify harness without first principle justification
 - NEVER frame emergent prompt work as "scope creep" - per **Quality Engineering**, emergent work discovers valuable variants
@@ -37,6 +38,11 @@ Identify patterns that indicate harness improvement opportunities:
 - Build a per-tool impact map:
   - **Per skill**: What did it catch? What did it miss? Did limitations or decisions reveal guidance gaps?
   - **Per validation suite**: What issues did it surface? What escaped to review? Did it produce false positives?
+  - **Per validation suite — crystallization**: For each suite used during execution, evaluate:
+    - What stochastic patterns were discovered during exploratory validation?
+    - Which patterns are stable and repeatable enough to crystallize into deterministic checks?
+    - Should any new deterministic tests be added to the suite's Deterministic Integration section?
+    - Are there stochastic exploration patterns that should be documented in the suite's Stochastic Validation section for future agents?
   - **Absent tooling**: What validation needs did prompts reveal that no existing suite covers?
 - Per **Agentic Validation Tooling**, this impact map feeds directly into harness improvement specs as evidence (not stored separately)
 
@@ -108,7 +114,6 @@ After all solutions are written, cross-reference related solutions:
 
 **MUST** update the original spec file in-place as a historical record. Per **Knowledge Compounding**, finalized specs become searchable via `ah knowledge docs search` - curate content for future retrieval value.
 
-- Set frontmatter `status: completed`
 - Add `## Implementation Reality` section documenting:
   - What was actually implemented vs originally planned
   - How engineer desires evolved during implementation (decisions, pivots, additions)
@@ -146,7 +151,8 @@ Classify issues from Signal Analysis:
 
 **Validation suite refinements** (inline with approval):
 - Strengthen existing suites with newly discovered check patterns or edge cases
-- Update "Interpreting Results" sections with failure modes encountered during execution
+- Update Stochastic Validation and Deterministic Integration sections with failure modes encountered during execution
+- **Crystallization**: Stable stochastic patterns discovered during execution should be promoted into deterministic checks in the suite's Deterministic Integration section, shifting stochastic exploration to the frontier
 
 **New validation suites**: Per **Agentic Validation Tooling**, if execution revealed validation gaps no existing suite covers:
 - **(A) Create spec** → Invoke `.allhands/flows/shared/CREATE_HARNESS_SPEC.md` with `domain_name: harness`

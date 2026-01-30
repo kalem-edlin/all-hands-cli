@@ -48,6 +48,17 @@ The core analytical phase reads all spec artifacts and identifies patterns acros
 
 The tooling signals phase produces a **per-tool impact map** that cross-references every prompt's skills and validation suites against its summary (Limitations, Decisions, Learnings). This map becomes evidence for harness improvement specs.
 
+### Crystallization Evaluation
+
+Per **Agentic Validation Tooling**, the tooling signals phase also evaluates each validation suite for **crystallization** opportunities. For each suite used during execution:
+
+- What stochastic patterns were discovered during exploratory validation?
+- Which patterns are stable and repeatable enough to crystallize into deterministic checks?
+- Should new deterministic tests be added to the suite's Deterministic Integration section?
+- Are there stochastic exploration patterns that should be documented for future agents?
+
+This evaluation feeds directly into the Harness Improvement phase as evidence for suite refinement per [ref:.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md::c0bdef0].
+
 A key design decision: emergent prompts are never framed as "scope creep." Per **Quality Engineering**, emergent work discovers valuable variants. Reverted emergent work is expected experimentation cost per **Software is Cheap**.
 
 ## Knowledge Outputs
@@ -86,6 +97,10 @@ flowchart TD
 ```
 
 Inline updates (skills, validation suites) require engineer approval. Structural changes always go through a spec. Deferred items are documented in `docs/memories.md` under "Deferred Harness Improvements."
+
+### Crystallization Promotion
+
+Per [ref:.allhands/flows/COMPOUNDING.md::29f9dfe], validation suite refinements include **crystallization promotion**: stable stochastic patterns discovered during execution are promoted into deterministic checks in the suite's Deterministic Integration section. This shifts stochastic exploration to the frontier -- agents no longer need to rediscover patterns that have been automated. The crystallization lifecycle ensures validation compounds across spec executions.
 
 ## Key Design Decisions
 

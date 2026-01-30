@@ -1,5 +1,5 @@
 ---
-description: "Prompt execution lifecycle: context gathering, implementation with deviation handling, validation review gate, and completion protocol with race-condition-safe ordering"
+description: "Prompt execution lifecycle with stochastic/deterministic validation phases: context gathering, implementation with exploratory validation, deterministic acceptance gate, and completion protocol with race-condition-safe ordering"
 ---
 
 # Prompt Task Execution
@@ -24,6 +24,17 @@ stateDiagram-v2
         HandleDeviation --> Blocked: architectural change needed
     }
 ```
+
+## Validation Dimensions in Execution
+
+Per **Agentic Validation Tooling**, the two validation dimensions apply at different phases of prompt execution:
+
+| Phase | Dimension | What Happens |
+|-------|-----------|--------------|
+| **Implementation** | Stochastic | Agent reads suite **Stochastic Validation** sections; uses model intuition to probe edge cases, test user flows, verify quality beyond deterministic checks |
+| **Validation Gate** | Deterministic | Agent runs suite **Deterministic Integration** commands; binary pass/fail gates completion |
+
+Stochastic exploration during implementation informs quality but is not an acceptance criterion. Acceptance criteria must be deterministic -- drawn from suite Deterministic Integration sections per [ref:.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md::c0bdef0].
 
 ## Context Gathering
 
