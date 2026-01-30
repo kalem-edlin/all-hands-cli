@@ -6,7 +6,8 @@ Extract learnings from completed specs to improve the harness, skills, and valid
 - MUST ask the engineer before modifying harness files
 - MUST write compounding summary to `.planning/<spec>/compounding_summary.md`
 - MUST write non-trivial solutions to `docs/solutions/<category>/`
-- MUST finalize spec in-place before completing
+- MUST add Implementation Reality section to spec in-place before completing
+- NEVER set spec frontmatter `status` — spec lifecycle is engineer-controlled
 - MUST interview engineer before finalizing compounding summary
 - NEVER modify harness without first principle justification
 - NEVER frame emergent prompt work as "scope creep" - per **Quality Engineering**, emergent work discovers valuable variants
@@ -113,7 +114,6 @@ After all solutions are written, cross-reference related solutions:
 
 **MUST** update the original spec file in-place as a historical record. Per **Knowledge Compounding**, finalized specs become searchable via `ah knowledge docs search` - curate content for future retrieval value.
 
-- Set frontmatter `status: completed`
 - Add `## Implementation Reality` section documenting:
   - What was actually implemented vs originally planned
   - How engineer desires evolved during implementation (decisions, pivots, additions)

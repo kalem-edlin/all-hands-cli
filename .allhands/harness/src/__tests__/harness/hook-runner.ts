@@ -109,6 +109,8 @@ export async function runHook(
     // PostToolUse output parsing
     if ('continue' in output) {
       hookResult.blocked = output.continue === false;
+    } else if ('decision' in output && output.decision === 'block') {
+      hookResult.blocked = true;
     }
   } else if (result.success && !result.stdout.trim()) {
     // Empty output = allow (for PreToolUse hooks)

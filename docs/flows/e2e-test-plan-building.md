@@ -1,5 +1,5 @@
 ---
-description: "Flow for building comprehensive E2E test plans that provide engineers with deterministic tests, infrastructure setup, and manual verification flows for milestone validation"
+description: "Flow for building comprehensive E2E test plans with dimension-mapped sections: deterministic integration tests, infrastructure setup, stochastic AI-coordinated validation, and manual verification flows for milestone validation"
 ---
 
 # E2E Test Plan Building
@@ -24,13 +24,23 @@ flowchart TD
     S4 -.- N4["Core 'convince the engineer' section"]
 ```
 
+### Dimension Mapping
+
+Per **Agentic Validation Tooling**, the test plan sections map to the two-dimensional validation model:
+
+| Section | Validation Dimension | Suite Body Section |
+|---------|---------------------|--------------------|
+| Section 1: Deterministic Test Summary | **Deterministic** | Commands drawn from suite **Deterministic Integration** sections |
+| Section 3: AI-Coordinated Validation | **Stochastic** | Agent exploration drawn from suite **Stochastic Validation** playbooks |
+| Section 2 & 4 | N/A | Infrastructure and manual flows are not dimension-mapped |
+
 ### Section Design Decisions
 
 | Section | What It Contains | What It Avoids |
 |---------|-----------------|----------------|
 | Deterministic Test Summary | Runnable commands grouped by domain, inline comments | Detailed breakdowns, file listings, coverage percentages |
 | Infrastructure Setup | Dependencies, env, database, services, dev servers | Assumed knowledge; derives everything from artifacts |
-| AI-Coordinated Validation | Agent prompts for Playwright MCP, load testing, profiling | Inclusion when no agentic tooling exists for the project |
+| AI-Coordinated Validation | Agent prompts for Playwright MCP, agent-browser, load testing, profiling | Inclusion when no agentic tooling exists for the project |
 | Manual E2E Flows | User flows, edge cases, regression scenarios | Duplicating what automated tests already cover |
 
 ## Update Mode
@@ -56,13 +66,17 @@ A key insight: if infrastructure setup cannot be derived from implementation art
 
 Section 3 is conditional -- it only appears when the project has tooling that supports agentic testing:
 
-- UI automation (Playwright MCP, simulator automation, browser MCPs)
+- UI automation (Playwright MCP, agent-browser, simulator automation, browser MCPs)
 - Load testing tools (k6, artillery, locust)
 - Performance profiling (flamegraphs, memory profilers, bundle analyzers)
 - Database inspection/scripting
 - API testing tools (curl automation, Postman/Insomnia MCPs)
 
 When present, the section provides example prompts engineers can give to agent sessions to exercise specific flows. When absent, the section notes which tooling categories would be valuable.
+
+### Context Gathering for Tooling
+
+Per [ref:.allhands/flows/E2E_TEST_PLAN_BUILDING.md::29f9dfe], during context gathering the flow runs `ah validation-tools list` to identify available suites. The `tools` field in suite output identifies which tooling is available for both stochastic and deterministic dimensions -- this informs which Section 3 tooling categories the project can support and surfaces tooling that may not be obvious from code inspection alone.
 
 ## Source Flow
 

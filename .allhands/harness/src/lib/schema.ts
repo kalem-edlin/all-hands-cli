@@ -340,7 +340,7 @@ export function formatErrors(result: ValidationResult): string {
 // Schema Type Detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type SchemaType = 'prompt' | 'alignment' | 'spec' | 'documentation' | 'validation-suite' | 'skill';
+export type SchemaType = 'prompt' | 'alignment' | 'spec' | 'documentation' | 'solution' | 'validation-suite' | 'skill';
 
 interface SchemaPattern {
   pattern: string;
@@ -352,6 +352,7 @@ const SCHEMA_PATTERNS: SchemaPattern[] = [
   { pattern: '.planning/**/alignment.md', schemaType: 'alignment' },
   { pattern: 'specs/**/*.spec.md', schemaType: 'spec' },
   { pattern: 'specs/roadmap/**/*.spec.md', schemaType: 'spec' },
+  { pattern: 'docs/solutions/**/*.md', schemaType: 'solution' },
   { pattern: 'docs/**/*.md', schemaType: 'documentation' },
   { pattern: '.allhands/validation/*.md', schemaType: 'validation-suite' },
   { pattern: '.allhands/skills/*/SKILL.md', schemaType: 'skill' },
@@ -396,6 +397,9 @@ export function inferSchemaType(file: string): SchemaType | null {
   }
   if (file.includes('/specs/') || file.endsWith('.spec.md')) {
     return 'spec';
+  }
+  if (file.includes('/docs/solutions/') && file.endsWith('.md')) {
+    return 'solution';
   }
   if (file.includes('/docs/') && file.endsWith('.md')) {
     return 'documentation';

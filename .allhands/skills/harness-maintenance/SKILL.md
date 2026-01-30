@@ -147,6 +147,8 @@ Exposed via `ah schema <type>`. Define frontmatter for harness-managed files:
 - `spec.yaml` - Spec structure
 - `skill.yaml` - Skill manifest
 - `validation-suite.yaml` - Validation tooling
+- `solution.yaml` - Solution documentation (`docs/solutions/`)
+- `documentation.yaml` - General documentation (`docs/`)
 
 ### Internal Schemas (`harness/src/lib/schemas/*.ts`)
 Zod schemas for harness configuration. NOT exposed to agents:
@@ -365,6 +367,9 @@ Zod schemas catch config mistakes at spawn time, not runtime. Fail fast with hel
 
 ### In-Memory State
 Registry patterns (spawned agents, search contexts) keep TUI in sync without polling.
+
+### Motivation-Driven Documentation
+Per **Frontier Models are Capable**, harness documentation (validation suites, skills, flows) should teach agents HOW TO THINK about using a tool, not replicate command references. Commands are discoverable via `--help`; documentation value is in motivations, exploration patterns, and thinking models. Avoid prescriptive command catalogs — describe WHY an agent would reach for a tool, and let the model deduce the HOW.
 
 ### Token Efficiency
 Read enforcer + context injection + TLDR layers save ~95% on large files.

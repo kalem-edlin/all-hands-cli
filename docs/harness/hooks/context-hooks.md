@@ -66,8 +66,8 @@ Async notification after file edits. Calls [ref:.allhands/harness/src/lib/tldr.t
 **impact-refactor** -- [ref:.allhands/harness/src/hooks/context.ts:impactRefactor:d7e4a93]
 Triggers when a user prompt mentions refactoring keywords (refactor, rename, move, delete, extract, inline). Extracts function names via [ref:.allhands/harness/src/hooks/context.ts:extractImpactFunctionNames:d7e4a93], queries [ref:.allhands/harness/src/lib/tldr.ts:impactDaemon:79b9873] for the reverse call graph, and injects a caller listing so agents understand the blast radius before modifying code.
 
-**transcript-safeguard** -- [ref:.allhands/harness/src/hooks/context.ts:isTranscriptDump:d7e4a93]
-PostToolUse guard on TaskOutput. Detects when a sub-agent returns a raw JSONL transcript dump (identified by conversation metadata markers like `parentUuid`, `sessionId`, `agentId` occurring across multiple lines). When detected, summarizes the transcript via an LLM call instead of passing thousands of tokens of raw JSON to the parent agent.
+**transcript-safeguard** -- [ref:.allhands/harness/src/hooks/context.ts:transcriptSafeguardPre:c0bdef0]
+PreToolUse guard on TaskOutput. Blocks all TaskOutput calls unconditionally -- background tasks broadcast a completion notification with their result when they finish, making TaskOutput redundant. Blocking prevents dumping massive raw transcripts into agent context.
 
 ## Search Context Pipeline
 
