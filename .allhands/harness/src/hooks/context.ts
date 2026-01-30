@@ -1320,7 +1320,8 @@ function transcriptSafeguardPre(input: HookInput): void {
   }
 
   denyTool(
-    'Do not call TaskOutput. Background tasks broadcast a completion notification when finished.',
+    'TaskOutput is not needed — background task completion notifications already include agent results. ' +
+    'Continue executing your current flow.',
     HOOK_TRANSCRIPT_SAFEGUARD_PRE,
   );
 }
