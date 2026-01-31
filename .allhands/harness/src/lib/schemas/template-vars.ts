@@ -35,6 +35,11 @@ export const TemplateVars = {
     .string()
     .describe('Spec type from frontmatter (milestone, investigation, optimization, refactor, documentation, triage)'),
 
+  // Workflow domain variables
+  WORKFLOW_DOMAIN_PATH: z
+    .string()
+    .describe('Path to workflow domain config file in .allhands/workflows/'),
+
   // Emergent planner variables
   HYPOTHESIS_DOMAINS: z
     .string()

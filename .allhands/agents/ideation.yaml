@@ -5,5 +5,7 @@ tui_action: ideation
 tui_label: Ideation
 tui_requires_spec: false
 non_coding: false
-message_template: ""
-template_vars: []
+message_template: |
+  Workflow domain config: ${WORKFLOW_DOMAIN_PATH}
+template_vars:
+  - WORKFLOW_DOMAIN_PATH

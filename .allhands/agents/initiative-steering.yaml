@@ -1,0 +1,19 @@
+name: initiative-steering
+flow: INITIATIVE_STEERING.md
+prompt_scoped: false
+tui_action: initiative-steering
+tui_label: Steer Initiative
+tui_requires_spec: true
+non_coding: true
+message_template: |
+  Spec Path: ${SPEC_PATH}
+  Alignment doc: ${ALIGNMENT_PATH}
+  Prompts folder: ${PROMPTS_FOLDER}
+  Workflow domain config: ${WORKFLOW_DOMAIN_PATH}
+  Branch: ${BRANCH}
+template_vars:
+  - SPEC_PATH
+  - ALIGNMENT_PATH
+  - PROMPTS_FOLDER
+  - WORKFLOW_DOMAIN_PATH
+  - BRANCH

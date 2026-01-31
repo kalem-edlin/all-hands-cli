@@ -933,6 +933,34 @@ export function buildTemplateContext(
     }
   }
 
+  // Resolve WORKFLOW_DOMAIN_PATH from spec's initial_workflow_domain frontmatter
+  const basePath = cwd || process.cwd();
+  let workflowDomain = 'milestone';
+  if (context.SPEC_PATH) {
+    try {
+      const specFullPath = join(basePath, context.SPEC_PATH);
+      if (existsSync(specFullPath)) {
+        const specContent = readFileSync(specFullPath, 'utf-8');
+        const fmMatch = specContent.match(/^---\n([\s\S]*?)\n---/);
+        if (fmMatch) {
+          const domainMatch = fmMatch[1].match(/^initial_workflow_domain:\s*(.+)/m);
+          if (domainMatch) {
+            workflowDomain = domainMatch[1].trim();
+          }
+        }
+      }
+    } catch {
+      // Ignore parse errors, use default
+    }
+  }
+  const workflowDomainPath = join(basePath, '.allhands', 'workflows', `${workflowDomain}.md`);
+  if (existsSync(workflowDomainPath)) {
+    context.WORKFLOW_DOMAIN_PATH = workflowDomainPath;
+  } else {
+    console.warn(`Workflow domain config not found: ${workflowDomainPath}`);
+    context.WORKFLOW_DOMAIN_PATH = '';
+  }
+
   return context;
 }
 
