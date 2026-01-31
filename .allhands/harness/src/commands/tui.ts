@@ -53,18 +53,11 @@ import { logTuiError, logTuiAction, logTuiLifecycle } from '../lib/trace-store.j
 import { getFlowsDirectory } from '../lib/flows.js';
 
 /**
- * Map spec types to scoping flow filenames.
- * Milestone uses the ideation agent's default flow (IDEATION_SESSION.md).
- * All other types map to their respective scoping flow file.
+ * Unified scoping flow — all spec types route here.
+ * Domain-specific behavior is driven by the WORKFLOW_DOMAIN_PATH template variable,
+ * not by flow file selection.
  */
-export const SCOPING_FLOW_MAP: Record<SpecType, string | null> = {
-  milestone: null,
-  investigation: 'INVESTIGATION_SCOPING.md',
-  optimization: 'OPTIMIZATION_SCOPING.md',
-  refactor: 'REFACTOR_SCOPING.md',
-  documentation: 'DOCUMENTATION_SCOPING.md',
-  triage: 'TRIAGE_SCOPING.md',
-};
+export const UNIFIED_SCOPING_FLOW = 'IDEATION_SCOPING.md';
 
 /**
  * Launch the TUI - can be called directly or via command
@@ -195,7 +188,8 @@ async function spawnAgentsForAction(
   currentSpec: SpecFile | null,
   branch: string,
   status: ReturnType<typeof readStatus>,
-  cwd?: string
+  cwd?: string,
+  contextOverrides?: Record<string, string>
 ): Promise<boolean> {
   const profileMap = getProfilesByTuiAction();
   const profiles = profileMap.get(action);
@@ -225,6 +219,11 @@ async function spawnAgentsForAction(
     undefined, // promptPath - not applicable for TUI actions
     cwd
   );
+
+  // Apply context overrides (e.g., WORKFLOW_DOMAIN_PATH for initiative steering)
+  if (contextOverrides) {
+    Object.assign(context, contextOverrides);
+  }
 
   // Spawn each profile
   for (const profile of profiles) {
@@ -301,8 +300,17 @@ async function handleAction(
   // Read status from planning directory
   const status = planningKey ? readStatus(planningKey, cwd) : null;
 
+  // Prepare context overrides for actions that need them
+  let contextOverrides: Record<string, string> | undefined;
+  if (action === 'initiative-steering' && data?.domain) {
+    const selectedDomain = data.domain as string;
+    contextOverrides = {
+      WORKFLOW_DOMAIN_PATH: join(cwd, '.allhands', 'workflows', `${selectedDomain}.md`),
+    };
+  }
+
   // Try to handle as a profile-based agent spawn
-  const handledByProfile = await spawnAgentsForAction(tui, action, planningKey, currentSpec, branch, status, cwd);
+  const handledByProfile = await spawnAgentsForAction(tui, action, planningKey, currentSpec, branch, status, cwd, contextOverrides);
   if (handledByProfile) {
     return;
   }
@@ -794,14 +802,9 @@ async function handleAction(
         break;
       }
 
-      const flowFile = SCOPING_FLOW_MAP[specType as SpecType];
-      const flowOverride = flowFile
-        ? join(getFlowsDirectory(), flowFile)
-        : undefined;
+      tui.log(`New Initiative: ${specType}`);
 
-      tui.log(`New Initiative: ${specType}${flowOverride ? ` (${flowFile})` : ''}`);
-
-      // Spawn ideation agent with optional flow override
+      // Spawn ideation agent with unified scoping flow and domain-specific config
       try {
         const context = buildTemplateContext(
           planningKey || 'default',
@@ -810,6 +813,12 @@ async function handleAction(
           undefined,
           cwd
         );
+
+        // Override WORKFLOW_DOMAIN_PATH based on the selected spec type
+        context.WORKFLOW_DOMAIN_PATH = join(cwd, '.allhands', 'workflows', `${specType}.md`);
+
+        // All spec types route to the unified scoping flow
+        const flowOverride = join(getFlowsDirectory(), UNIFIED_SCOPING_FLOW);
 
         const result = spawnAgentFromProfile(
           {

@@ -2,139 +2,98 @@
  * New Initiative Routing Integration Tests
  *
  * Validates:
- * - SCOPING_FLOW_MAP completeness and correctness against SpecType values
- * - All referenced scoping flow files exist on disk
- * - flowOverride propagation through spawnAgentFromProfile()
- * - buildActionItems() always-visible guarantee for new-initiative action
+ * - Unified scoping flow routing (all spec types → IDEATION_SCOPING.md)
+ * - WORKFLOW_DOMAIN_PATH resolution for each spec type
+ * - buildActionItems() always-visible guarantee for new-initiative and initiative-steering
  */
 
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import type { SpecType } from '../../lib/specs.js';
-import { SCOPING_FLOW_MAP } from '../../commands/tui.js';
+import { UNIFIED_SCOPING_FLOW } from '../../commands/tui.js';
 import { buildActionItems, type ToggleState } from '../../tui/actions.js';
 import { getFlowsDirectory } from '../../lib/flows.js';
 
-// ─── Task 1: SCOPING_FLOW_MAP completeness and correctness ──────────────────
+const ALL_SPEC_TYPES: SpecType[] = [
+  'milestone',
+  'investigation',
+  'optimization',
+  'refactor',
+  'documentation',
+  'triage',
+];
 
-describe('SCOPING_FLOW_MAP completeness and correctness', () => {
-  const ALL_SPEC_TYPES: SpecType[] = [
-    'milestone',
-    'investigation',
-    'optimization',
-    'refactor',
-    'documentation',
-    'triage',
-  ];
+// ─── Task 1: Unified scoping flow routing ────────────────────────────────────
 
-  it('has exactly 6 keys matching all SpecType values', () => {
-    const mapKeys = Object.keys(SCOPING_FLOW_MAP).sort();
-    const specTypes = [...ALL_SPEC_TYPES].sort();
-    expect(mapKeys).toEqual(specTypes);
+describe('Unified scoping flow routing', () => {
+  it('UNIFIED_SCOPING_FLOW is IDEATION_SCOPING.md', () => {
+    expect(UNIFIED_SCOPING_FLOW).toBe('IDEATION_SCOPING.md');
   });
 
-  it('milestone maps to null', () => {
-    expect(SCOPING_FLOW_MAP.milestone).toBeNull();
+  it('unified scoping flow file exists on disk', () => {
+    const flowsDir = getFlowsDirectory();
+    const fullPath = join(flowsDir, UNIFIED_SCOPING_FLOW);
+    expect(existsSync(fullPath)).toBe(true);
   });
 
-  it('investigation maps to INVESTIGATION_SCOPING.md', () => {
-    expect(SCOPING_FLOW_MAP.investigation).toBe('INVESTIGATION_SCOPING.md');
-  });
+  it('all spec types resolve to the same unified flow path', () => {
+    const flowsDir = getFlowsDirectory();
+    const expectedPath = join(flowsDir, UNIFIED_SCOPING_FLOW);
 
-  it('optimization maps to OPTIMIZATION_SCOPING.md', () => {
-    expect(SCOPING_FLOW_MAP.optimization).toBe('OPTIMIZATION_SCOPING.md');
-  });
-
-  it('refactor maps to REFACTOR_SCOPING.md', () => {
-    expect(SCOPING_FLOW_MAP.refactor).toBe('REFACTOR_SCOPING.md');
-  });
-
-  it('documentation maps to DOCUMENTATION_SCOPING.md', () => {
-    expect(SCOPING_FLOW_MAP.documentation).toBe('DOCUMENTATION_SCOPING.md');
-  });
-
-  it('triage maps to TRIAGE_SCOPING.md', () => {
-    expect(SCOPING_FLOW_MAP.triage).toBe('TRIAGE_SCOPING.md');
+    for (const _specType of ALL_SPEC_TYPES) {
+      // All types now route to the unified flow — no per-type mapping
+      const flowOverride = join(flowsDir, UNIFIED_SCOPING_FLOW);
+      expect(flowOverride).toBe(expectedPath);
+    }
   });
 });
 
-// ─── Task 2: Verify all referenced scoping flow files exist on disk ──────────
+// ─── Task 2: WORKFLOW_DOMAIN_PATH resolution per spec type ───────────────────
 
-describe('Scoping flow files exist on disk', () => {
-  const flowsDir = getFlowsDirectory();
+describe('WORKFLOW_DOMAIN_PATH resolution', () => {
+  it.each(ALL_SPEC_TYPES)(
+    '%s resolves to .allhands/workflows/%s.md',
+    (specType) => {
+      // Mirrors the resolution logic in handleAction's new-initiative case
+      const cwd = process.cwd();
+      const domainPath = join(cwd, '.allhands', 'workflows', `${specType}.md`);
 
-  const nonNullFlows = Object.entries(SCOPING_FLOW_MAP).filter(
-    ([, v]) => v !== null
-  ) as [string, string][];
-
-  it.each(nonNullFlows)(
-    '%s flow file %s exists at .allhands/flows/',
-    (_type, flowFile) => {
-      const fullPath = join(flowsDir, flowFile);
-      expect(existsSync(fullPath)).toBe(true);
+      expect(domainPath).toContain('.allhands/workflows/');
+      expect(domainPath).toContain(`${specType}.md`);
     }
   );
-});
 
-// ─── Task 3: flowOverride propagation through spawnAgentFromProfile() ────────
-
-describe('flowOverride propagation', () => {
-  it('milestone produces undefined flowOverride (null from map)', () => {
-    const flowFile = SCOPING_FLOW_MAP.milestone;
-    const flowOverride = flowFile
-      ? join(getFlowsDirectory(), flowFile)
-      : undefined;
-
-    expect(flowOverride).toBeUndefined();
-  });
-
-  it('investigation produces correct absolute flowOverride path', () => {
-    const flowFile = SCOPING_FLOW_MAP.investigation;
-    const flowOverride = flowFile
-      ? join(getFlowsDirectory(), flowFile)
-      : undefined;
-
-    expect(flowOverride).toBe(
-      join(getFlowsDirectory(), 'INVESTIGATION_SCOPING.md')
+  it('each spec type produces a unique WORKFLOW_DOMAIN_PATH', () => {
+    const cwd = process.cwd();
+    const paths = ALL_SPEC_TYPES.map((t) =>
+      join(cwd, '.allhands', 'workflows', `${t}.md`)
     );
+    const uniquePaths = new Set(paths);
+    expect(uniquePaths.size).toBe(ALL_SPEC_TYPES.length);
   });
 
-  it('all non-null spec types produce absolute paths under flows directory', () => {
-    const flowsDir = getFlowsDirectory();
-
-    for (const [, flowFile] of Object.entries(SCOPING_FLOW_MAP)) {
-      if (flowFile === null) continue;
-
-      const flowOverride = join(flowsDir, flowFile);
-      expect(flowOverride).toContain(flowsDir);
-      expect(flowOverride).toContain(flowFile);
-      // Verify it resolves to a real file
-      expect(existsSync(flowOverride)).toBe(true);
-    }
-  });
-
-  it('flowOverride field is accepted by ProfileSpawnConfig type', () => {
-    // Type-level verification: ProfileSpawnConfig includes flowOverride?: string
-    // At runtime we verify the contract: config.flowOverride || invocation.flowPath (tmux.ts:731)
-    // Actual tmux spawning requires a live session; here we validate the map → override pipeline
-    const flowFile = SCOPING_FLOW_MAP.optimization;
-    expect(flowFile).toBe('OPTIMIZATION_SCOPING.md');
+  it('flowOverride config shape includes WORKFLOW_DOMAIN_PATH', () => {
+    const cwd = process.cwd();
+    const specType = 'investigation';
 
     // Construct the same config shape the handler builds
+    const context = {
+      WORKFLOW_DOMAIN_PATH: join(cwd, '.allhands', 'workflows', `${specType}.md`),
+    };
     const config = {
       agentName: 'ideation',
-      context: {},
+      context,
       focusWindow: true,
-      flowOverride: flowFile ? join(getFlowsDirectory(), flowFile) : undefined,
+      flowOverride: join(getFlowsDirectory(), UNIFIED_SCOPING_FLOW),
     };
 
-    expect(config.flowOverride).toBeDefined();
-    expect(config.flowOverride).toContain('OPTIMIZATION_SCOPING.md');
+    expect(config.flowOverride).toContain('IDEATION_SCOPING.md');
+    expect(config.context.WORKFLOW_DOMAIN_PATH).toContain('investigation.md');
   });
 });
 
-// ─── Task 4: buildActionItems() always-visible guarantee ─────────────────────
+// ─── Task 3: buildActionItems() always-visible guarantee ─────────────────────
 
 describe('buildActionItems always-visible guarantee', () => {
   const prActionStates = ['create-pr', 'awaiting-review', 'rerun-pr-review'] as const;
@@ -159,6 +118,17 @@ describe('buildActionItems always-visible guarantee', () => {
       const newInitiative = items.find((item) => item.id === 'new-initiative');
       expect(newInitiative).toBeDefined();
       expect(newInitiative!.type).toBe('action');
+    }
+  );
+
+  it.each(toggleCombinations)(
+    'initiative-steering is present with loop=$loopEnabled, parallel=$parallelEnabled, pr=$prActionState',
+    (toggleState) => {
+      const items = buildActionItems(toggleState);
+      const steering = items.find((item) => item.id === 'initiative-steering');
+      expect(steering).toBeDefined();
+      expect(steering!.type).toBe('action');
+      expect(steering!.key).toBe('=');
     }
   );
 

@@ -46,7 +46,7 @@ vi.mock('../../hooks/shared.js', () => ({
 vi.mock('../../lib/planning.js', () => ({
   getCurrentBranch: vi.fn(() => 'feature/test-branch'),
   sanitizeBranchForDir: vi.fn(() => 'feature-test-branch'),
-  readStatus: vi.fn(() => null),
+  readStatus: vi.fn(() => ({ stage: 'executing' })),
   updatePRReviewStatus: vi.fn(),
 }));
 

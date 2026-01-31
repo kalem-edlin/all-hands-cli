@@ -166,6 +166,7 @@ export function buildActionItems(toggleState: ToggleState): ActionItem[] {
     { id: 'mark-completed', label: 'Complete', key: '9', type: 'action' },
     { id: 'switch-spec', label: 'Switch Workspace', key: '0', type: 'action' },
     { id: 'custom-flow', label: 'Custom Flow', key: '-', type: 'action' },
+    { id: 'initiative-steering', label: 'Steer Initiative', key: '=', type: 'action' },
     // Spacing before toggles
     { id: 'spacer-1', label: '', type: 'separator' },
     { id: 'separator-toggles', label: '━━ Toggles ━━', type: 'separator' },

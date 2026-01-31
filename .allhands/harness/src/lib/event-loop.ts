@@ -553,6 +553,18 @@ export class EventLoop {
     }
 
     try {
+      // Execution gating: only spawn executors/emergent planners when stage is 'executing'
+      try {
+        const status = readStatus(this.state.planningKey, this.cwd);
+        if (status?.stage !== 'executing') {
+          this.callbacks.onLoopStatus?.(`Stage is '${status?.stage || 'unknown'}' — waiting for executing stage`);
+          return;
+        }
+      } catch {
+        // No status file — cannot determine stage, skip spawning
+        return;
+      }
+
       // Block if emergent planner is running (only ONE at a time)
       const hasEmergent = this.state.activeAgents.some((name) => name.startsWith('emergent'));
       if (hasEmergent) {

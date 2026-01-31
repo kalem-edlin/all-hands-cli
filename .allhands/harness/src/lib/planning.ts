@@ -93,7 +93,7 @@ export interface StatusFile {
   name: string;           // Directory key (sanitized branch name)
   branch?: string;        // Original branch name (for collision detection)
   spec: string;           // Path to spec file
-  stage: 'planning' | 'executing' | 'reviewing' | 'pr' | 'compound';
+  stage: 'planning' | 'executing' | 'reviewing' | 'pr' | 'compound' | 'steering';
   loop: LoopConfig;
   compound_run: boolean;
   created: string;
