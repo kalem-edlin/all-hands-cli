@@ -76,6 +76,10 @@ Per **Knowledge Compounding**, capture engineer contributions:
 - In alignment doc: Amend agent summaries with engineer steering (don't delete summaries)
 - Keep documentation concise but complete for compounding
 
+## Boundary with Initiative Steering
+
+Coordination is for **reactive, quick-action interventions**: quick patches, emergent triage, prompt surgery, agent management. For **structured, domain-aware deep replanning** that may change initiative goals and create/modify multiple prompts, use Initiative Steering (`INITIATIVE_STEERING.md`) via the TUI's "Steer Initiative" action instead.
+
 ## Conversational Approach
 
 Per **Ideation First**, always clarify before acting:
