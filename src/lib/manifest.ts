@@ -1,10 +1,11 @@
 import { readFileSync, existsSync, statSync } from 'fs';
 import { join } from 'path';
-import { minimatch } from 'minimatch';
+import { minimatch, Minimatch } from 'minimatch';
 import { GitignoreFilter } from './gitignore.js';
 
 interface InternalData {
   internal?: string[];
+  initOnly?: string[];
 }
 
 const INTERNAL_FILENAME = '.internal.json';
@@ -14,12 +15,18 @@ export class Manifest {
   private internalPath: string;
   private data: InternalData;
   private gitignoreFilter: GitignoreFilter;
+  private initOnlyMatchers: { matcher: Minimatch; negated: boolean }[];
 
   constructor(allhandsRoot: string) {
     this.allhandsRoot = allhandsRoot;
     this.internalPath = join(allhandsRoot, INTERNAL_FILENAME);
     this.data = this.load();
     this.gitignoreFilter = new GitignoreFilter(allhandsRoot);
+    this.initOnlyMatchers = this.initOnlyPatterns.map(p => {
+      const negated = p.startsWith('!');
+      const pattern = negated ? p.slice(1) : p;
+      return { matcher: new Minimatch(pattern, { dot: true }), negated };
+    });
   }
 
   private load(): InternalData {
@@ -34,11 +41,29 @@ export class Manifest {
     return this.data.internal || [];
   }
 
+  get initOnlyPatterns(): string[] {
+    return this.data.initOnly || [];
+  }
+
   /**
    * Check if a file is marked as internal (should not be distributed).
    */
   isInternal(path: string): boolean {
     return this.internalPatterns.some(pattern => minimatch(path, pattern, { dot: true }));
+  }
+
+  /**
+   * Check if a file is init-only using last-match-wins semantics with negation support.
+   * Patterns starting with `!` exempt matching files from being init-only.
+   */
+  isInitOnly(path: string): boolean {
+    let initOnly = false;
+    for (const { matcher, negated } of this.initOnlyMatchers) {
+      if (matcher.match(path)) {
+        initOnly = !negated;
+      }
+    }
+    return initOnly;
   }
 
   /**

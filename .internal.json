@@ -30,5 +30,15 @@
     "concerns.md",
     "specs/**"
   ],
+  "initOnly": [
+    ".allhands/skills/**",
+    "!.allhands/skills/claude-code-patterns/**",
+    "!.allhands/skills/harness-maintenance/**",
+    ".allhands/validation/**",
+    ".allhands/settings.json",
+    ".allhands/docs.json",
+    ".tldr/config.json",
+    ".claude/settings.json"
+  ],
   "$distribution_comment": "What DOES get distributed: .allhands/ (flows, harness, agents, skills, schemas, validation), .claude/ (agents)"
 }

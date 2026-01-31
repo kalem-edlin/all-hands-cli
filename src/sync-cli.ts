@@ -11,8 +11,8 @@ const pkg = require('../package.json');
 const VERSION = pkg.version;
 
 // Sync command handler for reuse
-const syncHandler = async (argv: { target?: string; yes?: boolean }) => {
-  const code = await cmdSync(argv.target || '.', argv.yes || false);
+const syncHandler = async (argv: { target?: string; yes?: boolean; init?: boolean }) => {
+  const code = await cmdSync(argv.target || '.', argv.yes || false, argv.init || false);
   process.exit(code);
 };
 
@@ -28,6 +28,11 @@ const syncBuilder = (yargs: yargs.Argv) => {
       alias: 'y',
       type: 'boolean',
       describe: 'Skip confirmation prompts',
+      default: false,
+    })
+    .option('init', {
+      type: 'boolean',
+      describe: 'Include init-only files (for first-time setup)',
       default: false,
     });
 };
