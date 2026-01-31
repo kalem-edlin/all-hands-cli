@@ -6909,7 +6909,7 @@ function setupAhShim() {
   writeFileSync3(shimPath, AH_SHIM_SCRIPT, { mode: 493 });
   return { installed: true, path: shimPath, inPath };
 }
-async function cmdSync(target = ".", autoYes = false) {
+async function cmdSync(target = ".", autoYes = false, init = false) {
   const resolvedTarget = resolve6(process.cwd(), target);
   const allhandsRoot = getAllhandsRoot();
   const targetAllhandsDir = join7(resolvedTarget, ".allhands");
@@ -6950,6 +6950,13 @@ async function cmdSync(target = ".", autoYes = false) {
   }
   const manifest = new Manifest(allhandsRoot);
   const distributable = manifest.getDistributableFiles();
+  if (!init) {
+    for (const relPath of [...distributable]) {
+      if (manifest.isInitOnly(relPath)) {
+        distributable.delete(relPath);
+      }
+    }
+  }
   let copied = 0;
   let created = 0;
   let skipped = 0;
@@ -7224,6 +7231,9 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
   const filesToPush = [];
   const localGitFiles = new Set(getGitFiles(cwd));
   for (const relPath of upstreamFiles) {
+    if (manifest.isInitOnly(relPath)) {
+      continue;
+    }
     if (PUSH_BLOCKLIST.includes(relPath)) {
       continue;
     }
@@ -7242,6 +7252,7 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
   for (const pattern of finalIncludes) {
     const matchedFiles = expandGlob(pattern, cwd);
     for (const relPath of matchedFiles) {
+      if (manifest.isInitOnly(relPath)) continue;
       if (PUSH_BLOCKLIST.includes(relPath)) continue;
       if (finalExcludes.some((p) => minimatch(relPath, p, { dot: true }))) continue;
       if (filesToPush.some((f) => f.path === relPath)) continue;
@@ -7417,7 +7428,7 @@ var require2 = createRequire(import.meta.url);
 var pkg = require2("../package.json");
 var VERSION = pkg.version;
 var syncHandler = async (argv) => {
-  const code = await cmdSync(argv.target || ".", argv.yes || false);
+  const code = await cmdSync(argv.target || ".", argv.yes || false, argv.init || false);
   process.exit(code);
 };
 var syncBuilder = (yargs) => {
@@ -7429,6 +7440,10 @@ var syncBuilder = (yargs) => {
     alias: "y",
     type: "boolean",
     describe: "Skip confirmation prompts",
+    default: false
+  }).option("init", {
+    type: "boolean",
+    describe: "Include init-only files (for first-time setup)",
     default: false
   });
 };

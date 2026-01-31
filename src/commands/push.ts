@@ -108,6 +108,9 @@ function collectFilesToPush(
   const localGitFiles = new Set(getGitFiles(cwd));
 
   for (const relPath of upstreamFiles) {
+    if (manifest.isInitOnly(relPath)) {
+      continue;
+    }
     if (PUSH_BLOCKLIST.includes(relPath)) {
       continue;
     }
@@ -130,6 +133,7 @@ function collectFilesToPush(
   for (const pattern of finalIncludes) {
     const matchedFiles = expandGlob(pattern, cwd);
     for (const relPath of matchedFiles) {
+      if (manifest.isInitOnly(relPath)) continue;
       if (PUSH_BLOCKLIST.includes(relPath)) continue;
       if (finalExcludes.some((p) => minimatch(relPath, p, { dot: true }))) continue;
       if (filesToPush.some((f) => f.path === relPath)) continue;
