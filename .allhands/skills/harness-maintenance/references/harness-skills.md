@@ -75,10 +75,10 @@ Per **Context is Precious**, each reference doc should:
 
 ## Existing Skills
 
-| Skill | Purpose | Pattern |
-|-------|---------|---------|
-| `harness-maintenance` | Harness architecture and extension | Hub + `references/` |
-| `claude-code-patterns` | Claude Code native features | Hub + `docs/` |
+| Skill | Purpose | Pattern | Primary For |
+|-------|---------|---------|-------------|
+| `harness-maintenance` | Harness architecture and extension | Hub + `references/` | `.allhands/` content files (flows, schemas, skills, validation, agents) |
+| `claude-code-patterns` | Claude Code native features | Hub + `docs/` | TypeScript implementation in `harness/src/`, Claude Code configs in `.claude/` |
 
 ## Related References
 

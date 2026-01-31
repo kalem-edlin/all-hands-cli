@@ -44,6 +44,16 @@ Use **Scenario** to find the right reference for your task. Use **Trigger** to f
 | Validation tooling | [`validation-tooling.md`](references/validation-tooling.md) | Validation suites, crystallization lifecycle, suite writing philosophy | Validation suites, crystallization lifecycle, or stochastic/deterministic methodology |
 | Knowledge & docs | [`knowledge-compounding.md`](references/knowledge-compounding.md) | Documentation schemas, solutions, memories, knowledge indexes | Documentation schemas, knowledge indexes, or compounding flows |
 
+## Related Skills
+
+The `harness-maintenance` and `claude-code-patterns` skills have overlapping globs on `.allhands/` files. When both match:
+
+- **harness-maintenance** provides architectural knowledge, maintenance guidance, and routing to domain-specific references — the "why" and "when" of harness changes
+- **claude-code-patterns** provides Claude Code native feature docs, implementation patterns, and API reference — the "how" of building with Claude Code primitives
+- For structural changes to `.allhands/` content files (flows, schemas, skills, validation), **harness-maintenance** is primary
+- For TypeScript implementation in `harness/src/` or Claude Code configs in `.claude/`, **claude-code-patterns** is primary
+- When in doubt, read harness-maintenance first for architectural context, then claude-code-patterns for implementation details
+
 ## Cross-Cutting Patterns
 
 ### Key Design Patterns
@@ -62,6 +72,9 @@ Use **Scenario** to find the right reference for your task. Use **Trigger** to f
 - [ ] Update relevant reference doc if structural changes made
 - [ ] Run `ah validate agents` after profile changes
 - [ ] Test hook behavior with Claude Code runner
+- [ ] Verify routing table rows match reference files in `references/`
+- [ ] Verify each routing table entry has a corresponding thin flow in `flows/harness/`
+- [ ] Verify cross-domain navigation links in modified reference docs resolve
 
 <!--
 Knowledge Completeness Audit — 2026-01-30
