@@ -230,6 +230,42 @@ Per **Knowledge Compounding**, the emergent planner tracks work types in alignme
 
 ---
 
+## Workflow Domain Configuration
+
+Per **Frontier Models are Capable**, workflow domain configs centralize domain knowledge for consumption by multiple flows rather than duplicating it per-flow.
+
+### Architecture
+- `.allhands/workflows/*.md` — one config per domain (`milestone`, `investigation`, `optimization`, `refactor`, `documentation`, `triage`)
+- Structured **frontmatter** (`planning_depth`, `jury_required`, `max_tangential_hypotheses`, `required_ideation_questions`) provides programmatic flags for flow calibration
+- **Markdown body** contains expressive domain knowledge (interview questions, gap signals, planning considerations) consumed by agents at their discretion
+- Schema validated via `ah schema workflow`
+
+### Template Variable Abstraction
+- `WORKFLOW_DOMAIN_PATH` is the single abstraction boundary — agents receive the resolved path, never raw domain names
+- Resolved in `buildTemplateContext()` from the spec's `initial_workflow_domain` frontmatter field (default: `milestone`)
+- All domain-consuming agents (ideation, planner, emergent, initiative-steering) access configs exclusively through this variable
+
+### Flow Unification
+- Unified `IDEATION_SCOPING.md` replaced 6 separate per-type scoping flows (`IDEATION_SESSION.md`, `INVESTIGATION_SCOPING.md`, etc.)
+- `planning_depth` field (`deep` vs `focused`) drives flow bifurcation — not spec type checks
+- `stage` field on `status.yaml` gates execution (`executing`) and pauses during initiative steering (`steering`)
+
+### Coordinator vs Initiative Steering
+
+Both are TUI actions but serve fundamentally different purposes:
+
+| Dimension | Coordinator | Initiative Steering |
+|-----------|------------|-------------------|
+| **Scope** | Single-prompt interventions (quick patches, triage, prompt surgery) | Multi-prompt initiative-level replanning |
+| **Trigger** | Reactive — something broke or needs a tweak | Strategic — scope change, blocking issue, quality pivot |
+| **Domain awareness** | Not domain-config-driven | Consumes workflow domain config; can steer with a different domain than the spec's original |
+| **Execution impact** | Does not pause the event loop | Pauses prompt spawning (`stage: 'steering'`) during the session |
+| **Goal changes** | Does not change initiative goals | Can change initiative goals (resets `core_consolidation` to `pending`) |
+
+Per **Context is Precious**, the coordinator is lightweight and conversational; initiative steering is heavyweight with research subtasks, a domain-driven interview, and structured alignment doc amendments.
+
+---
+
 ## Platform Integration
 
 ### Settings Configuration (`.claude/settings.json`)
@@ -318,6 +354,12 @@ Sub-flows use `<inputs>` and `<outputs>` tags for execution-agnostic subtasks.
 2. Create flow file in `flows/`
 3. Run `ah validate agents`
 
+### Deleting Agent Profiles
+1. Check the profile's `tui_action` field value
+2. Search other profiles for the same `tui_action` value — if multiple profiles share a `tui_action`, they are co-dependencies (e.g., `compounder.yaml` and `documentor.yaml` both have `tui_action: compound`)
+3. Verify the TUI action handler does not expect multiple agents for that action
+4. `ah validate agents` and `npx tsc --noEmit` will NOT catch cross-profile `tui_action` dependency breaks — YAML files are outside the TypeScript dependency graph and agent validation is per-profile
+
 ### Updating Hypothesis Domains
 1. Edit available domains in `settings.json` under `emergent.hypothesisDomains`
 2. Domains are passed to emergent planner via `HYPOTHESIS_DOMAINS` template variable
@@ -325,6 +367,7 @@ Sub-flows use `<inputs>` and `<outputs>` tags for execution-agnostic subtasks.
 ### Adding New Template Variables
 1. Add to `TemplateVars` registry in `src/lib/schemas/template-vars.ts`
 2. Include Zod schema and description
+3. Wire the variable in `buildTemplateContext()` in [ref:src/lib/tmux.ts:buildTemplateContext] — registration without wiring passes `ah validate agents` but produces empty template values at runtime
 
 ### Adding New Schemas
 1. Create YAML in `schemas/` for agent-facing
@@ -359,6 +402,33 @@ Compaction summaries make incomplete work resumable. Per **Prompt Files as Units
 
 ### Workflow Constraints
 Dynamic action items prevent invalid operations. Can't run planner without milestone.
+
+---
+
+## Best Practices
+
+### Schema and TypeScript Synchronization
+
+Per **Agentic Validation Tooling**, agent-facing YAML schemas and their TypeScript interfaces must stay in sync:
+- `spec.yaml` fields → `SpecFrontmatter` interface in `lib/specs.ts`
+- `alignment.yaml` fields → relevant TypeScript types in `lib/planning.ts`
+- `workflow.yaml` fields → consumed via `parseYaml` in flow-consuming code
+
+When adding a new field to any schema YAML, the corresponding TypeScript interface **must** also be updated. Failure to do so causes `parseFrontmatter()` to silently discard unrecognized fields, leading agents to resort to fragile regex-based workarounds.
+
+### Frontmatter Parsing
+
+Per **Knowledge Compounding**, agents MUST use `parseFrontmatter()` from `lib/specs.ts` or `parseYaml()` from the `yaml` library for frontmatter field extraction. Raw regex for individual frontmatter fields is prohibited — it does not handle YAML quoting, comments, or multi-line values, and creates duplication when multiple call sites need the same field.
+
+### Template Variable Overrides (`contextOverrides`)
+
+Per **Frontier Models are Capable**, `spawnAgentsForAction()` in `tui.ts` accepts an optional `contextOverrides` parameter — a `Record<string, string>` applied via `Object.assign` after `buildTemplateContext()`. Override keys should be known template variable names from the `TemplateVars` registry in `template-vars.ts`.
+
+This pattern is used for initiative steering domain selection, where the engineer picks a different workflow domain than the spec's `initial_workflow_domain`. The flow:
+1. TUI modal presents domain choices (pre-selects spec's current domain)
+2. User selection produces `{ WORKFLOW_DOMAIN_PATH: resolvedPath }`
+3. Override replaces the default value from `buildTemplateContext()`
+4. Spawned agent receives the overridden context
 
 ---
 
