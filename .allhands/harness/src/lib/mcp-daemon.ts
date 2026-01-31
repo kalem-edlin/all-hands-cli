@@ -183,7 +183,12 @@ async function handleCall(
 ): Promise<{ success: boolean; result?: unknown; error?: string }> {
   try {
     const session = await ensureSession(server, config);
-    const result = await session.client.callTool({ name: tool, arguments: params });
+    const callTimeout = config.stateful_session_timeout ?? 60000;
+    const result = await session.client.callTool(
+      { name: tool, arguments: params },
+      undefined,
+      { timeout: callTimeout }
+    );
 
     // Extract content from result
     if ('content' in result && Array.isArray(result.content)) {
