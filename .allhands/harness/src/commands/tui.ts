@@ -16,7 +16,7 @@
 import { Command } from 'commander';
 import { join, basename, dirname, relative } from 'path';
 import { existsSync, readFileSync, renameSync } from 'fs';
-import { execSync } from 'child_process';
+
 import { TUI } from '../tui/index.js';
 import type { TUIState, PRActionState, PromptItem, AgentInfo } from '../tui/index.js';
 import {
@@ -417,31 +417,21 @@ async function handleAction(
 
       try {
         // Push any unpushed commits before triggering review
-        try {
-          const unpushedResult = execSync('git log @{u}..HEAD --oneline 2>/dev/null || echo ""', {
-            encoding: 'utf-8',
-            cwd: cwd || process.cwd(),
-          }).trim();
+        const workingDir = cwd || process.cwd();
+        const unpushedResult = gitExec(['log', '@{u}..HEAD', '--oneline'], workingDir);
 
-          if (unpushedResult) {
-            tui.log('Pushing local commits to remote...');
-            execSync('git push', {
-              encoding: 'utf-8',
-              cwd: cwd || process.cwd(),
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
+        if (unpushedResult.success && unpushedResult.stdout) {
+          tui.log('Pushing local commits to remote...');
+          const pushResult = gitExec(['push'], workingDir);
+          if (pushResult.success) {
             tui.log('Commits pushed successfully.');
+          } else {
+            tui.log('Warning: Could not push commits. Continuing with review trigger...');
           }
-        } catch {
+        } else if (!unpushedResult.success) {
           // No upstream or other git error - try push anyway
-          try {
-            execSync('git push', {
-              encoding: 'utf-8',
-              cwd: cwd || process.cwd(),
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
-          } catch {
-            // Push failed, but continue with review trigger
+          const pushResult = gitExec(['push'], workingDir);
+          if (!pushResult.success) {
             tui.log('Warning: Could not push commits. Continuing with review trigger...');
           }
         }
