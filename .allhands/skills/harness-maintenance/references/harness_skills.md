@@ -80,13 +80,6 @@ Per **Context is Precious**, each reference doc should:
 | `harness-maintenance` | Harness architecture and extension | Hub + `references/` |
 | `claude-code-patterns` | Claude Code native features | Hub + `docs/` |
 
-## When to Update This Reference
-
-- Update when changing the skill YAML frontmatter schema or `ah schema skill` output
-- Update when creating a new skill or establishing a new skill pattern
-- Update when modifying hub-and-spoke conventions, routing table format, or reference doc guidelines
-- Update when changing the `ah skills` CLI discovery behavior or glob matching logic
-
 ## Related References
 
 - [`writing-flows.md`](writing-flows.md) — When authoring reference docs or skill entry-point flows

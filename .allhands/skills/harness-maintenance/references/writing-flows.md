@@ -69,13 +69,6 @@ Sub-flows use `<inputs>` and `<outputs>` tags for execution-agnostic subtasks. T
 
 See `.allhands/flows/PROMPT_TASK_EXECUTION.md` — this flow demonstrates all conventions: `<goal>`, `<constraints>`, phase sections, action-verb bullets, progressive disclosure via sub-flow references, and explicit completion steps.
 
-## When to Update This Reference
-
-- Update when adding or modifying XML tag conventions (`<goal>`, `<constraints>`, `<inputs>`, `<outputs>`, etc.)
-- Update when changing flow file organization or directory structure (`flows/`, `flows/shared/`, `flows/shared/jury/`)
-- Update when evolving the progressive disclosure pattern or sub-flow referencing conventions
-- Update when adding new writing conventions or structure patterns for flows
-
 ## Related References
 
 - [`core-architecture.md`](core-architecture.md) — When your flow change touches directory structure, TUI lifecycle, or schema system

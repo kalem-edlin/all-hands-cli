@@ -22,37 +22,27 @@ Route maintainers to domain-specific harness knowledge. Per **Context is Preciou
 <constraints>
 - MUST read `.allhands/principles.md` before any harness modification
 - MUST cite First Principles by name when adding features or changing behavior
+- MUST update the relevant reference doc when making structural changes to the harness
 - MUST validate changes with `ah validate agents` after profile modifications
 - NEVER add complexity without clear first principle justification
 </constraints>
 
 ## Start Here
 
-Read `.allhands/principles.md` first. Every harness change should be motivated by a named principle.
+Read `.allhands/principles.md` first — it is the single entry point covering all first principles and core philosophy pillars. Every harness change should be motivated by a named principle.
 
 ## Reference Routing
 
-| Scenario | Reference | When to Use |
-|----------|-----------|-------------|
-| Writing or editing flows | [`references/writing-flows.md`](references/writing-flows.md) | Authoring flow files, XML tags, progressive disclosure, structure conventions |
-| Hooks, commands, or MCP | [`references/tools-commands-mcp-hooks.md`](references/tools-commands-mcp-hooks.md) | Adding/modifying hooks, CLI commands, MCP servers, extension points |
-| Architecture & schemas | [`references/core-architecture.md`](references/core-architecture.md) | Directory structure, TUI lifecycle, schema system, agent profiles, settings, platform integration |
-| Skills system | [`references/harness_skills.md`](references/harness_skills.md) | Creating/extending skills, hub-and-spoke pattern, skill schema, discovery mechanism |
-| Validation tooling | [`references/validation-tooling.md`](references/validation-tooling.md) | Creating validation suites, crystallization lifecycle, suite writing philosophy |
-| Knowledge & docs | [`references/knowledge-compounding.md`](references/knowledge-compounding.md) | Documentation schemas, solutions, memories, knowledge indexes, compounding patterns |
+Use **Scenario** to find the right reference for your task. Use **Trigger** to find which reference to update after a change.
 
-## Maintenance Triggers
-
-When you've just changed something and need to know which reference to update:
-
-| Change Type | Update Reference |
-|-------------|-----------------|
-| Flow XML tags, structure conventions, or progressive disclosure patterns | [`references/writing-flows.md`](references/writing-flows.md) |
-| CLI commands, hooks, MCP servers, or auto-discovery registration | [`references/tools-commands-mcp-hooks.md`](references/tools-commands-mcp-hooks.md) |
-| Directory structure, TUI lifecycle, schemas, agent profiles, or settings | [`references/core-architecture.md`](references/core-architecture.md) |
-| Skill schema, discovery mechanism, or hub-and-spoke conventions | [`references/harness_skills.md`](references/harness_skills.md) |
-| Validation suites, crystallization lifecycle, or stochastic/deterministic methodology | [`references/validation-tooling.md`](references/validation-tooling.md) |
-| Documentation schemas, knowledge indexes, or compounding flows | [`references/knowledge-compounding.md`](references/knowledge-compounding.md) |
+| Scenario | Reference | When to Use | Trigger (what changed) |
+|----------|-----------|-------------|------------------------|
+| Writing or editing flows | [`writing-flows.md`](references/writing-flows.md) | Flow files, XML tags, progressive disclosure, structure conventions | Flow XML tags, structure conventions, or progressive disclosure patterns |
+| Hooks, commands, or MCP | [`tools-commands-mcp-hooks.md`](references/tools-commands-mcp-hooks.md) | Adding/modifying hooks, CLI commands, MCP servers, extension points | CLI commands, hooks, MCP servers, or auto-discovery registration |
+| Architecture & schemas | [`core-architecture.md`](references/core-architecture.md) | Directory structure, TUI lifecycle, schema system, agent profiles, settings | Directory structure, TUI lifecycle, schemas, agent profiles, or settings |
+| Skills system | [`harness_skills.md`](references/harness_skills.md) | Creating/extending skills, hub-and-spoke pattern, skill schema, discovery | Skill schema, discovery mechanism, or hub-and-spoke conventions |
+| Validation tooling | [`validation-tooling.md`](references/validation-tooling.md) | Validation suites, crystallization lifecycle, suite writing philosophy | Validation suites, crystallization lifecycle, or stochastic/deterministic methodology |
+| Knowledge & docs | [`knowledge-compounding.md`](references/knowledge-compounding.md) | Documentation schemas, solutions, memories, knowledge indexes | Documentation schemas, knowledge indexes, or compounding flows |
 
 ## Cross-Cutting Patterns
 
