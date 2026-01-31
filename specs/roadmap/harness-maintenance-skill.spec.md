@@ -36,7 +36,7 @@ skills/harness-maintenance/
     writing-flows.md                # Flow authoring best practices
     tools-commands-mcp-hooks.md     # Extending CLI capability surface
     core-architecture.md            # TUI, event loop, orchestration, prompt types, emergent
-    harness_skills.md               # Creating and maintaining skills
+    harness-skills.md               # Creating and maintaining skills
     validation-tooling.md           # Creating validation suites and tooling specs
     knowledge-compounding.md        # Docs, knowledge indexes, solutions, memories
 ```
@@ -62,7 +62,7 @@ Content sources:
 - `writing-flows.md`: Migrate knowledge from current `WRITING_HARNESS_FLOWS.md` (the flow file remains but becomes thin)
 - `tools-commands-mcp-hooks.md`: Extract from current SKILL.md sections on hooks, commands, and extension points. These are adjacent enough to share one reference since they all follow the auto-discovery pattern.
 - `core-architecture.md`: Extract from current SKILL.md sections on TUI, event loop, agent profiles, schemas, hypothesis domains. Should capture both the architectural map (how things connect) and invariants (what must be preserved).
-- `harness_skills.md`: New content covering the skill schema, directory conventions, discovery mechanism, and when/how to create new skills
+- `harness-skills.md`: New content covering the skill schema, directory conventions, discovery mechanism, and when/how to create new skills
 - `validation-tooling.md`: Migrate knowledge from `CREATE_VALIDATION_TOOLING_SPEC.md` (research, tool validation, suite writing philosophy, evidence capture patterns)
 - `knowledge-compounding.md`: New content covering documentation schema, knowledge indexes, solutions, memories, and the compounding principles for maintaining these
 
