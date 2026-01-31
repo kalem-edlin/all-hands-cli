@@ -1,58 +1,80 @@
 <goal>
-Transform the spec into executable prompts with type-appropriate planning depth. Per **Quality Engineering**, milestone specs get deep planning with variant architecture. Per **Frontier Models are Capable**, exploratory specs get lightweight scoping that leaves room for hypothesis-driven discovery.
+Transform the spec into executable prompts with domain-appropriate planning depth. Per **Quality Engineering**, deep domains get full planning with variant architecture and jury review. Per **Frontier Models are Capable**, focused domains get lightweight scoping that leaves room for hypothesis-driven discovery. The workflow domain config at `WORKFLOW_DOMAIN_PATH` drives planning behavior.
 </goal>
 
 <inputs>
 - Spec doc path
 - Alignment doc path
 - Prompts folder path
+- `WORKFLOW_DOMAIN_PATH` — path to the workflow domain config file
 </inputs>
 
 <constraints>
-- MUST read spec `type` field before planning — it determines planning depth
+- MUST read the workflow domain config before planning — `planning_depth` determines the planning path
 - MUST present recommended approach for each decision point
-- Milestone specs MUST include jury review before finalizing
-- Exploratory specs MUST document unresolved questions in alignment doc for emergent planner consumption
-- Prompts MUST be fully autonomous - no human intervention during execution
-- Testing is NOT a prompt - validation happens via validation_suites attached to prompts
+- MUST include jury review when domain config sets `jury_required: true`
+- Focused planning domains MUST document unresolved questions in alignment doc for emergent planner consumption
+- Prompts MUST be fully autonomous — no human intervention during execution
+- Testing is NOT a prompt — validation happens via validation_suites attached to prompts
 </constraints>
 
 ## Context Gathering
 
-- Read the spec doc — note the `type` field (milestone, investigation, optimization, refactor, documentation, triage)
+- Read the spec doc
+- Read the workflow domain config at `WORKFLOW_DOMAIN_PATH`
+  - **Defensive fallback**: If `WORKFLOW_DOMAIN_PATH` is empty or the file does not exist, default to deep planning behavior (`planning_depth: deep`, `jury_required: true`). Per **Knowledge Compounding**, this handles backward compatibility with specs created before domain config was active.
+  - Note `planning_depth`, `jury_required`, and the Planning Considerations section
 - Read the alignment doc for existing prompts that may impact planning (if exists)
 - Read codebase files referenced in spec for initial grounding
 - Ensure your branch is up to date with base branch
-- Search documented solutions with `ah solutions search "<keywords>"` for relevant past learnings in this domain
+- Search documented solutions with `ah solutions search "<keywords>"` for relevant past learnings
 - Search memories with `ah memories search "<keywords>"` for engineer preferences and prior spec insights
 
-## Planning Depth by Spec Type
+## Idempotency Check
 
-Per **Frontier Models are Capable**, the spec `type` determines planning depth — deduce appropriate behavior:
+Per **Knowledge Compounding**, detect existing planning artifacts and offer modes:
 
-| Spec Type | Planning Path | Research | Interview | Jury | Output |
-|-----------|--------------|----------|-----------|------|--------|
-| `milestone` (or missing) | Milestone Planning | 1-4 deep subtasks | Full decision interview | Yes | 5-15 prompts + detailed alignment doc |
-| All other types | Exploratory Planning | 1-2 focused subtasks | Open questions only (skippable) | No | 0-3 seed prompts + problem-focused alignment doc |
+- Check if the prompts folder contains existing prompt files and/or an alignment doc exists
+- If no existing artifacts — proceed directly to Planning Depth
+- If existing artifacts detected, ask the engineer using `AskUserQuestion`:
+  - **Start fresh** — Clear prompts and alignment doc, replan from spec
+  - **Amend** — Read existing alignment doc and prompts, produce amendments without re-litigating existing decisions
+- In amend mode:
+  - Use **reference integrity check** for staleness: decisions referencing prompts that no longer exist or have been significantly modified are flagged as stale and re-presented to the engineer
+  - Decisions whose referenced prompts still exist and are structurally intact are preserved
+  - Focus research and interview on new/changed areas only
 
-## Milestone Planning
+## Planning Depth
+
+Per **Frontier Models are Capable**, the domain config's `planning_depth` determines the planning path — deduce appropriate behavior:
+
+| Planning Depth | Planning Path | Research | Interview | Jury | Output |
+|----------------|--------------|----------|-----------|------|--------|
+| `deep` (or fallback) | Deep Planning | 1-4 deep subtasks | Full decision interview | Gated by `jury_required` | 5-15 prompts + detailed alignment doc |
+| `focused` | Focused Planning | 1-2 focused subtasks | Open questions only (skippable) | No | 0-3 seed prompts + problem-focused alignment doc |
+
+The domain config's **Planning Considerations** section drives domain-specific behavior within each path — surface its constraints, limitations, and edge cases during research and interview phases.
+
+## Deep Planning
 
 ### Deep Research
 
-Spawn parallel general subtasks to ground yourself with information that will help you be confident making recommendations in the upcoming interview and subsequent writing of this implementation:
-- 1-4 Tasks: Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` in order to understand relevant implementation approaches in the codebase
-- 0-3 Tasks: Tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` in order to isolate optimal solutions to the problem (if necessary)
+Spawn parallel subtasks to ground recommendations before the engineer interview:
+- 1-4 Tasks: Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` to understand relevant implementation approaches
+- 0-3 Tasks: Tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` to isolate optimal solutions (if necessary)
+- Apply domain config's Planning Considerations to focus research scope and priorities
 
 ### Engineer Interview
 
-Per **Quality Engineering**, present researched approaches as options using the `AskUserQuestion` tool:
-- Ask ONE decision point at a time - do not batch all questions together
+Per **Quality Engineering**, present researched approaches as options using `AskUserQuestion`:
+- Ask ONE decision point at a time — do not batch all questions together
 - Each implementation approach becomes a set of options (2-4 per question)
 - Engineer can choose one OR many (disposable variants)
-- When selecting many, create parallel variant prompts behind feature flags if they cant work together at the same time
-- If we use variant prompts, engineer MUST choose a **convention** when selecting multiple approaches
+- When selecting many, create parallel variant prompts behind feature flags if they can't work together at the same time
+- If variant prompts used, engineer MUST choose a **convention** when selecting multiple approaches
 - Each option MUST have a recommended approach (mark with "(Recommended)" suffix)
 - Adapt subsequent questions based on previous answers when logical dependencies exist
+- Use domain config's Planning Considerations to inform approach evaluation criteria
 
 Keep interview concise and actionable.
 
@@ -69,7 +91,7 @@ When engineer selects multiple approaches:
 
 Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
 - Typically run after understanding the implementation approach and the external technology required
-- Can be used to answer questions on open source libraries to help with the engineer interview, where beneficial
+- Can inform the engineer interview where beneficial
 - Consolidate approach against actual documentation
 - Derive specific implementation steps
 
@@ -81,7 +103,7 @@ Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
 - For high-risk domains (auth, payments, data), note TDD approach requirement in prompt
   - Reference `.allhands/flows/shared/TDD_WORKFLOW.md` for TDD execution guidance
 
-### Milestone Alignment Doc
+### Deep Alignment Doc
 
 - Run `ah schema alignment` for format
 - Create alignment doc with Overview + Hard User Requirements sections
@@ -89,11 +111,11 @@ Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
   - Record: what you recommended, what they chose instead, their stated reasoning
   - Do NOT record when engineer accepts the recommended approach
   - Purpose: future agents need to know where human judgment overrode AI suggestions
-- Do NOT write prompt summaries - those are appended by executor after prompt completion
+- Do NOT write prompt summaries — those are appended by executor after prompt completion
 
 ### Plan Verification
 
-Before spawning jury, self-verify plans can achieve goals:
+Before jury review (if applicable), self-verify plans achieve goals:
 
 | Dimension | Check |
 |-----------|-------|
@@ -103,9 +125,11 @@ Before spawning jury, self-verify plans can achieve goals:
 | Scope Sanity | 2-3 tasks per prompt? <7 files per prompt? |
 | Validation Coverage | Prompts reference available validation suites where applicable? |
 
-If issues found, fix before jury review.
+Fix issues before proceeding.
 
 ### Plan Review Jury
+
+**Gated by `jury_required` from domain config.** If `jury_required: false` — skip this section entirely.
 
 Spawn parallel review subtasks (provide alignment doc, spec doc, prompts folder paths):
 
@@ -114,7 +138,7 @@ Spawn parallel review subtasks (provide alignment doc, spec doc, prompts folder 
 | Expectations Fit | `.allhands/flows/shared/jury/PROMPTS_EXPECTATIONS_FIT.md` | Alignment + prompts fit spec expectations |
 | Flow Analysis | `.allhands/flows/shared/jury/PROMPTS_FLOW_ANALYSIS.md` | Prompt dependencies, variant ordering, importance |
 | YAGNI | `.allhands/flows/shared/jury/PROMPTS_YAGNI.md` | Holistic over-engineering check |
-| Premortem | `.allhands/flows/shared/jury/PROMPT_PREMORTEM.md` | Risk analysis - Tigers, Elephants, failure modes |
+| Premortem | `.allhands/flows/shared/jury/PROMPT_PREMORTEM.md` | Risk analysis — Tigers, Elephants, failure modes |
 
 After jury returns:
 - Read `.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md` for feedback synthesis
@@ -139,19 +163,16 @@ If yes:
 - Enhances prompts with research insights
 - Preserves original content, only adds research findings
 
-This is recommended for:
-- Complex architectural decisions
-- High-risk domains (security, payments, data migrations)
-- Novel technologies not yet in codebase
-- Large specs with many unknowns
+Recommended for complex architectural decisions, high-risk domains, novel technologies, or large specs with many unknowns.
 
-## Exploratory Planning
+## Focused Planning
 
 ### Focused Research
 
 Spawn 1-2 targeted research subtasks grounded in the problem area:
 - Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` focused on the specific problem domain
 - Only spawn external research (`.allhands/flows/shared/RESEARCH_GUIDANCE.md`) if the spec references external tools or novel approaches
+- Apply domain config's Planning Considerations to focus research direction
 
 ### Engineer Scope Narrowing
 
@@ -159,7 +180,7 @@ Present spec open questions and concerns to the engineer using `AskUserQuestion`
 - Each open question becomes a question — engineer can answer to narrow scope or skip
 - Skipped/unanswered questions remain open for hypothesis-driven discovery
 - Include a recommended approach for each question
-- Keep interview brief — exploratory specs intentionally leave room for discovery
+- Keep interview brief — focused domains intentionally leave room for discovery
 
 ### Seed Prompt Creation
 
@@ -169,16 +190,18 @@ Present spec open questions and concerns to the engineer using `AskUserQuestion`
 - Seed prompts target the most concrete, immediately actionable aspects of the spec
 - Remaining open questions are left for the emergent planner to design experiments around
 
-### Exploratory Alignment Doc
+### Focused Alignment Doc
 
 - Run `ah schema alignment` for format — use the same schema sections with type-appropriate content:
   - **Overview**: Problem statement, evidence, context, and unresolved questions — the emergent planner reads these to design experiments
   - **Hard User Requirements**: Success criteria and constraints
-  - **Engineer Decisions**: Only deviations from recommendations (same as milestone)
+  - **Engineer Decisions**: Only deviations from recommendations (same as deep planning)
 - Document unresolved questions (skipped interview questions, open spec questions) prominently in Overview — per **Knowledge Compounding**, this enables emergent planner to discover and test answers
 - Document concerns and limitations as context for hypothesis formation
-- Do NOT write prompt summaries - those are appended by executor after prompt completion
+- Do NOT write prompt summaries — those are appended by executor after prompt completion
 
 ## Completion
 
-Stop once prompts + alignment doc are ready for execution.
+- Finalize prompts and alignment doc
+- Edit `.planning/<branch>/status.yaml` to set `stage: executing` — this signals the event loop to begin picking up prompts for execution
+- Stop

@@ -9,7 +9,9 @@ message_template: |
   Spec: ${SPEC_NAME}
   Spec Path: ${SPEC_PATH}
   Prompts Folder: ${PROMPTS_FOLDER}
+  Workflow domain config: ${WORKFLOW_DOMAIN_PATH}
 template_vars:
   - SPEC_NAME
   - SPEC_PATH
   - PROMPTS_FOLDER
+  - WORKFLOW_DOMAIN_PATH
