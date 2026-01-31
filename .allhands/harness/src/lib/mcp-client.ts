@@ -122,7 +122,7 @@ export async function startDaemon(agentId?: string): Promise<void> {
 /**
  * Send a command to the daemon and get response.
  */
-async function sendToDaemon<T>(agentId: string, command: unknown): Promise<T> {
+async function sendToDaemon<T>(agentId: string, command: unknown, timeoutMs = 30000): Promise<T> {
   return new Promise((resolve, reject) => {
     const socketPath = getSocketPath(agentId);
 
@@ -161,7 +161,7 @@ async function sendToDaemon<T>(agentId: string, command: unknown): Promise<T> {
       reject(new Error('Daemon connection timeout'));
     });
 
-    socket.setTimeout(30000); // 30 second timeout
+    socket.setTimeout(timeoutMs);
   });
 }
 
@@ -315,6 +315,7 @@ export async function callTool(
     // Ensure daemon is running, then call via daemon
     await startDaemon(aid);
 
+    const callTimeout = config.stateful_session_timeout ?? 30000;
     const result = await sendToDaemon<{
       success: boolean;
       result?: unknown;
@@ -325,7 +326,7 @@ export async function callTool(
       tool: toolName,
       params,
       config,
-    });
+    }, callTimeout);
 
     if (!result.success) {
       throw new Error(result.error ?? 'Tool call failed');
