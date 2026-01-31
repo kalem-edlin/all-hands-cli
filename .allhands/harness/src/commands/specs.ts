@@ -96,13 +96,6 @@ export async function reindexAfterMove(
       { path: newRelPath, added: true },
     ]);
   }
-
-  // Update docs index: docs includes all of specs/
-  // Remove from old location, add to new location
-  await service.reindexFromChanges('docs', [
-    { path: oldRelPath, deleted: true },
-    { path: newRelPath, added: true },
-  ]);
 }
 
 export function register(program: Command): void {
