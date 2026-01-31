@@ -6594,11 +6594,17 @@ var Manifest = class {
   internalPath;
   data;
   gitignoreFilter;
+  initOnlyMatchers;
   constructor(allhandsRoot) {
     this.allhandsRoot = allhandsRoot;
     this.internalPath = join3(allhandsRoot, INTERNAL_FILENAME);
     this.data = this.load();
     this.gitignoreFilter = new GitignoreFilter(allhandsRoot);
+    this.initOnlyMatchers = this.initOnlyPatterns.map((p) => {
+      const negated = p.startsWith("!");
+      const pattern = negated ? p.slice(1) : p;
+      return { matcher: new Minimatch(pattern, { dot: true }), negated };
+    });
   }
   load() {
     if (!existsSync3(this.internalPath)) {
@@ -6610,11 +6616,27 @@ var Manifest = class {
   get internalPatterns() {
     return this.data.internal || [];
   }
+  get initOnlyPatterns() {
+    return this.data.initOnly || [];
+  }
   /**
    * Check if a file is marked as internal (should not be distributed).
    */
   isInternal(path2) {
     return this.internalPatterns.some((pattern) => minimatch(path2, pattern, { dot: true }));
+  }
+  /**
+   * Check if a file is init-only using last-match-wins semantics with negation support.
+   * Patterns starting with `!` exempt matching files from being init-only.
+   */
+  isInitOnly(path2) {
+    let initOnly = false;
+    for (const { matcher, negated } of this.initOnlyMatchers) {
+      if (matcher.match(path2)) {
+        initOnly = !negated;
+      }
+    }
+    return initOnly;
   }
   /**
    * Check if a file is gitignored.
@@ -6887,7 +6909,7 @@ function setupAhShim() {
   writeFileSync3(shimPath, AH_SHIM_SCRIPT, { mode: 493 });
   return { installed: true, path: shimPath, inPath };
 }
-async function cmdSync(target = ".", autoYes = false) {
+async function cmdSync(target = ".", autoYes = false, init = false) {
   const resolvedTarget = resolve6(process.cwd(), target);
   const allhandsRoot = getAllhandsRoot();
   const targetAllhandsDir = join7(resolvedTarget, ".allhands");
@@ -6928,6 +6950,13 @@ async function cmdSync(target = ".", autoYes = false) {
   }
   const manifest = new Manifest(allhandsRoot);
   const distributable = manifest.getDistributableFiles();
+  if (!init) {
+    for (const relPath of [...distributable]) {
+      if (manifest.isInitOnly(relPath)) {
+        distributable.delete(relPath);
+      }
+    }
+  }
   let copied = 0;
   let created = 0;
   let skipped = 0;
@@ -7202,6 +7231,9 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
   const filesToPush = [];
   const localGitFiles = new Set(getGitFiles(cwd));
   for (const relPath of upstreamFiles) {
+    if (manifest.isInitOnly(relPath)) {
+      continue;
+    }
     if (PUSH_BLOCKLIST.includes(relPath)) {
       continue;
     }
@@ -7220,6 +7252,7 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
   for (const pattern of finalIncludes) {
     const matchedFiles = expandGlob(pattern, cwd);
     for (const relPath of matchedFiles) {
+      if (manifest.isInitOnly(relPath)) continue;
       if (PUSH_BLOCKLIST.includes(relPath)) continue;
       if (finalExcludes.some((p) => minimatch(relPath, p, { dot: true }))) continue;
       if (filesToPush.some((f) => f.path === relPath)) continue;
@@ -7395,7 +7428,7 @@ var require2 = createRequire(import.meta.url);
 var pkg = require2("../package.json");
 var VERSION = pkg.version;
 var syncHandler = async (argv) => {
-  const code = await cmdSync(argv.target || ".", argv.yes || false);
+  const code = await cmdSync(argv.target || ".", argv.yes || false, argv.init || false);
   process.exit(code);
 };
 var syncBuilder = (yargs) => {
@@ -7407,6 +7440,10 @@ var syncBuilder = (yargs) => {
     alias: "y",
     type: "boolean",
     describe: "Skip confirmation prompts",
+    default: false
+  }).option("init", {
+    type: "boolean",
+    describe: "Include init-only files (for first-time setup)",
     default: false
   });
 };
@@ -7420,28 +7457,6 @@ async function main() {
     "Initialize or update allhands in target repo",
     syncBuilder,
     syncHandler
-  ).command(
-    "init [target]",
-    false,
-    // hidden from help
-    syncBuilder,
-    syncHandler
-  ).command(
-    "update",
-    false,
-    // hidden from help
-    (yargs) => {
-      return yargs.option("yes", {
-        alias: "y",
-        type: "boolean",
-        describe: "Skip confirmation prompts",
-        default: false
-      });
-    },
-    async (argv2) => {
-      const code = await cmdSync(".", argv2.yes);
-      process.exit(code);
-    }
   ).command(
     "pull-manifest",
     "Create sync config for push customization",

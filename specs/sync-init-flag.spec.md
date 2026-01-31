@@ -2,7 +2,7 @@
 name: sync-init-flag
 domain_name: infrastructure
 type: milestone
-status: roadmap
+status: completed
 dependencies: []
 branch: feature/sync-init-flag
 ---
@@ -98,3 +98,20 @@ Engineer expects the README to document the `--init` flag: its purpose, when to 
 - `fullReplace` in `src/lib/full-replace.ts` is dead code — exported but never imported. Safe removal with no downstream impact.
 - The `GitignoreFilter` class in `src/lib/gitignore.ts` already handles glob pattern matching with the `ignore` npm package, which natively supports negation patterns. This may be reusable for `initOnly` pattern resolution.
 - `.internal.json` is itself listed in the `internal` array (self-referencing to prevent distribution). This must be preserved in the restructured format.
+
+## Implementation Reality
+
+**What was implemented**: All 6 goals delivered as specified. No deviations from the original plan.
+
+**Open Questions resolved**:
+- **Manifest API**: `isInitOnly(path)` method alongside existing `isDistributable()` — simpler two-method approach over tri-state, since consumers (sync/push) only need a boolean gate
+- **Negation patterns**: Standalone minimatch loop with last-match-wins semantics, not `GitignoreFilter` — appropriate for small, simple root-relative pattern set
+- **Backward compatibility**: Non-issue — `.internal.json` is in its own `internal` list and never distributed to consumer repos
+
+**Execution profile**: 4 planned prompts + 1 review-fix (Gemini Code Assist feedback to pre-compile minimatch patterns). All first-attempt. No emergent prompts, no reverts. Prompts 02/03 parallelized successfully after 01 completed.
+
+**Key technical decisions**:
+- `getDistributableFiles()` unchanged — still returns init-only files. Filtering happens downstream in sync/push consumers
+- Sync filters by mutating the distributable `Set` in-place before conflict detection
+- Push places init-only guard as the first filter in both Phase 1 and Phase 2 loops, unconditionally excluding init-only files even from `--include` patterns
+- `docs.json` moved from `internal` to `initOnly`, enabling first-time distribution to target repos

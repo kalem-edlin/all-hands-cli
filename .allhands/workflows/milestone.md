@@ -39,37 +39,11 @@ Work through relevant categories based on milestone scope. Each category surface
 | **Integrations** | "External services? APIs consumed/created?" | Assumes integrations are simple |
 | **Security** | "Who should do what? Sensitive data?" | Says "just basic login" |
 
-### Knowledge Gap Detection
-
-Watch for these signals requiring deeper probing:
+### Additional Knowledge Gap Signals
 
 | Signal | Action |
 |--------|--------|
-| "I think..." or "Maybe..." | Probe deeper, offer research |
-| "That sounds good" (to your suggestion) | Verify they understand implications |
-| "Just simple/basic X" | Challenge - define what simple means |
-| Technology buzzwords without context | Ask what they think it does |
 | Conflicting requirements | Surface the conflict explicitly and ask for Disposable Variants Approach |
-
-### Preference Language
-
-Map engineer input to spec language that preserves intent fidelity:
-
-| Engineer Input | Write As |
-|----------------|----------|
-| Strong preference | "Engineer desires X" / "Engineer expects X" |
-| Likes but flexible | "Engineer likes X but open to alternatives" |
-| Just an idea | "Engineer proposes X, open-ended for architect" |
-| No opinion | Leave in Open Questions |
-
-### Open Questions Guidance
-
-- **Close yourself**: Obvious feasibility questions, things answerable from gathered context
-- **Leave open**: Technology selection needing deep research, tradeoffs needing architect expertise, anything engineer explicitly delegated
-
-### Building on Unimplemented Milestones
-
-Use "Assuming X exists..." or "Assuming any of X, Y, Z exist..." to express dependencies on milestones that will be implemented by the time this one is. Never use cross-references to unimplemented milestone specs.
 
 ### Completeness Check
 
@@ -92,18 +66,7 @@ Per **Ideation First**, engineers control depth — domain config ensures covera
 ### Probe Guidance
 
 - Probe vague responses with category deep dives
-- Detect knowledge gaps using the signal table
-- Validate preference language to preserve intent fidelity
-- Ask one question at a time — reflect back understanding before moving on
-
-### Grounding
-
-Spawn parallel subtasks during interview to ground ideation in codebase reality:
-- 1-3 codebase exploration subtasks (yields hard dependencies, feasibility constraints)
-- 0-2 research subtasks for high-level tech solution approaches (if necessary)
-- Spawn ongoing research subtasks as new concepts emerge during the interview
-
-Present feasibility feedback grounded in exploration results.
+- Detect knowledge gaps using the signal tables
 
 ### Guiding Principles Synthesis
 
@@ -122,82 +85,6 @@ Spec body sections for milestone domain:
 Before or after creating the spec, offer flow analysis for complex features. Recommended for user-facing features with multiple paths, complex integrations, or features with unclear scope boundaries.
 
 ## Planning Considerations
-
-### Deep Research
-
-Spawn parallel subtasks to ground recommendations before the engineer interview:
-- 1-4 codebase understanding subtasks for relevant implementation approaches
-- 0-3 external research subtasks to isolate optimal solutions (if necessary)
-- Search documented solutions with `ah solutions search` for relevant past learnings
-- Search memories with `ah memories search` for engineer preferences and prior spec insights
-
-### Full Engineer Interview
-
-Per **Quality Engineering**, present researched approaches as options:
-- Ask one decision point at a time — do not batch questions
-- 2-4 options per question with recommended approach marked
-- Engineer can choose one or many (disposable variants)
-- Adapt subsequent questions based on prior answers when logical dependencies exist
-
-### Disposable Variant Architecture
-
-When engineer selects multiple approaches:
-- Create parallel variant prompts behind feature flags
-- Each variant is cheap to implement and test
-- Engineer must choose a convention when selecting multiple approaches
-- Multi-select triggers parallel variant prompts — planning agent architects variant structures
-
-### External Technology Research
-
-After understanding implementation approach and required external technology:
-- Spawn subtasks for external tech documentation research
-- Consolidate approach against actual documentation
-- Derive specific implementation steps
-- Can inform engineer interview where beneficial
-
-### Validation Suite Discovery
-
-- Discover and assign existing validation suites to prompts
-- For high-risk domains (auth, payments, data), flag TDD workflow requirement in prompts
-
-### Plan Verification
-
-Before jury review, self-verify plans achieve goals:
-
-| Dimension | Check |
-|-----------|-------|
-| Requirement Coverage | Every spec requirement has task(s)? |
-| Task Completeness | Every prompt has clear acceptance criteria? |
-| Key Links Planned | Components wire together (API -> UI)? |
-| Scope Sanity | 2-3 tasks per prompt? <7 files per prompt? |
-| Validation Coverage | Prompts reference available validation suites where applicable? |
-
-Fix issues before proceeding to jury review.
-
-### 4-Member Jury Review
-
-Spawn parallel review subtasks:
-
-| Jury Member | Focus |
-|-------------|-------|
-| **Expectations Fit** | Alignment + prompts fit spec expectations |
-| **Flow Analysis** | Prompt dependencies, variant ordering, importance |
-| **YAGNI** | Holistic over-engineering check |
-| **Premortem** | Risk analysis — Tigers (P1/P2), Elephants (discussion points), failure modes |
-
-After jury returns:
-- Premortem Tigers become P1/P2 review items; Elephants become discussion points
-- Present actionable options to engineer (including risk acceptance decisions)
-- Create new prompts for additions exceeding scope limits rather than packing into existing prompts
-- Update prompt dependencies when inserting new prompts
-
-### Review Options Breakdown
-
-Synthesize jury feedback into actionable options for the engineer. Document only deviations from recommendations, including accepted risks that were flagged.
-
-### Plan Deepening (Optional)
-
-Per **Knowledge Compounding**, offer to deepen the plan with comprehensive research. Recommended for complex architectural decisions, high-risk domains, novel technologies, or large specs with many unknowns.
 
 ### Prompt Output Range
 

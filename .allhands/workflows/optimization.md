@@ -51,8 +51,6 @@ Per **Ideation First**, the optimization interview captures measurable targets s
 
 - Probe vague targets — demand concrete numbers
 - Verify baseline metrics exist or flag measurement as a prerequisite task
-- Ask one question at a time — reflect back understanding before moving on
-- Skip questions the engineer has already answered in prior responses
 
 ### Output Sections
 

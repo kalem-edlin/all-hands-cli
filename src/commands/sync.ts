@@ -53,7 +53,7 @@ function setupAhShim(): { installed: boolean; path: string | null; inPath: boole
   return { installed: true, path: shimPath, inPath };
 }
 
-export async function cmdSync(target: string = '.', autoYes: boolean = false): Promise<number> {
+export async function cmdSync(target: string = '.', autoYes: boolean = false, init: boolean = false): Promise<number> {
   const resolvedTarget = resolve(process.cwd(), target);
   const allhandsRoot = getAllhandsRoot();
 
@@ -104,6 +104,15 @@ export async function cmdSync(target: string = '.', autoYes: boolean = false): P
   // Load manifest for file-by-file sync
   const manifest = new Manifest(allhandsRoot);
   const distributable = manifest.getDistributableFiles();
+
+  // Filter out init-only files when --init is not set
+  if (!init) {
+    for (const relPath of [...distributable]) {
+      if (manifest.isInitOnly(relPath)) {
+        distributable.delete(relPath);
+      }
+    }
+  }
 
   let copied = 0;
   let created = 0;

@@ -61,8 +61,6 @@ Per **Ideation First**, the refactor interview captures scope boundaries and inv
 
 - Probe vague scope boundaries — demand specific modules, files, or patterns
 - Enumerate invariants explicitly — don't assume the engineer has considered all contract surfaces
-- Ask one question at a time — reflect back understanding before moving on
-- Skip questions the engineer has already answered in prior responses
 
 ### Output Sections
 

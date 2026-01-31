@@ -69,6 +69,15 @@ Sub-flows use `<inputs>` and `<outputs>` tags for execution-agnostic subtasks. T
 
 See `.allhands/flows/PROMPT_TASK_EXECUTION.md` — this flow demonstrates all conventions: `<goal>`, `<constraints>`, phase sections, action-verb bullets, progressive disclosure via sub-flow references, and explicit completion steps.
 
+## Flow-Config Boundary
+
+Flows and workflow domain configs serve distinct roles. Maintaining the boundary prevents redundancy and keeps configs concise.
+
+- **Flows** own generic behaviors: interview mechanics, grounding patterns, conviction spectrum, open question triage, roadmap-aware assumptions
+- **Configs** provide domain-specific context: vocabulary, gap signals, output sections, planning strategy, category deep dives
+- **Litmus test**: If removing it from the config would break ALL domains, it belongs in the flow. If it only affects ONE domain, it belongs in the config.
+- Configs layer domain-specific additions on top of flow behaviors — they should not restate the base behaviors the flow already provides
+
 ## Related References
 
 - [`core-architecture.md`](core-architecture.md) — When your flow change touches directory structure, TUI lifecycle, or schema system

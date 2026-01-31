@@ -63,6 +63,30 @@ ah <command>
 The `ah` command works from any directory within an all-hands project.
 
 
+## Syncing to Target Repos
+
+The `sync` command distributes harness files from this repo to target repositories:
+
+```bash
+ah sync /path/to/target-repo
+```
+
+By default, sync preserves configuration files that target repos customize (settings, hooks, validation suites). These "init-only" files are only included during first-time setup or when explicitly requested.
+
+### The `--init` Flag
+
+Use `--init` to include init-only files — configuration defaults like `docs.json` that are normally withheld to avoid overwriting target-repo customizations:
+
+```bash
+# First-time setup — include all defaults
+ah sync /path/to/target-repo --init
+
+# Regular update — preserves target-repo configuration
+ah sync /path/to/target-repo
+```
+
+Use `--init` when setting up a new repo or resetting configuration to harness defaults. Omit it for routine updates. See `ah sync --help` for full options.
+
 ## Project Settings
 
 Project-specific configuration lives in `.allhands/settings.json`:
