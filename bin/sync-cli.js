@@ -6610,11 +6610,33 @@ var Manifest = class {
   get internalPatterns() {
     return this.data.internal || [];
   }
+  get initOnlyPatterns() {
+    return this.data.initOnly || [];
+  }
   /**
    * Check if a file is marked as internal (should not be distributed).
    */
   isInternal(path2) {
     return this.internalPatterns.some((pattern) => minimatch(path2, pattern, { dot: true }));
+  }
+  /**
+   * Check if a file is init-only using last-match-wins semantics with negation support.
+   * Patterns starting with `!` exempt matching files from being init-only.
+   */
+  isInitOnly(path2) {
+    let initOnly = false;
+    for (const pattern of this.initOnlyPatterns) {
+      if (pattern.startsWith("!")) {
+        if (minimatch(path2, pattern.slice(1), { dot: true })) {
+          initOnly = false;
+        }
+      } else {
+        if (minimatch(path2, pattern, { dot: true })) {
+          initOnly = true;
+        }
+      }
+    }
+    return initOnly;
   }
   /**
    * Check if a file is gitignored.
@@ -7420,28 +7442,6 @@ async function main() {
     "Initialize or update allhands in target repo",
     syncBuilder,
     syncHandler
-  ).command(
-    "init [target]",
-    false,
-    // hidden from help
-    syncBuilder,
-    syncHandler
-  ).command(
-    "update",
-    false,
-    // hidden from help
-    (yargs) => {
-      return yargs.option("yes", {
-        alias: "y",
-        type: "boolean",
-        describe: "Skip confirmation prompts",
-        default: false
-      });
-    },
-    async (argv2) => {
-      const code = await cmdSync(".", argv2.yes);
-      process.exit(code);
-    }
   ).command(
     "pull-manifest",
     "Create sync config for push customization",

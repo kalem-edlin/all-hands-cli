@@ -5,6 +5,7 @@ import { GitignoreFilter } from './gitignore.js';
 
 interface InternalData {
   internal?: string[];
+  initOnly?: string[];
 }
 
 const INTERNAL_FILENAME = '.internal.json';
@@ -34,11 +35,35 @@ export class Manifest {
     return this.data.internal || [];
   }
 
+  get initOnlyPatterns(): string[] {
+    return this.data.initOnly || [];
+  }
+
   /**
    * Check if a file is marked as internal (should not be distributed).
    */
   isInternal(path: string): boolean {
     return this.internalPatterns.some(pattern => minimatch(path, pattern, { dot: true }));
+  }
+
+  /**
+   * Check if a file is init-only using last-match-wins semantics with negation support.
+   * Patterns starting with `!` exempt matching files from being init-only.
+   */
+  isInitOnly(path: string): boolean {
+    let initOnly = false;
+    for (const pattern of this.initOnlyPatterns) {
+      if (pattern.startsWith('!')) {
+        if (minimatch(path, pattern.slice(1), { dot: true })) {
+          initOnly = false;
+        }
+      } else {
+        if (minimatch(path, pattern, { dot: true })) {
+          initOnly = true;
+        }
+      }
+    }
+    return initOnly;
   }
 
   /**
