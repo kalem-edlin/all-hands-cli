@@ -257,7 +257,7 @@ function finalizeSingleFile(
     // For file-only refs (empty symbol), just add the hash
     if (!placeholder.symbol || placeholder.symbol.trim() === "") {
       const fullRef = `[ref:${placeholder.file}::${hashResult.hash}]`;
-      finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+      finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
       replacements.push({ from: placeholder.match, to: fullRef });
       continue;
     }
@@ -265,7 +265,7 @@ function finalizeSingleFile(
     // For non-code files (markdown, yaml, json, etc.), treat symbol as a label (no ctags lookup)
     if (!isCodeFile(placeholder.file)) {
       const fullRef = `[ref:${placeholder.file}:${placeholder.symbol}:${hashResult.hash}]`;
-      finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+      finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
       replacements.push({ from: placeholder.match, to: fullRef });
       continue;
     }
@@ -282,7 +282,7 @@ function finalizeSingleFile(
 
     // Create full ref
     const fullRef = `[ref:${placeholder.file}:${placeholder.symbol}:${hashResult.hash}]`;
-    finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+    finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
     replacements.push({ from: placeholder.match, to: fullRef });
   }
 
@@ -340,7 +340,7 @@ function refreshSingleFile(
     const newRef = m.symbol === ""
       ? `[ref:${m.file}::${hashResult.hash}]`
       : `[ref:${m.file}:${m.symbol}:${hashResult.hash}]`;
-    refreshedContent = refreshedContent.replace(oldRef, newRef);
+    refreshedContent = refreshedContent.replaceAll(oldRef, newRef);
     updated++;
   }
 
