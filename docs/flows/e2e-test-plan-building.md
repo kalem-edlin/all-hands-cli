@@ -76,8 +76,8 @@ When present, the section provides example prompts engineers can give to agent s
 
 ### Context Gathering for Tooling
 
-Per [ref:.allhands/flows/E2E_TEST_PLAN_BUILDING.md::29f9dfe], during context gathering the flow runs `ah validation-tools list` to identify available suites. The `tools` field in suite output identifies which tooling is available for both stochastic and deterministic dimensions -- this informs which Section 3 tooling categories the project can support and surfaces tooling that may not be obvious from code inspection alone.
+Per [ref:.allhands/flows/E2E_TEST_PLAN_BUILDING.md::aa87ec8], during context gathering the flow runs `ah validation-tools list` to identify available suites. The `tools` field in suite output identifies which tooling is available for both stochastic and deterministic dimensions -- this informs which Section 3 tooling categories the project can support and surfaces tooling that may not be obvious from code inspection alone.
 
 ## Source Flow
 
-[ref:.allhands/flows/E2E_TEST_PLAN_BUILDING.md::79b9873]
+[ref:.allhands/flows/E2E_TEST_PLAN_BUILDING.md::aa87ec8]

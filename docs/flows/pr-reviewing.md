@@ -29,7 +29,7 @@ sequenceDiagram
 
 ## Feedback Processing
 
-The flow reads PR comments via `gh` CLI, then structures feedback using the review options breakdown methodology from [ref:.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md::79b9873]. Feedback is grouped by severity and effort before presentation to the engineer.
+The flow reads PR comments via `gh` CLI, then structures feedback using the review options breakdown methodology from [ref:.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md::739ad0a]. Feedback is grouped by severity and effort before presentation to the engineer.
 
 ## Decision Handling
 
@@ -38,7 +38,7 @@ The flow reads PR comments via `gh` CLI, then structures feedback using the revi
 | Accepted | Create `type: review-fix` prompt with PR comment context | Feeds into prompt execution loop |
 | Declined | Document in alignment doc with engineer reasoning | Prevents re-suggestion by future agents |
 
-Both outcomes produce artifacts. The accepted path creates prompts following [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::79b9873]. The declined path updates the alignment doc (schema via `ah schema alignment`) with explicit rejection rationale. This dual-tracking ensures no review feedback is lost regardless of the engineer's decision.
+Both outcomes produce artifacts. The accepted path creates prompts following [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::1abf30b]. The declined path updates the alignment doc (schema via `ah schema alignment`) with explicit rejection rationale. This dual-tracking ensures no review feedback is lost regardless of the engineer's decision.
 
 ## Prompt Creation
 
@@ -51,4 +51,4 @@ The flow completes once all prompts are created and the alignment doc is updated
 
 ## Source Flow
 
-[ref:.allhands/flows/PR_REVIEWING.md::79b9873]
+[ref:.allhands/flows/PR_REVIEWING.md::63f8508]

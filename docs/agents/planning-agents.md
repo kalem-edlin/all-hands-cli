@@ -10,7 +10,7 @@ Planning agents operate upstream of execution. They translate human intent into 
 
 | Aspect | Ideation | Planner | Emergent |
 |--------|----------|---------|----------|
-| Config | [ref:.allhands/agents/ideation.yaml::48bd111] | [ref:.allhands/agents/planner.yaml::48bd111] | [ref:.allhands/agents/emergent.yaml::48bd111] |
+| Config | [ref:.allhands/agents/ideation.yaml::faf0f2d] | [ref:.allhands/agents/planner.yaml::9013364] | [ref:.allhands/agents/emergent.yaml::9b6a9d4] |
 | Flow | `IDEATION_SESSION.md` | `SPEC_PLANNING.md` | `EMERGENT_PLANNING.md` |
 | Requires spec | No | Yes | Yes |
 | Prompt scoped | No | No | Yes |

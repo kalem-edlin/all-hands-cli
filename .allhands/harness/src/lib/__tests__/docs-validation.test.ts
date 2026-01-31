@@ -11,6 +11,8 @@ import {
   detectPlaceholders,
   countCodeBlocks,
   hasCapabilityList,
+  getBlobHashForFile,
+  batchGetBlobHashes,
 } from "../docs-validation.js";
 
 describe("REF_PATTERN", () => {
@@ -272,5 +274,71 @@ describe("hasCapabilityList", () => {
   it("does not flag plain text", () => {
     const content = "Just some text about Command and Purpose.";
     expect(hasCapabilityList(content)).toBe(false);
+  });
+});
+
+describe("getBlobHashForFile", () => {
+  // These tests require running inside a git repo with committed files.
+  // They use the project's own files as fixtures.
+  const projectRoot = process.cwd();
+
+  it("returns a 7-char hex hash for a committed file", () => {
+    const result = getBlobHashForFile("package.json", projectRoot);
+    expect(result.success).toBe(true);
+    expect(result.hash).toMatch(/^[a-f0-9]{7}$/);
+  });
+
+  it("handles absolute paths by normalizing to relative", () => {
+    const absPath = `${projectRoot}/package.json`;
+    const result = getBlobHashForFile(absPath, projectRoot);
+    expect(result.success).toBe(true);
+    expect(result.hash).toMatch(/^[a-f0-9]{7}$/);
+  });
+
+  it("returns failure for non-existent file", () => {
+    const result = getBlobHashForFile("this-file-does-not-exist.xyz", projectRoot);
+    expect(result.success).toBe(false);
+    expect(result.hash).toBe("0000000");
+  });
+
+  it("returns consistent hash for the same file content", () => {
+    const result1 = getBlobHashForFile("package.json", projectRoot);
+    const result2 = getBlobHashForFile("package.json", projectRoot);
+    expect(result1.hash).toBe(result2.hash);
+  });
+});
+
+describe("batchGetBlobHashes", () => {
+  const projectRoot = process.cwd();
+
+  it("returns hashes for multiple files", () => {
+    const files = ["package.json", "tsconfig.json"];
+    const results = batchGetBlobHashes(files, projectRoot);
+    expect(results.size).toBe(2);
+    for (const file of files) {
+      const result = results.get(file);
+      expect(result).toBeDefined();
+      expect(result!.success).toBe(true);
+      expect(result!.hash).toMatch(/^[a-f0-9]{7}$/);
+    }
+  });
+
+  it("returns same hash as individual getBlobHashForFile", () => {
+    const file = "package.json";
+    const individual = getBlobHashForFile(file, projectRoot);
+    const batch = batchGetBlobHashes([file], projectRoot);
+    expect(batch.get(file)!.hash).toBe(individual.hash);
+  });
+
+  it("handles empty file list", () => {
+    const results = batchGetBlobHashes([], projectRoot);
+    expect(results.size).toBe(0);
+  });
+
+  it("handles mix of existing and non-existing files", () => {
+    const files = ["package.json", "nonexistent-file.xyz"];
+    const results = batchGetBlobHashes(files, projectRoot);
+    expect(results.get("package.json")!.success).toBe(true);
+    expect(results.get("nonexistent-file.xyz")!.success).toBe(false);
   });
 });

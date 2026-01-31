@@ -10,7 +10,7 @@ These flows are under active development. They define useful capabilities but la
 
 ## Debug Investigation
 
-[ref:.allhands/flows/wip/DEBUG_INVESTIGATION.md::79b9873]
+[ref:.allhands/flows/wip/DEBUG_INVESTIGATION.md::8d96611]
 
 A structured investigation methodology for complex bugs with unclear root causes. Per **Agentic Validation Tooling**, systematic debugging beats random exploration.
 
@@ -64,7 +64,7 @@ Integration with the milestone workflow is under consideration via four paths:
 
 ## Memory Recall
 
-[ref:.allhands/flows/wip/MEMORY_RECALL.md::79b9873]
+[ref:.allhands/flows/wip/MEMORY_RECALL.md::38dd927]
 
 A query interface for the simple memory file at `docs/memories.md`. Per **Knowledge Compounding**, memories enable reuse of solutions without re-discovery.
 

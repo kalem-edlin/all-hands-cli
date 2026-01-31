@@ -6,7 +6,7 @@ description: "Jury-based implementation review orchestration with seven speciali
 
 After implementation is complete, the judge orchestrates a jury of specialized reviewers to assess the work against planning artifacts and the original spec. The design embodies **Quality Engineering**: the question is not "does this work?" but "which issues matter enough to fix?" The engineer makes all final decisions.
 
-[ref:.allhands/flows/JUDGE_REVIEWING.md::79b9873]
+[ref:.allhands/flows/JUDGE_REVIEWING.md::7a26793]
 
 ## Jury Architecture
 
@@ -38,7 +38,7 @@ All seven reviewers run in parallel as independent subtasks. The judge never rea
 
 ### Domain Best Practices
 
-[ref:.allhands/flows/shared/jury/BEST_PRACTICES_REVIEW.md::79b9873]
+[ref:.allhands/flows/shared/jury/BEST_PRACTICES_REVIEW.md::d8bd995]
 
 Spawned per domain touched by the implementation (expo/react-native, trpc/serverless, database/drizzle/supabase, web/tanstack/nextjs, dev tooling, CI/CD). Each reviewer extracts domain skills and codebase knowledge, then compares implementation against extracted patterns for compliance, preferences, pitfalls, and consistency.
 
@@ -46,19 +46,19 @@ Fallback: if no skill findings exist for a domain, the reviewer falls back to we
 
 ### Expectations Fit
 
-[ref:.allhands/flows/shared/jury/EXPECTATIONS_FIT_REVIEW.md::79b9873]
+[ref:.allhands/flows/shared/jury/EXPECTATIONS_FIT_REVIEW.md::40d4d15]
 
 Verifies implementation honors desires, concerns, and decisions from ideation and planning. Checks: engineer desires implemented, success criteria met, concerns addressed, planning decisions honored, scope matched, and -- critically -- goal achievement versus mere task completion.
 
 ### Security
 
-[ref:.allhands/flows/shared/jury/SECURITY_REVIEW.md::79b9873]
+[ref:.allhands/flows/shared/jury/SECURITY_REVIEW.md::7e98745]
 
 Reviews against OWASP Top 10 and common vulnerability patterns. File-type-aware: API endpoints get input validation and auth checks, database queries get parameterization review, frontend gets XSS and CSRF analysis, config files get secrets exposure scanning.
 
 ### YAGNI
 
-[ref:.allhands/flows/shared/jury/YAGNI_REVIEW.md::79b9873]
+[ref:.allhands/flows/shared/jury/YAGNI_REVIEW.md::0fca163]
 
 Detects over-engineering with source-awareness: agentic over-reach gets highest priority (P1), post-planning engineer decisions get P2, original planning decisions get P3. Agents systematically over-engineer, so this reviewer provides a deliberate counterweight.
 
@@ -66,7 +66,7 @@ Patterns detected: beyond-scope implementation, unused code, over-abstraction, u
 
 ### Maintainability
 
-[ref:.allhands/flows/shared/jury/MAINTAINABILITY_REVIEW.md::79b9873]
+[ref:.allhands/flows/shared/jury/MAINTAINABILITY_REVIEW.md::2d6ec3f]
 
 Targets agentic anti-patterns specifically:
 
@@ -83,19 +83,19 @@ Includes LOC reduction estimates for simplification recommendations.
 
 ### Architecture
 
-[ref:.allhands/flows/shared/jury/ARCHITECTURE_REVIEW.md::79b9873]
+[ref:.allhands/flows/shared/jury/ARCHITECTURE_REVIEW.md::3ec3664]
 
 Verifies SOLID principles, dependency direction (toward stable abstractions), circular dependency detection, layer violation detection, and boundary crossing analysis. Compares against both documented architecture and implicit patterns discovered via `ah knowledge docs search`.
 
 ### Claim Verification
 
-[ref:.allhands/flows/shared/jury/CLAIM_VERIFICATION_REVIEW.md::79b9873]
+[ref:.allhands/flows/shared/jury/CLAIM_VERIFICATION_REVIEW.md::5bbb331]
 
 Verifies factual assertions in prompts and alignment docs against actual codebase state. Categorizes claims as existence, absence, behavior, or location claims, each with different verification methods. Flags common verification failure patterns like "based on search results..." or "similar to X, Y does..."
 
 ## Feedback Synthesis
 
-[ref:.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md::79b9873]
+[ref:.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md::739ad0a]
 
 After all reviewers complete, findings are organized into actionable options:
 
@@ -109,4 +109,4 @@ Duplicates across reviewers are combined and elevated -- repeated concerns prove
 
 ## Output: Review-Fix Prompts
 
-Accepted fixes become `type: review-fix` prompts created per [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::79b9873]. Per **Knowledge Compounding**, declined items are documented with reasoning to prevent future re-suggestion of rejected approaches.
+Accepted fixes become `type: review-fix` prompts created per [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::1abf30b]. Per **Knowledge Compounding**, declined items are documented with reasoning to prevent future re-suggestion of rejected approaches.

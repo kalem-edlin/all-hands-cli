@@ -8,7 +8,7 @@ Research in the harness is never open-ended browsing. Every research flow serves
 
 ## Research Tool Selection
 
-[ref:.allhands/flows/shared/RESEARCH_GUIDANCE.md::79b9873]
+[ref:.allhands/flows/shared/RESEARCH_GUIDANCE.md::eb9185c]
 
 Before any research begins, agents must select the right tool for the depth needed:
 
@@ -27,7 +27,7 @@ The combination strategy is deliberate: when unsure, run multiple tools in paral
 
 ## Codebase Understanding
 
-[ref:.allhands/flows/shared/CODEBASE_UNDERSTANDING.md::79b9873]
+[ref:.allhands/flows/shared/CODEBASE_UNDERSTANDING.md::b10cce8]
 
 This flow governs how agents explore the codebase without consuming excessive context. It enforces a strict search hierarchy:
 
@@ -47,7 +47,7 @@ Queries must be complete sentences, not keyword soup. `"how does the retry mecha
 
 ## External Technology Guidance
 
-[ref:.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md::79b9873]
+[ref:.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md::9766b03]
 
 When implementation requires external libraries or services, this flow provides two parallel research channels:
 
@@ -60,7 +60,7 @@ The clone-and-browse approach leverages the agent's file navigation capabilities
 
 ## Plan Deepening
 
-[ref:.allhands/flows/shared/PLAN_DEEPENING.md::79b9873]
+[ref:.allhands/flows/shared/PLAN_DEEPENING.md::97692d7]
 
 Plan deepening is an optional enhancement phase that runs after planning is complete but before execution begins. It enriches prompts with research findings without changing their scope.
 

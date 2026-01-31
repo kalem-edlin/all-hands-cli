@@ -8,7 +8,7 @@
  *   [ref:file:symbol:hash] - Symbol reference (validated via ctags)
  *   [ref:file::hash]       - File-only reference (no symbol validation)
  *
- * Where hash = file-level git hash (git log -1 --format=%h -- file)
+ * Where hash = git blob hash (content-addressable, stable across merges/rebases)
  */
 
 import { spawnSync } from "child_process";
@@ -222,13 +222,19 @@ export interface ValidationResult {
 }
 
 /**
- * Get the most recent commit hash for a file.
+ * Get the git blob hash for a file (content-addressable, stable across merges/rebases).
+ * Uses `git rev-parse HEAD:<relative-path>` which returns the blob SHA for the file's content.
  */
-export function getMostRecentHashForFile(
+export function getBlobHashForFile(
   filePath: string,
   cwd: string
 ): { hash: string; success: boolean } {
-  const result = spawnSync("git", ["log", "-1", "--format=%h", "--", filePath], {
+  // Normalize to repo-relative path
+  const relPath = filePath.startsWith(cwd)
+    ? relative(cwd, filePath)
+    : filePath;
+
+  const result = spawnSync("git", ["rev-parse", `HEAD:${relPath}`], {
     encoding: "utf-8",
     cwd,
   });
@@ -241,10 +247,11 @@ export function getMostRecentHashForFile(
 }
 
 /**
- * Batch get git hashes for multiple files in a single git call.
- * Much faster than calling getMostRecentHashForFile N times.
+ * Batch get git blob hashes for multiple files using a single `git ls-tree -r HEAD` call.
+ * Much faster than calling getBlobHashForFile N times, and produces content-addressable
+ * hashes that are stable across merges, rebases, and squash merges.
  */
-export function batchGetFileHashes(
+export function batchGetBlobHashes(
   files: string[],
   cwd: string
 ): Map<string, { hash: string; success: boolean }> {
@@ -254,84 +261,59 @@ export function batchGetFileHashes(
     return results;
   }
 
-  // Use git log with multiple paths to get hashes in one call
-  // Format: hash<TAB>filename for each file
-  const result = spawnSync(
-    "git",
-    [
-      "log",
-      "-1",
-      "--format=%h",
-      "--name-only",
-      "--",
-      ...files,
-    ],
-    { encoding: "utf-8", cwd, maxBuffer: 10 * 1024 * 1024 }
-  );
+  // Resolve git repo root (ls-tree paths are always repo-root-relative)
+  const repoRootResult = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf-8",
+    cwd,
+  });
+  const repoRoot = repoRootResult.status === 0
+    ? repoRootResult.stdout.trim()
+    : cwd;
 
-  // Fallback: if batch fails, use individual calls
-  if (result.status !== 0) {
-    for (const file of files) {
-      results.set(file, getMostRecentHashForFile(file, cwd));
-    }
-    return results;
-  }
-
-  // Parse output - each file gets its own hash line
-  // Use a different approach: get hash per file using ls-tree for committed files
+  // Single git ls-tree call to get all blob hashes
   const lsResult = spawnSync(
     "git",
-    ["ls-tree", "-r", "--name-only", "HEAD"],
+    ["ls-tree", "-r", "HEAD"],
     { encoding: "utf-8", cwd, maxBuffer: 10 * 1024 * 1024 }
   );
 
-  const committedFiles = new Set(
-    lsResult.status === 0 ? lsResult.stdout.trim().split("\n") : []
-  );
-
-  // For each file, get its hash (only need one git call per unique directory)
-  // Group files by directory for efficiency
-  const filesByDir = new Map<string, string[]>();
-  for (const file of files) {
-    const dir = file.includes("/") ? file.substring(0, file.lastIndexOf("/")) : ".";
-    if (!filesByDir.has(dir)) {
-      filesByDir.set(dir, []);
+  // Build a map of repo-root-relative path -> 7-char blob hash
+  const blobMap = new Map<string, string>();
+  if (lsResult.status === 0 && lsResult.stdout) {
+    for (const line of lsResult.stdout.trim().split("\n")) {
+      if (!line) continue;
+      // Format: <mode> <type> <sha>\t<path>
+      const tabIdx = line.indexOf("\t");
+      if (tabIdx === -1) continue;
+      const path = line.substring(tabIdx + 1);
+      const parts = line.substring(0, tabIdx).split(" ");
+      if (parts.length >= 3 && parts[1] === "blob") {
+        blobMap.set(path, parts[2].substring(0, 7));
+      }
     }
-    filesByDir.get(dir)!.push(file);
   }
 
-  // Get hashes for each directory group
-  for (const [_dir, dirFiles] of filesByDir) {
-    // Get all hashes for files in this directory in one call
-    const hashResult = spawnSync(
-      "git",
-      ["log", "-1", "--format=%h %H", "--", ...dirFiles],
-      { encoding: "utf-8", cwd }
-    );
+  // Compute prefix to convert cwd-relative paths to repo-root-relative paths
+  const cwdPrefix = cwd !== repoRoot ? relative(repoRoot, cwd) : "";
 
-    if (hashResult.status === 0 && hashResult.stdout.trim()) {
-      const hash = hashResult.stdout.trim().split(" ")[0].substring(0, 7);
-      // Apply same hash to all files in this batch (they're from same commit)
-      for (const file of dirFiles) {
-        const relFile = file.startsWith(cwd) ? relative(cwd, file) : file;
-        if (committedFiles.has(relFile) || existsSync(join(cwd, file))) {
-          results.set(file, { hash, success: true });
-        } else {
-          results.set(file, { hash: "0000000", success: false });
-        }
-      }
+  // Look up each requested file in the blob map
+  for (const file of files) {
+    // Normalize file path to repo-root-relative
+    let repoRelPath: string;
+    if (file.startsWith("/")) {
+      repoRelPath = relative(repoRoot, file);
+    } else if (cwdPrefix) {
+      repoRelPath = join(cwdPrefix, file);
     } else {
-      // Fallback for this group
-      for (const file of dirFiles) {
-        results.set(file, getMostRecentHashForFile(file, cwd));
-      }
+      repoRelPath = file;
     }
-  }
 
-  // Fill in any missing files
-  for (const file of files) {
-    if (!results.has(file)) {
-      results.set(file, getMostRecentHashForFile(file, cwd));
+    const hash = blobMap.get(repoRelPath);
+    if (hash) {
+      results.set(file, { hash, success: true });
+    } else {
+      // Fall back to individual lookup for misses (e.g., submodules, unusual paths)
+      results.set(file, getBlobHashForFile(file, cwd));
     }
   }
 
@@ -530,7 +512,7 @@ export function validateRef(
   } else if (hashCache && hashCache.has(ref.file)) {
     hashResult = hashCache.get(ref.file)!;
   } else {
-    hashResult = getMostRecentHashForFile(absolutePath, projectRoot);
+    hashResult = getBlobHashForFile(absolutePath, projectRoot);
   }
 
   const { hash: currentHash, success } = hashResult;
@@ -773,7 +755,7 @@ export function validateDocs(
   // Batch fetch all file hashes upfront (major performance improvement)
   const uniqueFiles = [...new Set(allRefs.map((r) => r.file))];
   const absoluteFiles = uniqueFiles.map((f) => join(projectRoot, f));
-  const hashCache = batchGetFileHashes(absoluteFiles, projectRoot);
+  const hashCache = batchGetBlobHashes(absoluteFiles, projectRoot);
 
   // Validate each reference (using cached hashes)
   for (const ref of allRefs) {

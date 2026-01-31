@@ -10,7 +10,7 @@ Agents need to retrieve knowledge from two distinct sources: **local project kno
 
 ### Solutions Search
 
-[ref:.allhands/harness/src/commands/solutions.ts:searchSolutions:79b9873] searches documented solutions in `docs/solutions/`. Solutions are markdown files with YAML frontmatter containing structured fields (title, tags, component, symptoms, root_cause, severity).
+[ref:.allhands/harness/src/commands/solutions.ts:searchSolutions:19e47dd] searches documented solutions in `docs/solutions/`. Solutions are markdown files with YAML frontmatter containing structured fields (title, tags, component, symptoms, root_cause, severity).
 
 Scoring weights determine field importance:
 
@@ -23,13 +23,13 @@ Scoring weights determine field importance:
 | problem_type | 1 | Broad categorization |
 | root_cause | 1 | Technical detail |
 
-[ref:.allhands/harness/src/commands/solutions.ts:scoreSolution:79b9873] computes a cumulative score per keyword across all fields. [ref:.allhands/harness/src/commands/solutions.ts:extractKeywords:79b9873] handles quoted phrases and whitespace splitting, allowing queries like `"tmux session" timeout`.
+[ref:.allhands/harness/src/commands/solutions.ts:scoreSolution:19e47dd] computes a cumulative score per keyword across all fields. [ref:.allhands/harness/src/commands/solutions.ts:extractKeywords:19e47dd] handles quoted phrases and whitespace splitting, allowing queries like `"tmux session" timeout`.
 
 ### Memories Search
 
-[ref:.allhands/harness/src/commands/memories.ts:searchMemories:79b9873] searches project memories stored as markdown tables in `docs/memories.md`. Each table row has Name, Domain, Source, and Description columns grouped under section headers.
+[ref:.allhands/harness/src/commands/memories.ts:searchMemories:49c8ec9] searches project memories stored as markdown tables in `docs/memories.md`. Each table row has Name, Domain, Source, and Description columns grouped under section headers.
 
-[ref:.allhands/harness/src/commands/memories.ts:scoreMemory:79b9873] applies similar weighted scoring:
+[ref:.allhands/harness/src/commands/memories.ts:scoreMemory:49c8ec9] applies similar weighted scoring:
 
 | Field | Weight |
 |-------|--------|
@@ -43,7 +43,7 @@ Memories support additional filtering by `--domain` and `--source` before scorin
 ### Shared Search Design
 
 Both local search commands share these characteristics:
-- Keyword extraction with quoted phrase support ([ref:.allhands/harness/src/commands/solutions.ts:extractKeywords:79b9873])
+- Keyword extraction with quoted phrase support ([ref:.allhands/harness/src/commands/solutions.ts:extractKeywords:19e47dd])
 - Cumulative scoring across multiple fields
 - Results sorted by score descending, truncated to `--limit`
 - JSON output with `matchedFields` array explaining why each result matched
@@ -53,7 +53,7 @@ Both local search commands share these characteristics:
 
 ### Perplexity
 
-[ref:.allhands/harness/src/commands/perplexity.ts:callPerplexityApi:79b9873] sends queries to Perplexity's `sonar-pro` model, which returns AI-synthesized answers with citation URLs. The distinctive feature is the `--challenge` flag, which sends Perplexity's findings to [ref:.allhands/harness/src/commands/perplexity.ts:callGrokChallengeApi:79b9873] (Grok/X.AI) for adversarial validation. The Grok challenger prompt specifically targets contradicting opinions, newer alternatives, and developer sentiment from X/Twitter posts.
+[ref:.allhands/harness/src/commands/perplexity.ts:callPerplexityApi:e041bed] sends queries to Perplexity's `sonar-pro` model, which returns AI-synthesized answers with citation URLs. The distinctive feature is the `--challenge` flag, which sends Perplexity's findings to [ref:.allhands/harness/src/commands/perplexity.ts:callGrokChallengeApi:e041bed] (Grok/X.AI) for adversarial validation. The Grok challenger prompt specifically targets contradicting opinions, newer alternatives, and developer sentiment from X/Twitter posts.
 
 ```mermaid
 sequenceDiagram
@@ -73,7 +73,7 @@ sequenceDiagram
 
 ### Tavily
 
-[ref:.allhands/harness/src/commands/tavily.ts:callTavilyApi:79b9873] provides two capabilities:
+[ref:.allhands/harness/src/commands/tavily.ts:callTavilyApi:3ab56fe] provides two capabilities:
 
 - **Search** (`ah tavily search`): Web search with optional LLM-generated answer, configurable max results (capped at 20)
 - **Extract** (`ah tavily extract`): Full content extraction from up to 20 URLs, returned as markdown

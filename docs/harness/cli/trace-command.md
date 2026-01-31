@@ -64,7 +64,7 @@ Error events are explicitly enumerated for fast filtering: `tool.failure`, `tool
 
 ## Storage Architecture
 
-[ref:.allhands/harness/src/lib/trace-store.ts:logEvent:79b9873] writes to both backends on every event:
+[ref:.allhands/harness/src/lib/trace-store.ts:logEvent:36af65f] writes to both backends on every event:
 
 - **SQLite** (`.allhands/harness/.cache/trace/trace.db`): Indexed columns for agent_id, agent_type, event_type, tool_name, timestamp, is_error. Enables efficient filtered queries.
 - **JSONL** (`.allhands/harness/.cache/trace/trace.jsonl`): Append-only file, one JSON object per line. Enables `grep`, `jq`, and file-watching workflows.
@@ -82,7 +82,7 @@ To prevent log bloat from large tool inputs/outputs, payloads are trimmed before
 | Max array items | 5 | `TRACE_MAX_ARRAY_ITEMS` |
 | Max object keys | 8 | `TRACE_MAX_OBJECT_KEYS` |
 
-[ref:.allhands/harness/src/lib/trace-store.ts:sanitizePayload:79b9873] applies [ref:.allhands/harness/src/lib/trace-store.ts:trimStrings:79b9873] and [ref:.allhands/harness/src/lib/trace-store.ts:truncateStructure:79b9873] to enforce these limits with cycle detection via WeakSet.
+[ref:.allhands/harness/src/lib/trace-store.ts:sanitizePayload:36af65f] applies [ref:.allhands/harness/src/lib/trace-store.ts:trimStrings:36af65f] and [ref:.allhands/harness/src/lib/trace-store.ts:truncateStructure:36af65f] to enforce these limits with cycle detection via WeakSet.
 
 ## Structured Logging Helpers
 
@@ -90,18 +90,18 @@ The trace store provides typed logging functions that construct appropriate even
 
 | Function | Event Type | Use Case |
 |----------|-----------|----------|
-| [ref:.allhands/harness/src/lib/trace-store.ts:logHarnessError:79b9873] | `harness.error` | Internal harness failures |
-| [ref:.allhands/harness/src/lib/trace-store.ts:logHookStart:79b9873] | `hook.start` | Hook execution begins |
-| [ref:.allhands/harness/src/lib/trace-store.ts:logHookSuccess:79b9873] | `hook.success` | Hook completes |
-| [ref:.allhands/harness/src/lib/trace-store.ts:logCommandStart:79b9873] | `command.start` | CLI command begins |
-| [ref:.allhands/harness/src/lib/trace-store.ts:logCommandSuccess:79b9873] | `command.success` | CLI command completes |
-| [ref:.allhands/harness/src/lib/trace-store.ts:logCommandError:79b9873] | `command.error` | CLI command fails |
-| [ref:.allhands/harness/src/lib/trace-store.ts:logTuiError:79b9873] | `tui.error` | TUI runtime error |
-| [ref:.allhands/harness/src/lib/trace-store.ts:logTuiAction:79b9873] | `tui.action` | User action in TUI |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logHarnessError:36af65f] | `harness.error` | Internal harness failures |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logHookStart:36af65f] | `hook.start` | Hook execution begins |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logHookSuccess:36af65f] | `hook.success` | Hook completes |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logCommandStart:36af65f] | `command.start` | CLI command begins |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logCommandSuccess:36af65f] | `command.success` | CLI command completes |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logCommandError:36af65f] | `command.error` | CLI command fails |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logTuiError:36af65f] | `tui.error` | TUI runtime error |
+| [ref:.allhands/harness/src/lib/trace-store.ts:logTuiAction:36af65f] | `tui.action` | User action in TUI |
 
 ## Query Interface
 
-[ref:.allhands/harness/src/lib/trace-store.ts:queryEvents:79b9873] builds parameterized SQL queries from filter options:
+[ref:.allhands/harness/src/lib/trace-store.ts:queryEvents:36af65f] builds parameterized SQL queries from filter options:
 
 - `agentId`, `agentType` -- Filter by agent identity
 - `eventType` -- Single event type filter
@@ -110,11 +110,11 @@ The trace store provides typed logging functions that construct appropriate even
 - `errorsOnly` -- Boolean flag that filters on `is_error = 1`
 - `limit`/`offset` -- Pagination (default limit: 100)
 
-[ref:.allhands/harness/src/lib/trace-store.ts:getStats:79b9873] provides aggregate statistics with breakdowns by event type, agent type, and tool name, all supporting the `since` time filter.
+[ref:.allhands/harness/src/lib/trace-store.ts:getStats:36af65f] provides aggregate statistics with breakdowns by event type, agent type, and tool name, all supporting the `since` time filter.
 
 ## CLI Commands
 
-[ref:.allhands/harness/src/commands/trace.ts:register:79b9873] exposes four subcommands:
+[ref:.allhands/harness/src/commands/trace.ts:register:089fb26] exposes four subcommands:
 
 - **`ah trace list`** -- Query events with full filter support. Human-readable output highlights errors in red, shows truncated payloads for tool events, and displays prompt text for `prompt.submit` events.
 - **`ah trace errors`** -- Shortcut for `list --errors`. Prominently displays error messages, command summaries, hook names, and truncated stack traces.

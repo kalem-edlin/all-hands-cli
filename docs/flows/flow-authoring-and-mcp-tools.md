@@ -10,11 +10,11 @@ Two complementary authoring guidelines: one for writing harness flows (the instr
 
 ## Flow Authoring
 
-[ref:.allhands/flows/shared/WRITING_HARNESS_FLOWS.md::79b9873]
+[ref:.allhands/flows/shared/WRITING_HARNESS_FLOWS.md::f39048c]
 
 ### Principle-to-Directive Mapping
 
-Every flow directive traces back to a first principle from [ref:.allhands/principles.md::79b9873]. This mapping is the foundation of flow authoring:
+Every flow directive traces back to a first principle from [ref:.allhands/principles.md::0610b13]. This mapping is the foundation of flow authoring:
 
 | First Principle | What It Means for Flows |
 |-----------------|------------------------|
@@ -44,13 +44,13 @@ Body sections use `##` headers as capability phases (Context Gathering, Implemen
 - `flows/` root: Agent default flows, disclosed immediately on agent startup
 - `flows/subdirectories/`: Progressively disclosed flows with `<inputs>` and `<outputs>` tags, invoked by other flows
 
-The northstar example flow is [ref:.allhands/flows/PROMPT_TASK_EXECUTION.md::79b9873].
+The northstar example flow is [ref:.allhands/flows/PROMPT_TASK_EXECUTION.md::9baf478].
 
 ---
 
 ## MCP Server Integration
 
-[ref:.allhands/flows/shared/WRITING_HARNESS_MCP_TOOLS.md::79b9873]
+[ref:.allhands/flows/shared/WRITING_HARNESS_MCP_TOOLS.md::fad1587]
 
 ### Integration Phases
 

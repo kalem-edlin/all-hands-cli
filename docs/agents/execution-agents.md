@@ -10,7 +10,7 @@ The executor is the only agent that produces code changes from pre-authored prom
 
 ## Executor Configuration
 
-[ref:.allhands/agents/executor.yaml::48bd111]
+[ref:.allhands/agents/executor.yaml::a0ae2f8]
 
 | Field | Value |
 |-------|-------|

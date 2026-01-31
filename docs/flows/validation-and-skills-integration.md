@@ -19,7 +19,7 @@ These dimensions map to suite body sections: **Stochastic Validation** teaches a
 
 ### Suite Existence Threshold
 
-A validation suite MUST have a meaningful stochastic dimension to justify existing. Per [ref:.allhands/principles.md::6668667], deterministic-only tools (type checking, linting, formatting) are test commands referenced directly in acceptance criteria and CI/CD -- they are NOT suites.
+A validation suite MUST have a meaningful stochastic dimension to justify existing. Per [ref:.allhands/principles.md::0610b13], deterministic-only tools (type checking, linting, formatting) are test commands referenced directly in acceptance criteria and CI/CD -- they are NOT suites.
 
 ### Crystallization Lifecycle
 
@@ -34,7 +34,7 @@ stateDiagram-v2
     CICD --> StochasticExploration: Exploration shifts to frontier
 ```
 
-Per [ref:.allhands/flows/COMPOUNDING.md::29f9dfe], the compounding flow evaluates crystallization during its Tooling Signals phase and promotes stable stochastic patterns into deterministic checks during Harness Improvement.
+Per [ref:.allhands/flows/COMPOUNDING.md::905aed8], the compounding flow evaluates crystallization during its Tooling Signals phase and promotes stable stochastic patterns into deterministic checks during Harness Improvement.
 
 ---
 
@@ -59,7 +59,7 @@ flowchart TD
 
 ## Validation Tooling Discovery
 
-[ref:.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md::79b9873]
+[ref:.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md::1df56ac]
 
 This flow matches implementation tasks to existing validation suites. Per **Agentic Validation Tooling**, programmatic validation replaces human supervision for routine checks.
 
@@ -88,7 +88,7 @@ Stochastic exploration during implementation is not ordered -- agents follow mod
 
 ## Skill Extraction
 
-[ref:.allhands/flows/shared/SKILL_EXTRACTION.md::79b9873]
+[ref:.allhands/flows/shared/SKILL_EXTRACTION.md::03a6816]
 
 This flow finds and distills domain expertise from skill files into actionable prompt guidance. Per **Knowledge Compounding**, skills are "how to do it right" -- expertise that compounds across prompts.
 
@@ -113,7 +113,7 @@ This flow finds and distills domain expertise from skill files into actionable p
 
 ## TDD Workflow
 
-[ref:.allhands/flows/shared/TDD_WORKFLOW.md::79b9873]
+[ref:.allhands/flows/shared/TDD_WORKFLOW.md::8d9b5d8]
 
 This flow applies test-driven development to prompt execution. Per **Agentic Validation Tooling**, tests written first create clear acceptance criteria and prevent scope drift.
 

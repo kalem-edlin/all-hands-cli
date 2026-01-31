@@ -11,7 +11,7 @@ The harness supports six spec types: milestone, investigation, optimization, ref
 All five scoping flows follow a two-phase structure:
 
 1. **Scoping Interview** -- Ask targeted questions via `AskUserQuestion`, one at a time. Per **Frontier Models are Capable**, the agent adapts depth based on engineer responses -- probing vague answers, skipping questions already addressed.
-2. **Spec Creation** -- Synthesize interview answers into spec content (Motivation, Goals, Technical Considerations, Open Questions), set the `type` field in spec frontmatter, and delegate to [ref:.allhands/flows/shared/CREATE_SPEC.md::4eddba4] for persistence.
+2. **Spec Creation** -- Synthesize interview answers into spec content (Motivation, Goals, Technical Considerations, Open Questions), set the `type` field in spec frontmatter, and delegate to [ref:.allhands/flows/shared/CREATE_SPEC.md::e145081] for persistence.
 
 The interview dimensions differ per type because each problem class has distinct information needs. An investigation needs evidence and symptoms; an optimization needs baselines and targets.
 
@@ -42,7 +42,7 @@ Each spec type maps to a default branch prefix when the spec does not specify on
 | `documentation` | `docs/` |
 | `triage` | `triage/` |
 
-These conventions are defined in [ref:.allhands/flows/shared/CREATE_SPEC.md::4eddba4] and applied during `ah specs persist`.
+These conventions are defined in [ref:.allhands/flows/shared/CREATE_SPEC.md::e145081] and applied during `ah specs persist`.
 
 ## Downstream Impact
 

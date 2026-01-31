@@ -35,11 +35,11 @@ sequenceDiagram
     Commander->>User: execute matched command or launch TUI
 ```
 
-When no subcommand is provided, [ref:.allhands/harness/src/cli.ts:main:13330fb] falls through to the default action, which launches the TUI via `launchTUI`. This makes the bare `ah` command an interactive experience while subcommands remain agent-scriptable.
+When no subcommand is provided, [ref:.allhands/harness/src/cli.ts:main:dc6aae1] falls through to the default action, which launches the TUI via `launchTUI`. This makes the bare `ah` command an interactive experience while subcommands remain agent-scriptable.
 
 ## Command Auto-Discovery
 
-[ref:.allhands/harness/src/commands/index.ts:discoverAndRegister:79b9873] implements convention-over-configuration discovery:
+[ref:.allhands/harness/src/commands/index.ts:discoverAndRegister:33f0cd2] implements convention-over-configuration discovery:
 
 | Rule | Behavior |
 |------|----------|
@@ -55,15 +55,15 @@ The `CommandModule` interface enforces a single contract: export a `register` fu
 
 ## Base Command Utilities
 
-[ref:.allhands/harness/src/lib/base-command.ts::79b9873] provides the cross-cutting layer that every command can opt into.
+[ref:.allhands/harness/src/lib/base-command.ts::b6b76d4] provides the cross-cutting layer that every command can opt into.
 
 ### Environment Context
 
-[ref:.allhands/harness/src/lib/base-command.ts:getEnvContext:79b9873] reads agent identity from environment variables (`AGENT_TYPE`, `PROMPT_NUMBER`, `SPEC_NAME`). These are set by the tmux window spawner when agents are launched, providing automatic trace attribution without commands needing to accept explicit agent flags.
+[ref:.allhands/harness/src/lib/base-command.ts:getEnvContext:b6b76d4] reads agent identity from environment variables (`AGENT_TYPE`, `PROMPT_NUMBER`, `SPEC_NAME`). These are set by the tmux window spawner when agents are launched, providing automatic trace attribution without commands needing to accept explicit agent flags.
 
 ### Context Resolution
 
-[ref:.allhands/harness/src/lib/base-command.ts:parseContext:79b9873] merges CLI options with environment context. The precedence order:
+[ref:.allhands/harness/src/lib/base-command.ts:parseContext:b6b76d4] merges CLI options with environment context. The precedence order:
 
 1. Explicit `--agent` flag (highest)
 2. `AGENT_TYPE` environment variable
@@ -73,7 +73,7 @@ This allows both human operators (who pass flags) and automated agents (who inhe
 
 ### Output Formatting
 
-[ref:.allhands/harness/src/lib/base-command.ts:formatOutput:79b9873] switches between JSON (for agent consumption) and human-readable text based on the `--json` flag. Every command that uses `executeCommand` gets this for free.
+[ref:.allhands/harness/src/lib/base-command.ts:formatOutput:b6b76d4] switches between JSON (for agent consumption) and human-readable text based on the `--json` flag. Every command that uses `executeCommand` gets this for free.
 
 ### Traced Execution
 
@@ -81,11 +81,11 @@ Two patterns exist for adding trace logging:
 
 | Pattern | Use Case |
 |---------|----------|
-| [ref:.allhands/harness/src/lib/base-command.ts:executeCommand:79b9873] | Commands that return `CommandResult` objects |
-| [ref:.allhands/harness/src/lib/base-command.ts:tracedAction:79b9873] | Lightweight wrapper for commands that handle their own output |
+| [ref:.allhands/harness/src/lib/base-command.ts:executeCommand:b6b76d4] | Commands that return `CommandResult` objects |
+| [ref:.allhands/harness/src/lib/base-command.ts:tracedAction:b6b76d4] | Lightweight wrapper for commands that handle their own output |
 
 Both patterns log start, success, and error events to the trace store. `tracedAction` is the more common pattern -- it wraps a Commander action handler and extracts arguments for logging automatically, filtering out the Commander object that Commander.js appends as the last argument.
 
 ### Common Options
 
-[ref:.allhands/harness/src/lib/base-command.ts:addCommonOptions:79b9873] attaches `--agent`, `--json`, and `--verbose` flags to any command. These are the harness-standard options that enable agent-mode operation and observability.
+[ref:.allhands/harness/src/lib/base-command.ts:addCommonOptions:b6b76d4] attaches `--agent`, `--json`, and `--verbose` flags to any command. These are the harness-standard options that enable agent-mode operation and observability.

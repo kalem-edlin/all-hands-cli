@@ -10,7 +10,7 @@ Three agents handle validation and review at different stages of the lifecycle. 
 
 | Aspect | Judge | PR Reviewer | E2E Test Planner |
 |--------|-------|-------------|------------------|
-| Config | [ref:.allhands/agents/judge.yaml::48bd111] | [ref:.allhands/agents/pr-reviewer.yaml::48bd111] | [ref:.allhands/agents/e2e-test-planner.yaml::48bd111] |
+| Config | [ref:.allhands/agents/judge.yaml::597e87f] | [ref:.allhands/agents/pr-reviewer.yaml::631b3e9] | [ref:.allhands/agents/e2e-test-planner.yaml::89753a5] |
 | Flow | `JUDGE_REVIEWING.md` | `PR_REVIEWING.md` | `E2E_TEST_PLAN_BUILDING.md` |
 | TUI label | Review Jury | Review PR | E2E Tests |
 | Non-coding | **Yes** | No | No |
