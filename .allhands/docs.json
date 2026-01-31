@@ -1,5 +1,5 @@
 {
-  "$schema": ".allhands/harness/src/schemas/docs.schema.json",
+  "$schema": "harness/src/schemas/docs.schema.json",
   "domains": [],
   "exclude": []
 }
