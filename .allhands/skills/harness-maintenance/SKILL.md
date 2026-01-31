@@ -238,7 +238,7 @@ Per **Frontier Models are Capable**, workflow domain configs centralize domain k
 ### Architecture
 - `.allhands/workflows/*.md` — one config per domain (`milestone`, `investigation`, `optimization`, `refactor`, `documentation`, `triage`)
 - Structured **frontmatter** (`planning_depth`, `jury_required`, `max_tangential_hypotheses`, `required_ideation_questions`) provides programmatic flags for flow calibration
-- **Markdown body** contains expressive domain knowledge (interview questions, gap signals, planning considerations) consumed by agents at their discretion
+- **Markdown body** contains domain-specific context (vocabulary, gap signals, output sections, planning strategy) — not restatement of flow instructions. Frontmatter flags drive flow bifurcation; body provides domain knowledge for agent discretion
 - Schema validated via `ah schema workflow`
 
 ### Template Variable Abstraction

@@ -3,6 +3,13 @@ Core harness integration for all agents. Per **Context is Precious**
 </goal>
 
 
+## Flow Delegation
+
+Per **Context is Precious**, when a flow instructs you to delegate a sub-flow to a subtask (e.g., "tell them to read", "spawn subtask to read"):
+- Tell the subtask to read the flow file — do NOT read it yourself first
+- The sub-flow's content is intended for the subtask's context, not yours
+- You only need to know what the subtask will accomplish, not how the sub-flow instructs it
+
 **MUST use `ah knowledge docs search <descriptive_query>` for code search tied to crucial project knowledge for any codebase discovery needs**
 
 **You MUST use `tldr` tooling when retrieving codebase / file context using the following rules:**

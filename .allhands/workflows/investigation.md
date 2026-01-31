@@ -51,8 +51,6 @@ Per **Ideation First**, the investigation interview captures the problem space s
 
 - Probe vague symptom descriptions — demand concrete evidence
 - Separate symptoms from suspected causes — capture both but label them distinctly
-- Ask one question at a time — reflect back understanding before moving on
-- Skip questions the engineer has already answered in prior responses
 
 ### Output Sections
 

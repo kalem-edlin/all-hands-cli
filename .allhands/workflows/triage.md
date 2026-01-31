@@ -55,8 +55,6 @@ Per **Context is Precious**, triage needs external data to ground decisions in r
 
 - Probe vague signal descriptions — demand specific error messages, metrics, or user reports
 - Distinguish urgency from importance — time-sensitive vs high-impact may require different approaches
-- Ask one question at a time — reflect back understanding before moving on
-- Skip questions the engineer has already answered in prior responses
 
 ### Output Sections
 

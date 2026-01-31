@@ -12,7 +12,11 @@ Transform the spec into executable prompts with domain-appropriate planning dept
 <constraints>
 - MUST read the workflow domain config before planning — `planning_depth` determines the planning path
 - MUST present recommended approach for each decision point
+- MUST NOT re-ask questions already solidified by the spec — the spec represents resolved decisions from ideation
+- MUST NOT ask questions with obvious answers derivable from spec context or research findings
+- MUST leverage research findings to propose alternatives, challenge approaches, and surface unforeseen constraints — never enter the interview uninformed
 - MUST include jury review when domain config sets `jury_required: true`
+- NEVER read jury review files (`.allhands/flows/shared/jury/*`) directly — subtasks load their own flows per **Context is Precious**
 - Focused planning domains MUST document unresolved questions in alignment doc for emergent planner consumption
 - Prompts MUST be fully autonomous — no human intervention during execution
 - Testing is NOT a prompt — validation happens via validation_suites attached to prompts
@@ -64,9 +68,14 @@ Spawn parallel subtasks to ground recommendations before the engineer interview:
 - 0-3 Tasks: Tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` to isolate optimal solutions (if necessary)
 - Apply domain config's Planning Considerations to focus research scope and priorities
 
+After research completes, synthesize findings to identify: approach alternatives the spec didn't consider, constraints or limitations the spec may not account for, edge cases surfaced by codebase reality, and feasibility concerns with stated approaches. Bring these to the interview — don't wait for the engineer to ask.
+
 ### Engineer Interview
 
-Per **Quality Engineering**, present researched approaches as options using `AskUserQuestion`:
+The interview covers genuinely open decisions — not re-litigation of spec content. The spec represents resolved ideation outcomes; respect them. Per **Quality Engineering**, come to the interview with a researched perspective and present it using `AskUserQuestion`:
+
+- **Only ask about open decisions**: Do not re-ask what the spec has decided. Do not ask questions whose answers are obvious from spec context or research findings. Focus on implementation approach decisions that genuinely require engineer input.
+- **Bring your own analysis**: For each decision point, present what research revealed — alternatives the spec didn't consider, constraints discovered in the codebase, tradeoffs between approaches, edge cases that need handling. The engineer should be responding to informed proposals, not generating options from scratch.
 - Ask ONE decision point at a time — do not batch all questions together
 - Each implementation approach becomes a set of options (2-4 per question)
 - Engineer can choose one OR many (disposable variants)
@@ -178,8 +187,8 @@ Spawn 1-2 targeted research subtasks grounded in the problem area:
 
 Present spec open questions and concerns to the engineer using `AskUserQuestion`:
 - Each open question becomes a question — engineer can answer to narrow scope or skip
+- For each question, present what research revealed and your recommended resolution — the engineer should be responding to an informed proposal, not an open-ended prompt
 - Skipped/unanswered questions remain open for hypothesis-driven discovery
-- Include a recommended approach for each question
 - Keep interview brief — focused domains intentionally leave room for discovery
 
 ### Seed Prompt Creation

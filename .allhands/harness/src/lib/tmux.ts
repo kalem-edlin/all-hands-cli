@@ -418,6 +418,15 @@ export function createWindow(
     stdio: 'pipe',
   });
 
+  // Prevent tmux from overriding the window name via automatic-rename
+  try {
+    execSync(`tmux set-option -t "${sessionName}:${windowName}" allow-rename off`, {
+      stdio: 'pipe',
+    });
+  } catch {
+    // Ignore — non-critical
+  }
+
   // Get the new window's index
   const windows = listWindows(sessionName);
   const window = windows.find((w) => w.name === windowName);

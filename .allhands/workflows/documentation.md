@@ -54,8 +54,6 @@ Per **Knowledge Compounding**, documentation compounds value when it targets the
 
 - Probe vague coverage requests — demand specific areas and audiences
 - Distinguish between "no docs" and "wrong docs" — the approach differs significantly
-- Ask one question at a time — reflect back understanding before moving on
-- Skip questions the engineer has already answered in prior responses
 
 ### Output Sections
 

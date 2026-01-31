@@ -59,23 +59,16 @@ For each domain touched by implementation:
 ## Feedback Synthesis
 
 After all jury subtasks complete:
-- Read `.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md` to structure feedback
-- Break down findings into actionable options for the engineer
-- Present options with tradeoffs, not mandates
-
-### Issue Severity Classification
-
-| Severity | Description |
-|----------|-------------|
-| Blocking | Prevents goal achievement - missing wiring, broken functionality |
-| Recommended | Should fix - best practice violations, potential issues |
-| Optional | Nice to have - style improvements, minor enhancements |
+- Read `.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md` for structuring feedback into P1/P2/P3 ranked options
+- Deduplicate and elevate repeated concerns across jury members
+- For each item: describe the issue, explain importance, suggest implementation
+- Group by priority and effort
+- Present actionable options to engineer with tradeoffs, not mandates
 
 ## Engineer Decision
 
-Present synthesized feedback to engineer:
-- Group by severity (blocking, recommended, optional)
-- Let engineer choose which issues to address
+- Present ranked options and let engineer choose which to accept and which to decline
+- Track both accepted AND declined items with engineer's reasoning
 - Per **Quality Engineering**, engineer effort goes to quality control of variants
 
 ## Prompt Creation

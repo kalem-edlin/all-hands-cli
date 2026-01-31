@@ -16,7 +16,7 @@ Create, edit, and maintain Prompt Task files - the atomic unit of work. Per **Pr
 - MUST include `skills` and `validation_suites` in frontmatter
 - MUST include `patches_prompts: [X, Y]` for user-patch prompts
 - NEVER modify `status: done` prompts unless explicitly requested
-- NEVER write alignment doc summaries for newly created prompts. Per **Prompt Files as Units of Work**, summaries are written by the executing agent after completion — they document decisions made and work done, which don't exist yet at creation time.
+- NEVER create prompt summary entries in the alignment doc's `## Prompt Summaries` section. Per **Prompt Files as Units of Work**, those entries are written exclusively by executor agents after prompt completion — they document decisions made and work done, which don't exist yet at creation time.
 </constraints>
 
 ## Schema Reference
