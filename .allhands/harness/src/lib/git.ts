@@ -4,7 +4,7 @@
  * Provides git context for notifications and other features.
  */
 
-import { execSync, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import { basename } from "path";
 import { getBaseBranch, getLocalBaseBranch } from '../hooks/shared.js';
 
@@ -141,16 +141,8 @@ export function getDiff(ref: string): string {
  */
 export function getProjectRoot(): string {
   const cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  try {
-    const result = execSync("git rev-parse --show-toplevel", {
-      encoding: "utf-8",
-      cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    return result.trim();
-  } catch {
-    return cwd;
-  }
+  const result = gitExec(['rev-parse', '--show-toplevel'], cwd);
+  return result.success ? result.stdout : cwd;
 }
 
 /**
@@ -236,36 +228,6 @@ export function checkoutBranch(branch: string, cwd?: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Find an existing worktree for a given branch.
- * Returns the worktree path if found, null otherwise.
- */
-export function findWorktreeForBranch(branch: string, cwd?: string): string | null {
-  const workingDir = cwd || process.cwd();
-  try {
-    const worktreeList = execSync('git worktree list --porcelain', {
-      cwd: workingDir,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    const lines = worktreeList.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startsWith('worktree ')) {
-        const wtPath = lines[i].substring('worktree '.length);
-        // Check next lines for branch info
-        for (let j = i + 1; j < lines.length && !lines[j].startsWith('worktree '); j++) {
-          if (lines[j] === `branch refs/heads/${branch}`) {
-            return wtPath;
-          }
-        }
-      }
-    }
-  } catch {
-    // Ignore errors
-  }
-  return null;
 }
 
 // ── Remote sync ─────────────────────────────────────────────────────────────
