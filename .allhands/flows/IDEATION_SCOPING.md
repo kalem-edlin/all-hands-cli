@@ -29,7 +29,6 @@ Exploratory co-creation that surfaces the problem and solution space. Per **Idea
 - Read dependent milestone specs
 - Spawn 1-3 subtasks: tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` to deeply understand codebase reality
 - Spawn 0-2 research subtasks: tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` for high-level tech solution approaches
-- Search with `ah solutions search` and `ah memories search` for relevant context
 - Spawn additional research subtasks as new concepts emerge during interview
 
 ## Exploratory Interview
