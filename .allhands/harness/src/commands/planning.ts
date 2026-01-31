@@ -22,6 +22,7 @@ import {
   sanitizeBranchForDir,
   ensurePlanningDir,
   listPlanningDirs,
+  resetPlanningArtifacts,
 } from '../lib/planning.js';
 import { getSpecForBranch } from '../lib/specs.js';
 import { tracedAction } from '../lib/base-command.js';
@@ -199,6 +200,46 @@ export function register(program: Command): void {
         console.log(`  Branch: ${branch}`);
         console.log(`  Spec: ${spec.id} (${spec.path})`);
         console.log(`  Stage: ${status?.stage || 'planning'}`);
+      }
+    }));
+
+  // ah planning reset
+  cmd
+    .command('reset')
+    .description('Reset planning artifacts for current branch (deletes prompts and alignment doc, resets stage to planning)')
+    .option('--json', 'Output as JSON')
+    .action(tracedAction('planning reset', async (options: { json?: boolean }) => {
+      const cwd = process.cwd();
+      const branch = getCurrentBranch(cwd);
+      const dirKey = sanitizeBranchForDir(branch);
+
+      if (!planningDirExists(dirKey, cwd)) {
+        if (options.json) {
+          console.log(JSON.stringify({
+            success: false,
+            error: `No planning directory for branch: ${branch}`,
+            branch,
+          }, null, 2));
+        } else {
+          console.error(`No planning directory for branch: ${branch}`);
+        }
+        process.exit(1);
+      }
+
+      const wasReset = resetPlanningArtifacts(dirKey, cwd);
+
+      if (options.json) {
+        console.log(JSON.stringify({
+          success: wasReset,
+          branch,
+          planningDir: `.planning/${dirKey}/`,
+          message: 'Planning artifacts cleared — spec revision requires re-planning',
+        }, null, 2));
+      } else {
+        console.log('Planning artifacts cleared — spec revision requires re-planning');
+        console.log(`  Branch: ${branch}`);
+        console.log(`  Planning: .planning/${dirKey}/`);
+        console.log(`  Stage: planning`);
       }
     }));
 }

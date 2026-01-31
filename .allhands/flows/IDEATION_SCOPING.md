@@ -12,6 +12,37 @@ Exploratory co-creation that surfaces the problem and solution space. Per **Idea
 - NEVER ask questions answerable from codebase exploration
 </constraints>
 
+## Active Spec Revision Mode
+
+**Check first**: If `SPEC_PATH` is non-empty and the file exists at that path, enter **revision mode** instead of the normal flow below.
+
+### Revision Mode
+
+1. Read the existing spec file at `SPEC_PATH`
+2. Read the workflow domain config at `WORKFLOW_DOMAIN_PATH`
+3. Present the existing spec content to the engineer as grounding:
+   - Summarize the current spec scope, goals, and key decisions
+   - State: "This spec already exists. I'll focus on what you want to change or add."
+4. Conduct a focused revision interview:
+   - Ask what aspects of the spec need changing, extending, or refining
+   - Reference existing spec content — do not ask about things already covered unless the engineer wants to revise them
+   - Apply domain config's `required_ideation_questions` only where they surface gaps in the revision context
+   - ONE question at a time, as with normal ideation
+5. After the engineer signals readiness:
+   - Revise the existing spec file in place — update and append, do not replace wholesale
+   - Preserve unchanged sections; modify only what the revision touches
+6. **After spec revision is written**: reset planning artifacts since existing plans are now stale:
+   ```bash
+   ah planning reset
+   ```
+   This deletes all prompts and the alignment doc, and resets status to `planning` stage.
+7. Report to the engineer: "Spec revised. Planning artifacts cleared — the planning flow will re-trigger to produce new prompts aligned with the updated spec."
+8. **Stop** — do not continue to the normal Initiation flow below.
+
+---
+
+**If `SPEC_PATH` is empty or the file does not exist**: proceed with the normal flow below.
+
 ## Initiation
 
 - Run `ah specs list --domains-only` for roadmap visibility (may return empty)
@@ -113,8 +144,8 @@ When the spec depends on functionality from unimplemented roadmap items, use "As
 - Synthesize answers into spec content using the domain config's output section structure
 - Write `initial_workflow_domain: <domain_name>` to spec frontmatter (from the config's `name` field)
 - Set `type: <domain_type>` in spec frontmatter (from the config's `type` field)
-- Apply "Assuming X exists..." pattern for dependencies on unimplemented roadmap specs
-- Follow `.allhands/flows/shared/CREATE_SPEC.md` to write, persist, and optionally enable the spec
+- If the domain config includes "Building on Unimplemented Milestones" guidance: use "Assuming X exists..." pattern for dependencies
+- Follow `.allhands/flows/shared/CREATE_SPEC.md` to write, create, and optionally activate the spec
 
 ### Optional: Spec Flow Analysis
 

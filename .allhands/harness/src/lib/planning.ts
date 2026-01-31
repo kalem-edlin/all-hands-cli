@@ -13,7 +13,7 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { getBaseBranch } from './git.js';
@@ -499,6 +499,48 @@ export function updatePRReviewStatus(
     key,
     cwd
   );
+}
+
+/**
+ * Reset planning artifacts for re-ideation.
+ *
+ * Deletes all prompt files and the alignment doc, then resets
+ * status.yaml stage to 'planning'. Keeps the status.yaml and
+ * directory structure intact.
+ *
+ * @param key - The directory key (sanitized branch name)
+ * @param cwd - Working directory
+ * @returns true if artifacts were reset, false if no planning dir exists
+ */
+export function resetPlanningArtifacts(key: string, cwd?: string): boolean {
+  const paths = getPlanningPaths(key, cwd);
+
+  if (!existsSync(paths.root)) {
+    return false;
+  }
+
+  // Delete all files in prompts/ subdirectory
+  if (existsSync(paths.prompts)) {
+    const promptFiles = readdirSync(paths.prompts);
+    for (const file of promptFiles) {
+      unlinkSync(join(paths.prompts, file));
+    }
+  }
+
+  // Delete alignment.md if it exists
+  if (existsSync(paths.alignment)) {
+    unlinkSync(paths.alignment);
+  }
+
+  // Reset status.yaml stage to 'planning'
+  if (existsSync(paths.status)) {
+    const status = readStatus(key, cwd);
+    if (status) {
+      updateStatus({ stage: 'planning' }, key, cwd);
+    }
+  }
+
+  return true;
 }
 
 // ============================================================================

@@ -8,7 +8,6 @@
  * - How to update the prompt's progress section
  */
 
-import { execSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 import {
   analyzeConversation,
@@ -22,6 +21,7 @@ import {
   parsePromptFile,
 } from './prompts.js';
 import { readAlignment, getCurrentBranch } from './planning.js';
+import { gitExec } from './git.js';
 
 export interface CompactionInput {
   conversationLogs: string; // File path
@@ -50,17 +50,11 @@ export function getGitDiffSummary(cwd?: string): string {
 
   try {
     // Get both staged and unstaged changes
-    const staged = execSync('git diff --cached --stat', {
-      encoding: 'utf-8',
-      cwd: workingDir,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    const stagedResult = gitExec(['diff', '--cached', '--stat'], workingDir);
+    const staged = stagedResult.stdout;
 
-    const unstaged = execSync('git diff --stat', {
-      encoding: 'utf-8',
-      cwd: workingDir,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    const unstagedResult = gitExec(['diff', '--stat'], workingDir);
+    const unstaged = unstagedResult.stdout;
 
     const parts: string[] = [];
     if (staged) {
@@ -87,12 +81,8 @@ export function getGitDiffFull(cwd?: string, maxLines: number = 500): string {
   const workingDir = cwd || process.cwd();
 
   try {
-    const diff = execSync('git diff HEAD', {
-      encoding: 'utf-8',
-      cwd: workingDir,
-      maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const diffResult = gitExec(['diff', 'HEAD'], workingDir);
+    const diff = diffResult.stdout;
 
     // Truncate if too long
     const lines = diff.split('\n');
@@ -269,26 +259,14 @@ export async function executeRecommendation(
     // Commit all changes
     try {
       // Stage all changes
-      execSync('git add -A', {
-        cwd: workingDir,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      gitExec(['add', '-A'], workingDir);
 
       // Check if there are staged changes
-      const status = execSync('git status --porcelain', {
-        cwd: workingDir,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      const statusResult = gitExec(['status', '--porcelain'], workingDir);
 
-      if (status.trim()) {
-        // Commit
-        execSync(`git commit -m "${commitMessage.replace(/"/g, '\\"')}"`, {
-          cwd: workingDir,
-          encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+      if (statusResult.stdout) {
+        // Commit — spawnSync handles the message safely, no shell escaping needed
+        gitExec(['commit', '-m', commitMessage], workingDir);
         return true;
       }
 
@@ -303,11 +281,7 @@ export async function executeRecommendation(
         // Stash preserve files first
         for (const file of recommendation.preserveFiles) {
           try {
-            execSync(`git stash push -m "preserve-${file}" -- "${file}"`, {
-              cwd: workingDir,
-              encoding: 'utf-8',
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
+            gitExec(['stash', 'push', '-m', `preserve-${file}`, '--', file], workingDir);
           } catch {
             // File might not have changes
           }
@@ -315,28 +289,16 @@ export async function executeRecommendation(
       }
 
       // Discard all changes
-      execSync('git checkout .', {
-        cwd: workingDir,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      gitExec(['checkout', '.'], workingDir);
 
       // Clean untracked files (except .planning/)
-      execSync('git clean -fd --exclude=.planning', {
-        cwd: workingDir,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      gitExec(['clean', '-fd', '--exclude=.planning'], workingDir);
 
-      // Restore preserved files
+      // Restore preserved files (reverse order — git stash is LIFO)
       if (recommendation.preserveFiles.length > 0) {
-        for (const file of recommendation.preserveFiles) {
+        for (let i = recommendation.preserveFiles.length - 1; i >= 0; i--) {
           try {
-            execSync('git stash pop', {
-              cwd: workingDir,
-              encoding: 'utf-8',
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
+            gitExec(['stash', 'pop'], workingDir);
           } catch {
             // Stash might be empty
           }

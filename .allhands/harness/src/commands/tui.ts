@@ -14,9 +14,9 @@
  */
 
 import { Command } from 'commander';
-import { join, basename, dirname } from 'path';
-import { existsSync, readFileSync, mkdirSync, renameSync } from 'fs';
-import { execSync } from 'child_process';
+import { join, basename, dirname, relative } from 'path';
+import { existsSync, readFileSync, renameSync } from 'fs';
+
 import { TUI } from '../tui/index.js';
 import type { TUIState, PRActionState, PromptItem, AgentInfo } from '../tui/index.js';
 import {
@@ -33,7 +33,7 @@ import {
 import { triggerPRReview } from '../lib/pr-review.js';
 import { loadProjectSettings } from '../hooks/shared.js';
 import { findSpecForPath, extractSpecNameFromFile } from '../lib/planning-utils.js';
-import { getBaseBranch, getLocalBaseBranch, hasUncommittedChanges } from '../lib/git.js';
+import { getBaseBranch, hasUncommittedChanges, gitExec, validateGitRef, syncWithOriginMain } from '../lib/git.js';
 import { loadAllPrompts, getNextPromptNumber } from '../lib/prompts.js';
 import {
   isTmuxInstalled,
@@ -314,6 +314,28 @@ async function handleAction(
     }
   }
 
+  // Pre-spawn gate: sync with origin/main before compounding
+  if (action === 'compound') {
+    const syncResult = syncWithOriginMain(cwd);
+    if (!syncResult.success && syncResult.conflicts.length > 0) {
+      // Merge conflicts — already aborted by syncWithOriginMain
+      await tui.showConfirmation(
+        'Compounding Aborted',
+        'Merge conflicts with main — compounding aborted',
+        'Conflicting files:\n' + syncResult.conflicts.map(f => '  - ' + f).join('\n') + '\n\nResolve conflicts manually, push, and retry compounding.'
+      );
+      return;
+    } else if (!syncResult.success) {
+      // Fetch failure (no conflicts — network/remote issue)
+      await tui.showConfirmation(
+        'Compounding Aborted',
+        'Failed to sync with remote main — compounding aborted',
+        'Could not merge origin/main. This can be caused by uncommitted changes or network issues. Please resolve and try again.'
+      );
+      return;
+    }
+  }
+
   // Try to handle as a profile-based agent spawn
   const handledByProfile = await spawnAgentsForAction(tui, action, planningKey, currentSpec, branch, status, cwd, contextOverrides);
   if (handledByProfile) {
@@ -395,31 +417,21 @@ async function handleAction(
 
       try {
         // Push any unpushed commits before triggering review
-        try {
-          const unpushedResult = execSync('git log @{u}..HEAD --oneline 2>/dev/null || echo ""', {
-            encoding: 'utf-8',
-            cwd: cwd || process.cwd(),
-          }).trim();
+        const workingDir = cwd || process.cwd();
+        const unpushedResult = gitExec(['log', '@{u}..HEAD', '--oneline'], workingDir);
 
-          if (unpushedResult) {
-            tui.log('Pushing local commits to remote...');
-            execSync('git push', {
-              encoding: 'utf-8',
-              cwd: cwd || process.cwd(),
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
+        if (unpushedResult.success && unpushedResult.stdout) {
+          tui.log('Pushing local commits to remote...');
+          const pushResult = gitExec(['push'], workingDir);
+          if (pushResult.success) {
             tui.log('Commits pushed successfully.');
+          } else {
+            tui.log('Warning: Could not push commits. Continuing with review trigger...');
           }
-        } catch {
+        } else if (!unpushedResult.success) {
           // No upstream or other git error - try push anyway
-          try {
-            execSync('git push', {
-              encoding: 'utf-8',
-              cwd: cwd || process.cwd(),
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
-          } catch {
-            // Push failed, but continue with review trigger
+          const pushResult = gitExec(['push'], workingDir);
+          if (!pushResult.success) {
             tui.log('Warning: Could not push commits. Continuing with review trigger...');
           }
         }
@@ -479,94 +491,77 @@ async function handleAction(
       tui.log(`Marking spec as completed: ${currentSpec.id}`);
 
       try {
-        // Push any unpushed commits to the feature branch
-        try {
-          const unpushedResult = execSync('git log @{u}..HEAD --oneline 2>/dev/null || echo ""', {
-            encoding: 'utf-8',
-            cwd: cwd || process.cwd(),
-          }).trim();
+        /** Remote sync: fetch + merge origin/main */
+        tui.log('Syncing with origin/main...');
+        const syncResult = syncWithOriginMain(cwd);
 
-          if (unpushedResult) {
-            tui.log('Pushing local commits to remote...');
-            execSync('git push', {
-              encoding: 'utf-8',
-              cwd: cwd || process.cwd(),
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
-            tui.log('Commits pushed successfully.');
-          }
-        } catch {
-          // No upstream or other git error - try push anyway
-          try {
-            execSync('git push', {
-              encoding: 'utf-8',
-              cwd: cwd || process.cwd(),
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
-          } catch {
-            tui.log('Warning: Could not push commits. Continuing with completion...');
-          }
+        if (!syncResult.success && syncResult.conflicts.length > 0) {
+          // Merge conflicts detected — already aborted by syncWithOriginMain
+          const conflictDetail = "Conflicting files:\n" + syncResult.conflicts.map(f => "  - " + f).join("\n") + "\n\nResolve conflicts manually, push, and retry completion.";
+          await tui.showConfirmation(
+            'Merge Conflicts Detected',
+            `Could not merge origin/main into ${branch}.`,
+            conflictDetail
+          );
+          logTuiError('mark-completed', `Merge conflicts: ${syncResult.conflicts.join(', ')}`, {
+            spec: currentSpec.id,
+            branch,
+            conflicts: syncResult.conflicts,
+          }, cwd);
+          return;
+        } else if (!syncResult.success) {
+          await tui.showConfirmation(
+            'Completion Aborted',
+            'Failed to sync with remote main — completion aborted.',
+            'Could not merge origin/main. This can be caused by uncommitted changes or network issues. Please resolve and try again.'
+          );
+          return;
+        } else {
+          tui.log('Synced with origin/main successfully.');
         }
 
-        // Mark spec frontmatter as completed
-        updateSpecStatus(currentSpec.path, 'completed');
+        // Compute relative paths for git staging before the move
+        const oldRelPath = relative(cwd, currentSpec.path);
+        const newRelPath = relative(cwd, join(cwd, 'specs', currentSpec.filename));
+        const destPath = join(cwd, 'specs', currentSpec.filename);
 
-        // Move spec from roadmap to completed
-        const completedDir = join(cwd, 'specs', 'completed');
-        if (!existsSync(completedDir)) {
-          mkdirSync(completedDir, { recursive: true });
-        }
-
-        const destPath = join(completedDir, currentSpec.filename);
         if (existsSync(destPath)) {
           tui.log(`Error: Destination already exists: ${destPath}`);
           break;
         }
 
+        // Move spec file from specs/roadmap/ to specs/
         renameSync(currentSpec.path, destPath);
-        tui.log(`Moved spec to: specs/completed/${currentSpec.filename}`);
+        tui.log(`Moved spec to: specs/${currentSpec.filename}`);
+
+        // Update frontmatter on the new path
+        updateSpecStatus(destPath, 'completed');
 
         // Reindex roadmap and docs indexes after file move
         await reindexAfterMove(cwd, currentSpec.path, destPath, true);
 
-        // Stage and commit the move (skip commit if nothing staged)
-        execSync('git add -A specs/', { stdio: 'pipe', cwd });
-        const staged = execSync('git diff --cached --quiet || echo changed', { encoding: 'utf-8', cwd }).trim();
-        if (staged) {
-          execSync(`git commit -m "chore: mark spec ${currentSpec.id} as completed"`, { stdio: 'pipe', cwd });
+        // Stage only the moved spec file (deletion of old + addition of new)
+        gitExec(['add', '--', oldRelPath], cwd);
+        gitExec(['add', '--', newRelPath], cwd);
+
+        // Commit
+        const commitResult = gitExec(['commit', '-m', `chore: mark spec ${currentSpec.id} as completed`], cwd);
+        if (!commitResult.success) {
+          tui.log(`Error committing: ${commitResult.stderr}`);
+          break;
         }
 
-        // Push the completion commit
-        try {
-          execSync('git push', {
-            encoding: 'utf-8',
-            cwd: cwd || process.cwd(),
-            stdio: ['pipe', 'pipe', 'pipe'],
-          });
-        } catch {
+        // Push with -u to ensure upstream tracking is set
+        const pushResult = gitExec(['push', '-u', 'origin', 'HEAD'], cwd);
+        if (!pushResult.success) {
           tui.log('Warning: Could not push completion commit.');
         }
 
-        // Discard uncommitted changes so checkout doesn't fail
-        execSync('git checkout -- . && git clean -fd', { stdio: 'pipe', cwd });
+        // Refresh spec list to reflect completed status — developer stays on feature branch
+        const refreshedSpec = getSpecForBranch(branch, cwd);
+        tui.syncBranchContext(branch, refreshedSpec);
 
-        // Checkout local base branch
-        const localBase = getLocalBaseBranch();
-        const baseBranch = getBaseBranch();
-        tui.log(`Checking out local base branch: ${localBase}`);
-        execSync(`git checkout ${localBase}`, { stdio: 'pipe', cwd });
-
-        // Update TUI state
-        tui.updateState({
-          spec: undefined,
-          branch: localBase,
-          prompts: [],
-        });
-
-        // Sync EventLoop state to prevent stale branch detection
-        tui.syncBranchContext(localBase, null);
-
-        tui.log(`Spec ${currentSpec.id} completed. You are now ready to merge into ${baseBranch}.`);
+        tui.log(`Spec ${currentSpec.id} completed successfully.`);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         tui.log(`Error: ${message}`);
@@ -588,8 +583,14 @@ async function handleAction(
       tui.log(`Switching to spec: ${specId}`);
 
       try {
+        /** Guard: check for uncommitted changes before any git operations */
+        const proceedWithSwitch = await confirmProceedWithUncommittedChanges(
+          tui, cwd, 'You have uncommitted changes that may be lost during branch switch. Proceed anyway?'
+        );
+        if (!proceedWithSwitch) break;
+
         // Find spec file using specs library
-        let specFile = findSpecById(specId, cwd);
+        const specFile = findSpecById(specId, cwd);
 
         if (!specFile) {
           tui.log(`Error: Spec file not found: ${specId}`);
@@ -599,84 +600,131 @@ async function handleAction(
         // Check if spec has a branch assigned
         if (!specFile.branch) {
           tui.log(`Error: Spec "${specId}" has no branch assigned.`);
-          tui.log('Use "ah specs persist <spec_path>" to assign a branch.');
+          tui.log('Use "ah specs create <spec_path>" to assign a branch.');
           break;
         }
 
-        // Check if spec is completed - if so, warn and offer to resurrect
+        // Completed specs cannot be switched to
         if (specFile.status === 'completed') {
-          const confirmed = await tui.showConfirmation(
-            'Resurrect Completed Spec?',
-            `Spec "${specFile.title}" is marked as completed.\n\n` +
-            'Selecting it will move the spec back to the roadmap\n' +
-            'and you will need to mark it completed again when done.\n\n' +
-            'Both docs and roadmap indexes will be updated.'
-          );
+          tui.log(`Spec "${specFile.id}" is completed and cannot be selected.`);
+          break;
+        }
 
-          if (!confirmed) {
-            tui.log('Spec selection cancelled');
-            break;
+        const specBranch = specFile.branch!;
+
+        // Validate branch name safety
+        validateGitRef(specBranch, 'spec branch');
+
+        /** Cross-worktree detection: check if spec is active in another worktree */
+        const worktreeResult = gitExec(['worktree', 'list', '--porcelain'], cwd);
+        if (worktreeResult.success) {
+          const worktreeLines = worktreeResult.stdout.split('\n');
+          const worktreePaths: string[] = [];
+          for (const line of worktreeLines) {
+            if (line.startsWith('worktree ')) {
+              worktreePaths.push(line.substring('worktree '.length));
+            }
           }
 
-          // Resurrect the spec: update status, move to roadmap, reindex
-          tui.log('Resurrecting spec to roadmap...');
-          try {
-            if (!updateSpecStatus(specFile.path, 'roadmap')) {
-              tui.log('Error: Failed to update spec status');
-              break;
+          const sanitizedBranchKey = sanitizeBranchForDir(specBranch);
+          for (const wtPath of worktreePaths) {
+            // Skip the current working directory
+            if (wtPath === cwd) continue;
+            const planningPath = join(wtPath, '.planning', sanitizedBranchKey);
+            if (existsSync(planningPath)) {
+              await tui.showConfirmation(
+                'Spec Active in Another Worktree',
+                `Cannot activate spec here.`,
+                `Spec '${specFile.id}' is already active in another worktree:\n  ${wtPath}\n\nSwitch to that directory to continue work on this spec.`
+              );
+              process.stderr.write(`Error: Spec '${specFile.id}' is already active in worktree: ${wtPath}\n`);
+              logTuiError('switch-spec', `Spec active in another worktree: ${wtPath}`, {
+                specId,
+                specBranch,
+                worktreePath: wtPath,
+              }, cwd);
+              // Use a flag to break out of the switch case
+              tui.log(`Spec is active in worktree: ${wtPath}`);
+              return;
             }
+          }
+        }
 
-            const roadmapDir = join(cwd, 'specs', 'roadmap');
-            const targetPath = join(roadmapDir, specFile.filename);
-            const wasNotInRoadmap = !specFile.path.includes('/roadmap/');
+        // Branch creation / checkout with remote sync
+        const branchExists = gitExec(['rev-parse', '--verify', specBranch], cwd);
 
-            if (wasNotInRoadmap) {
-              mkdirSync(roadmapDir, { recursive: true });
-              renameSync(specFile.path, targetPath);
-              await reindexAfterMove(cwd, specFile.path, targetPath, true);
-            }
+        if (!branchExists.success) {
+          // Branch does NOT exist locally — create from origin/main
+          tui.log(`Creating new branch from origin/main: ${specBranch}`);
 
-            tui.log('Spec resurrected and indexes updated ✓');
+          // Fetch first (non-blocking on failure)
+          const fetchResult = gitExec(['fetch', 'origin', 'main'], cwd);
+          if (!fetchResult.success) {
+            tui.log('Warning: Could not fetch from origin. Creating branch from local state.');
+          }
 
-            // Re-find the spec since its path has changed
-            specFile = findSpecById(specId, cwd);
-            if (!specFile) {
-              tui.log(`Error: Spec file not found after resurrection: ${specId}`);
-              break;
-            }
-          } catch (resErr) {
-            const message = resErr instanceof Error ? resErr.message : String(resErr);
-            tui.log(`Error resurrecting spec: ${message}`);
-            logTuiError('resurrect-spec', resErr instanceof Error ? resErr : message, {
+          // Create branch from origin/main (or local main if fetch failed)
+          const createBase = fetchResult.success ? 'origin/main' : 'main';
+          const createResult = gitExec(['checkout', '-b', specBranch, createBase], cwd);
+          if (!createResult.success) {
+            tui.log(`Error creating branch: ${createResult.stderr}`);
+            logTuiError('checkout-branch', createResult.stderr, {
               specId,
-              spec: currentSpec?.id,
+              specBranch,
               branch,
             }, cwd);
             break;
           }
+        } else {
+          // Branch exists — checkout and merge origin/main
+          tui.log(`Checking out existing branch: ${specBranch}`);
+
+          const checkoutResult = gitExec(['checkout', specBranch], cwd);
+          if (!checkoutResult.success) {
+            tui.log(`Error checking out branch: ${checkoutResult.stderr}`);
+            logTuiError('checkout-branch', checkoutResult.stderr, {
+              specId,
+              specBranch,
+              branch,
+            }, cwd);
+            break;
+          }
+
+          // Sync with origin/main
+          tui.log('Syncing with origin/main...');
+          const syncResult = syncWithOriginMain(cwd);
+
+          if (!syncResult.success && syncResult.conflicts.length > 0) {
+            // Merge conflicts detected — already aborted by syncWithOriginMain
+            const conflictDetail = "Conflicting files:\n" + syncResult.conflicts.map(f => "  - " + f).join("\n") + "\n\nResolve conflicts manually and retry.";
+            await tui.showConfirmation(
+              'Merge Conflicts Detected',
+              `Could not merge origin/main into ${specBranch}.`,
+              conflictDetail
+            );
+            process.stderr.write(`Error: Merge conflicts in ${specBranch}: ${syncResult.conflicts.join(', ')}\n`);
+            logTuiError('switch-spec', `Merge conflicts: ${syncResult.conflicts.join(', ')}`, {
+              specId,
+              specBranch,
+              conflicts: syncResult.conflicts,
+            }, cwd);
+            // Return without completing activation — user must resolve conflicts
+            return;
+          } else if (!syncResult.success) {
+            await tui.showConfirmation(
+              'Switch Aborted',
+              'Failed to sync with remote main — switch aborted.',
+              'Could not merge origin/main. This can be caused by uncommitted changes or network issues. Please resolve and try again.'
+            );
+            return;
+          } else {
+            tui.log('Synced with origin/main successfully.');
+          }
         }
 
-        // Checkout the spec's branch (we already validated it exists above)
-        const specBranch = specFile.branch!;
-        tui.log(`Checking out branch: ${specBranch}`);
-
-        try {
-          execSync(`git checkout ${specBranch}`, { stdio: 'pipe', cwd });
-        } catch (gitErr) {
-          const message = gitErr instanceof Error ? gitErr.message : String(gitErr);
-          tui.log(`Error checking out branch: ${message}`);
-          logTuiError('checkout-branch', gitErr instanceof Error ? gitErr : message, {
-            specId,
-            specBranch,
-            branch,
-          }, cwd);
-          break;
-        }
-
-        // Get planning key for the new branch
+        // Preserve .planning/ directory creation
         const newPlanningKey = sanitizeBranchForDir(specBranch);
 
-        // Ensure planning directory exists
         if (!planningDirExists(newPlanningKey, cwd)) {
           tui.log(`Creating .planning/${newPlanningKey}/`);
           ensurePlanningDir(newPlanningKey, cwd);
@@ -684,7 +732,6 @@ async function handleAction(
         }
 
         // Update TUI state
-        const newStatus = readStatus(newPlanningKey, cwd);
         const newPrompts = loadAllPrompts(newPlanningKey, cwd);
         tui.updateState({
           spec: specFile.id,
@@ -757,49 +804,6 @@ async function handleAction(
       break;
     }
 
-    case 'clear-spec': {
-      // Check for uncommitted changes before proceeding
-      try {
-        const statusOut = execSync('git status --porcelain', { encoding: 'utf-8', cwd }).trim();
-        if (statusOut.length > 0) {
-          await tui.showConfirmation(
-            'Uncommitted Changes',
-            'You have uncommitted changes in your working tree. Please commit or discard them before clearing the spec.'
-          );
-          break;
-        }
-      } catch {
-        tui.log('Error: Could not check git status.');
-        break;
-      }
-
-      const localBase = getLocalBaseBranch();
-      tui.log(`Checking out local base branch: ${localBase}`);
-
-      try {
-        execSync(`git checkout ${localBase}`, { stdio: 'pipe', cwd });
-
-        tui.updateState({
-          spec: undefined,
-          branch: localBase,
-          prompts: [],
-        });
-
-        // Sync EventLoop state to prevent stale branch detection
-        tui.syncBranchContext(localBase, null);
-
-        tui.log(`Now on branch: ${localBase} (no spec)`);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        tui.log(`Error: ${message}`);
-        logTuiError('clear-spec', e instanceof Error ? e : message, {
-          spec: currentSpec?.id,
-          branch,
-        }, cwd);
-      }
-      break;
-    }
-
     case 'new-initiative': {
       const specType = data?.specType as string | undefined;
       if (!specType) {
@@ -821,6 +825,15 @@ async function handleAction(
 
         // Override WORKFLOW_DOMAIN_PATH based on the selected spec type
         context.WORKFLOW_DOMAIN_PATH = join(cwd, '.allhands', 'workflows', `${specType}.md`);
+
+        // Detect active spec for revision mode
+        const activeSpec = getSpecForBranch(branch, cwd);
+        if (activeSpec && activeSpec.status !== 'completed') {
+          const specAbsPath = activeSpec.path.startsWith('/') ? activeSpec.path : join(cwd, activeSpec.path);
+          context.SPEC_PATH = specAbsPath;
+          context.SPEC_NAME = activeSpec.id;
+          tui.log(`Active spec detected: ${activeSpec.id} — ideation will enter revision mode`);
+        }
 
         // All spec types route to the unified scoping flow
         const flowOverride = join(getFlowsDirectory(), UNIFIED_SCOPING_FLOW);

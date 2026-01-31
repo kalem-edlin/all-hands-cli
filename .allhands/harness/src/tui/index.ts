@@ -993,10 +993,6 @@ export class TUI {
       onCancel: () => {
         this.closeModal();
       },
-      onClear: () => {
-        this.closeModal();
-        this.options.onAction('clear-spec');
-      },
     });
     this.screen.render();
   }
@@ -1203,16 +1199,20 @@ export class TUI {
   /**
    * Show a confirmation dialog and wait for user response.
    * Returns true if user confirms, false if cancelled.
+   * Optional detail text renders below the message in a dimmer style.
    */
-  public showConfirmation(title: string, message: string): Promise<boolean> {
+  public showConfirmation(title: string, message: string, detail?: string): Promise<boolean> {
     return new Promise((resolve) => {
       if (this.activeModal) {
         this.closeModal();
       }
 
       const width = 60;
-      const lines = message.split('\n');
-      const height = Math.min(lines.length + 6, 20);
+      const messageLines = message.split('\n');
+      // Detail adds a blank separator line plus its own lines
+      const detailLines = detail ? detail.split('\n') : [];
+      const totalContentLines = messageLines.length + (detail ? 1 + detailLines.length : 0);
+      const height = Math.min(totalContentLines + 6, 20);
 
       const box = blessed.box({
         parent: this.screen,
@@ -1241,6 +1241,18 @@ export class TUI {
         content: `{#c7d2fe-fg}${message}{/#c7d2fe-fg}`,
         tags: true,
       });
+
+      // Add detail text below message if provided
+      if (detail) {
+        blessed.text({
+          parent: box,
+          top: 1 + messageLines.length + 1, // message offset + message lines + blank separator
+          left: 2,
+          right: 2,
+          content: `{#5c6370-fg}${detail}{/#5c6370-fg}`,
+          tags: true,
+        });
+      }
 
       // Add button hints
       blessed.text({
