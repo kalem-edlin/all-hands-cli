@@ -330,7 +330,7 @@ async function handleAction(
       await tui.showConfirmation(
         'Compounding Aborted',
         'Failed to sync with remote main — compounding aborted',
-        'Could not fetch origin/main. Check your network connection and remote configuration.'
+        'Could not merge origin/main. This can be caused by uncommitted changes or network issues. Please resolve and try again.'
       );
       return;
     }
@@ -491,7 +491,7 @@ async function handleAction(
       tui.log(`Marking spec as completed: ${currentSpec.id}`);
 
       try {
-        // Remote sync: fetch + merge origin/main
+        /** Remote sync: fetch + merge origin/main */
         tui.log('Syncing with origin/main...');
         const syncResult = syncWithOriginMain(cwd);
 
@@ -510,7 +510,12 @@ async function handleAction(
           }, cwd);
           return;
         } else if (!syncResult.success) {
-          tui.log('Warning: Could not sync with origin/main. Continuing with local state.');
+          await tui.showConfirmation(
+            'Completion Aborted',
+            'Failed to sync with remote main — completion aborted.',
+            'Could not merge origin/main. This can be caused by uncommitted changes or network issues. Please resolve and try again.'
+          );
+          return;
         } else {
           tui.log('Synced with origin/main successfully.');
         }
@@ -578,7 +583,7 @@ async function handleAction(
       tui.log(`Switching to spec: ${specId}`);
 
       try {
-        // Guard: check for uncommitted changes before any git operations
+        /** Guard: check for uncommitted changes before any git operations */
         const proceedWithSwitch = await confirmProceedWithUncommittedChanges(
           tui, cwd, 'You have uncommitted changes that may be lost during branch switch. Proceed anyway?'
         );
@@ -610,7 +615,7 @@ async function handleAction(
         // Validate branch name safety
         validateGitRef(specBranch, 'spec branch');
 
-        // Cross-worktree detection: check if spec is active in another worktree
+        /** Cross-worktree detection: check if spec is active in another worktree */
         const worktreeResult = gitExec(['worktree', 'list', '--porcelain'], cwd);
         if (worktreeResult.success) {
           const worktreeLines = worktreeResult.stdout.split('\n');
@@ -706,8 +711,12 @@ async function handleAction(
             // Return without completing activation — user must resolve conflicts
             return;
           } else if (!syncResult.success) {
-            // Fetch or merge failed without conflicts (e.g., no remote)
-            tui.log('Warning: Could not sync with origin/main. Continuing with local state.');
+            await tui.showConfirmation(
+              'Switch Aborted',
+              'Failed to sync with remote main — switch aborted.',
+              'Could not merge origin/main. This can be caused by uncommitted changes or network issues. Please resolve and try again.'
+            );
+            return;
           } else {
             tui.log('Synced with origin/main successfully.');
           }

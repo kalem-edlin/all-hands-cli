@@ -564,11 +564,14 @@ export async function buildPR(
     try {
       // Sync with origin/main before push
       const syncResult = syncWithOriginMain(workingDir);
-      if (!syncResult.success && syncResult.conflicts.length > 0) {
+      if (!syncResult.success) {
+        const failureReason = syncResult.conflicts.length > 0
+          ? `Merge conflicts with main must be resolved before updating PR:\n${syncResult.conflicts.join('\n')}`
+          : 'Failed to sync with main. This can be caused by uncommitted changes or network issues. Please resolve and try again.';
         return {
           success: false,
           title: prContent.title,
-          body: `Merge conflicts with main must be resolved before updating PR:\n${syncResult.conflicts.join('\n')}`,
+          body: failureReason,
         };
       }
 
@@ -604,11 +607,14 @@ export async function buildPR(
   try {
     // Sync with origin/main before push
     const syncResult = syncWithOriginMain(workingDir);
-    if (!syncResult.success && syncResult.conflicts.length > 0) {
+    if (!syncResult.success) {
+      const failureReason = syncResult.conflicts.length > 0
+        ? `Merge conflicts with main must be resolved before creating PR:\n${syncResult.conflicts.join('\n')}`
+        : 'Failed to sync with main. This can be caused by uncommitted changes or network issues. Please resolve and try again.';
       return {
         success: false,
         title: prContent.title,
-        body: `Merge conflicts with main must be resolved before creating PR:\n${syncResult.conflicts.join('\n')}`,
+        body: failureReason,
       };
     }
 
