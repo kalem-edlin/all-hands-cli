@@ -315,7 +315,7 @@ export async function callTool(
     // Ensure daemon is running, then call via daemon
     await startDaemon(aid);
 
-    const callTimeout = config.stateful_session_timeout ?? 30000;
+    const callTimeout = config.stateful_session_timeout ?? 60000;
     const result = await sendToDaemon<{
       success: boolean;
       result?: unknown;
