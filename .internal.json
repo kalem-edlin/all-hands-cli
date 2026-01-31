@@ -28,8 +28,7 @@
     "target-lines.json",
     ".reposearch/**",
     "concerns.md",
-    "specs/**",
-    "docs.json"
+    "specs/**"
   ],
   "$distribution_comment": "What DOES get distributed: .allhands/ (flows, harness, agents, skills, schemas, validation), .claude/ (agents)"
 }

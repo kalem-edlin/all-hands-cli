@@ -60,14 +60,14 @@ Full documentation effort for new repos or out-of-sync docs.
    - Missing frontmatter
 
 2. **Domain Detection**
-   - Read `docs.json` at project root for declared domains (optional - projects don't need this file)
+   - Read `.allhands/docs.json` at project root for declared domains (optional - projects don't need this file)
    - If not declared, infer:
      - Run `tldr structure .` or `ah complexity .` on project root
      - Check for monorepo markers: `pnpm-workspace.yaml`, `lerna.json`, `turbo.json`, `nx.json`
      - If monorepo: each workspace package is a domain, plus root-level coordination docs
      - Otherwise: identify main product areas from directory structure
    - Present detected domains to user for confirmation
-   - Persist confirmed domains to `docs.json` at project root (using the schema from `ah schema docs-config`). Always write this file, whether user adjusted or accepted defaults — it codifies the domain map for future incremental runs.
+   - Persist confirmed domains to `.allhands/docs.json` at project root (using the schema from `ah schema docs-config`). Always write this file, whether user adjusted or accepted defaults — it codifies the domain map for future incremental runs.
 
 3. **Proceed to Core Flow** with:
    ```yaml

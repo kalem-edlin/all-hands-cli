@@ -1,7 +1,7 @@
 ---
 name: unified-workflow-orchestration
 domain_name: infrastructure
-status: roadmap
+status: completed
 dependencies: []
 branch: feature/unified-workflow-orchestration
 ---
