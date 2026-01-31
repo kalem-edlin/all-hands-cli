@@ -2,7 +2,7 @@
 name: workflow-domain-configuration
 domain_name: infrastructure
 type: milestone
-status: roadmap
+status: completed
 dependencies: []
 branch: feature/workflow-domain-configuration
 ---
@@ -224,3 +224,42 @@ Engineer expects minimal, non-invasive updates to `.allhands/pillars.md`:
 - **Emergence phase transition is a flow change** — The emergent planner already reads the alignment doc. Adding `core_consolidation` awareness is a flow change (checking the field, adjusting hypothesis strategy), not a code change to the harness runtime
 - **Event loop gating invariant** — The `stage` field on `status.yaml` already gates execution. Making spec planning the explicit setter of `stage: executing` enforces an invariant rather than adding a new mechanism. The loop's `checkPromptLoop()` already checks status before spawning
 - **Existing milestone behavior preservation** — The milestone workflow domain config encodes the domain knowledge; the unified flows preserve the orchestration logic. The milestone planning path (deep research subtasks, full engineer interview with options, external tech research, jury review, plan deepening) remains as conditional flow logic triggered by the milestone domain config's characteristics
+
+## Implementation Reality
+
+### What Was Implemented vs Planned
+
+All 10 spec goals were implemented as planned across 13 prompts (10 planned + 3 review-fix from jury review). No goals were descoped, deferred, or significantly altered. The engineer declined YAGNI scope reduction, keeping full scope: all 6 domain configs, amend mode, and two-phase emergence.
+
+### Key Technical Decisions
+
+- **Content-presence branching over type checks**: The unified `IDEATION_SCOPING.md` triggers milestone-specific features (deep dives, gap detection, completeness check, guiding principles) by detecting content presence in domain config sections rather than hardcoded `planning_depth` or `type` checks. This enables new domains to activate features by adding config content without flow code changes.
+- **"Deep Planning" / "Focused Planning" naming**: Planning paths were named to decouple from spec type terminology. `planning_depth: deep` activates the full pipeline; `planning_depth: focused` activates the lightweight path.
+- **Stage-field loop pause over window detection**: Initiative steering pauses the event loop via `stage: 'steering'` on `status.yaml` rather than window-name-based detection — uses the same mechanism as execution gating for architectural consistency.
+- **`status: deleted` for prompt deletion**: Initiative steering marks prompts as deleted in frontmatter rather than removing files, preserving the audit trail.
+- **`contextOverrides` for domain selection**: TUI actions pass engineer's domain selection to agents via `contextOverrides` on `spawnAgentsForAction()` rather than mutating global template context.
+
+### Jury Review Outcomes
+
+The 7-member post-implementation jury caught 5 P1/P2 issues resolved by review-fix prompts 11-13:
+- Duplicated regex frontmatter parsing → extracted shared `getWorkflowDomain()` utility with proper YAML parsing
+- Unsanitized domain values in `path.join()` → added `VALID_WORKFLOW_DOMAINS` allowlist validation
+- Missing `initial_workflow_domain` on `SpecFrontmatter` interface → added to type definition
+- Missing `ALIGNMENT_PATH` on planner agent profile → added to template vars
+- Tautological routing tests asserting constants against themselves → replaced with filesystem/runtime assertions
+- Duplicated 6-domain array in TUI modals → extracted shared `WORKFLOW_DOMAIN_ITEMS` constant
+- 5 workflow domain patterns not encoded in harness-maintenance skill → encoded as new skill sections
+
+### Open Questions Resolved
+
+- **Schema depth**: Structured frontmatter for programmatic flags (`planning_depth`, `jury_required`, `max_tangential_hypotheses`, `required_ideation_questions`) + markdown body for expressive domain knowledge
+- **Initiative steering invocation**: Dedicated TUI action ("Steer Initiative") with domain selection modal
+- **Event loop during steering**: Paused via `stage: 'steering'` — active executors continue, no new spawns
+- **Tangential hypothesis cap**: Configured per domain in workflow domain config's `max_tangential_hypotheses` field
+- **Amend mode staleness**: Reference integrity check — decisions referencing prompts that no longer exist or with modified acceptance criteria are flagged as stale
+- **Steering domain tracking**: Tracked in alignment doc amendment section, not by updating `initial_workflow_domain` on the spec
+- **Milestone config completeness**: Domain config describes WHAT (6-dimension interview, gap signals, completeness criteria, jury topics); unified flows handle HOW (subtask spawning, interview sequencing, phase orchestration). `planning_depth` and `jury_required` flags gate which flow phases activate.
+
+### Validation Gap
+
+No TypeScript-specific validation suite exists. All 13 prompts used `validation_suites: []`. Manual validation relied on `tsc --noEmit`, `npx vitest run`, `ah validate agents/file`, and manual acceptance criteria walkthroughs. This gap was previously identified and persists.

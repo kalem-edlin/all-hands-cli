@@ -1,7 +1,7 @@
 ---
 name: unified-workflow-orchestration
 domain_name: infrastructure
-status: roadmap
+status: completed
 dependencies: []
 branch: feature/unified-workflow-orchestration
 ---
@@ -214,3 +214,37 @@ The triage scoping flow is distinct in that it reads from external sources (Post
 - **Documentation flow consolidation** — The current `DOCUMENTATION.md` flow uses a two-layer delegation pattern (discovery agents → writer agents). With the hypothesis planner model, documentation becomes: hypothesis planner identifies uncovered areas → creates prompts for each area → executors write documentation. This replaces the custom documentation orchestration with the standard loop, eliminating the `documentor.yaml` agent and `DOCUMENTATION.md` flow.
 - **Settings.json `emergent` section** — The `emergent.hypothesisDomains` field in settings.json remains as the global default menu of available domains. The `emergent` key could be renamed to `hypothesis` for clarity, but this is a cosmetic change.
 - **Spec `type` determines branch prefix** — The `CREATE_SPEC.md` flow (or `ah specs persist`) should derive branch prefix from spec type: milestone → `feature/`, investigation → `fix/`, optimization → `optimize/`, refactor → `refactor/`, documentation → `docs/`, triage → `triage/`. This is a convention, not a hard constraint — the `branch` field on the spec is always the source of truth.
+
+## Implementation Reality
+
+### What Was Implemented vs Planned
+
+All 9 spec goals were implemented across 17 prompts (8 planned, 4 emergent, 2 user-patch, 3 review-fix):
+
+1. **Two-agent model** — Implemented as designed. `hypothesis-planner.yaml` (plan only) + executor (unchanged). Agent file uses canonical `emergent` naming per engineer decision, not `hypothesis-planner`.
+2. **Unified event loop** — Single code path in `checkPromptLoop()`. All emergent toggle/state machinery removed.
+3. **Spec type field** — 6-value enum added. `hypothesis_domains` deferred as spec field (jury-approved scope reduction) — settings.json global defaults only.
+4. **New Initiative TUI action** — Implemented via `flowOverride` on existing `ideation` agent profile rather than separate profiles per type. `SCOPING_FLOW_MAP` exported as `Record<SpecType, string | null>`.
+5. **Planner type-aware behavior** — `SPEC_PLANNING.md` branches milestone (deep) vs exploratory (lightweight) via table format.
+6. **Always-available TUI actions** — All `hidden`/`disabled` conditions removed. Two toggles: Loop, Parallel.
+7. **Hypothesis planner agent + flow** — Created with `prompt_scoped: false`, `non_coding: true`. Always produces at least 1 prompt (engineer decision).
+8. **Scoping flows** — 5 separate flows created (~25 lines each). Triage is a stub with manual fallback (deferred).
+9. **CREATE_SPEC + Compounding + Pillars** — Branch prefix convention, type-conditional compounding, pillars 1/8/9 updated.
+
+### How Engineer Desires Evolved
+
+- **Hypothesis planner termination**: Spec proposed 0-prompt termination → engineer decided "always produce work" with progressive tangentiality. Engineer controls termination via loop toggle.
+- **Emergent naming**: Spec proposed renaming to `hypothesis-planner.yaml` → engineer declined, "emergent" is canonical agent identity. `hp-` prefixed variables renamed to `emergent-` via PR review fix.
+- **documentor.yaml deletion**: Prompt 07 deleted as part of documentation consolidation → engineer restored via user-patch 17 because compound TUI action requires both profiles.
+- **Uncommitted changes guards**: Not in original spec → engineer added via user-patch 11 after TUI overhaul exposed PR actions without safety guards.
+- **Exponential backoff**: Not in original spec → emergent prompt 10 added spawn resilience. Engineer kept it.
+- **Test coverage**: Not explicitly planned → 4 emergent prompts (09, 10, 15, 16) added 62 tests covering event loop decisions, backoff, spec type parsing, and initiative routing.
+
+### Key Technical Decisions
+
+- `flowOverride` parameter on `spawnAgentFromProfile()` enables routing without per-type agent profiles
+- `SPEC_TYPE` template variable separate from `WORKFLOW_TYPE` (different concepts)
+- `type: emergent` preserved on hypothesis planner prompts (describes work type, not agent type)
+- `EmergentSettings` interface added to `ProjectSettings` for typed settings.json access
+- `WORKFLOW_TYPE` template variable removed entirely (no references remained)
+- `confirmProceedWithUncommittedChanges()` extracted as shared helper across 3 TUI handlers
