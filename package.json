@@ -1,5 +1,5 @@
 {
-  "name": "all-hands",
+  "name": "all-hands-cli",
   "version": "0.1.0",
   "description": "Agentic harness for model-first software development",
   "type": "module",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kalem-edlin/all-hands"
+    "url": "https://github.com/kalem-edlin/all-hands-cli"
   },
   "publishConfig": {
     "access": "public"
