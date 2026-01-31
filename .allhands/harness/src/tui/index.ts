@@ -36,6 +36,19 @@ import { createModal, Modal } from './modal.js';
 import { createPromptsPane, PromptItem } from './prompts-pane.js';
 import { AgentInfo, createStatusPane, getSelectableItems } from './status-pane.js';
 
+/**
+ * Shared workflow domain items for initiative and steering modals.
+ * Single source of truth for the 6 domain {id, label} pairs.
+ */
+export const WORKFLOW_DOMAIN_ITEMS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: 'milestone', label: 'Milestone — Feature development with deep ideation' },
+  { id: 'investigation', label: 'Investigation — Debug / diagnose issues' },
+  { id: 'optimization', label: 'Optimization — Performance / efficiency work' },
+  { id: 'refactor', label: 'Refactor — Cleanup / tech debt' },
+  { id: 'documentation', label: 'Documentation — Coverage gaps' },
+  { id: 'triage', label: 'Triage — External signal analysis' },
+];
+
 export type PaneId = 'actions' | 'prompts' | 'status';
 
 export type PRActionState = 'create-pr' | 'awaiting-review' | 'rerun-pr-review';
@@ -908,18 +921,9 @@ export class TUI {
    * Routes to the appropriate scoping flow based on selection.
    */
   private openNewInitiativeModal(): void {
-    const specTypes: Array<{ id: string; label: string }> = [
-      { id: 'milestone', label: 'Milestone — Feature development with deep ideation' },
-      { id: 'investigation', label: 'Investigation — Debug / diagnose issues' },
-      { id: 'optimization', label: 'Optimization — Performance / efficiency work' },
-      { id: 'refactor', label: 'Refactor — Cleanup / tech debt' },
-      { id: 'documentation', label: 'Documentation — Coverage gaps' },
-      { id: 'triage', label: 'Triage — External signal analysis (coming soon)' },
-    ];
-
     this.activeModal = createModal(this.screen, {
       title: 'New Initiative — Select Type',
-      items: specTypes.map((t) => ({
+      items: WORKFLOW_DOMAIN_ITEMS.map((t) => ({
         id: t.id,
         label: t.label,
         type: 'item' as const,
@@ -950,19 +954,10 @@ export class TUI {
       }
     }
 
-    const allDomains: Array<{ id: string; label: string }> = [
-      { id: 'milestone', label: 'Milestone — Feature development' },
-      { id: 'investigation', label: 'Investigation — Debug / diagnose' },
-      { id: 'optimization', label: 'Optimization — Performance' },
-      { id: 'refactor', label: 'Refactor — Cleanup / tech debt' },
-      { id: 'documentation', label: 'Documentation — Coverage gaps' },
-      { id: 'triage', label: 'Triage — External signal analysis' },
-    ];
-
     // Reorder so the default domain appears first (pre-selected)
     const sorted = [
-      ...allDomains.filter((d) => d.id === defaultDomain),
-      ...allDomains.filter((d) => d.id !== defaultDomain),
+      ...WORKFLOW_DOMAIN_ITEMS.filter((d) => d.id === defaultDomain),
+      ...WORKFLOW_DOMAIN_ITEMS.filter((d) => d.id !== defaultDomain),
     ];
 
     this.activeModal = createModal(this.screen, {

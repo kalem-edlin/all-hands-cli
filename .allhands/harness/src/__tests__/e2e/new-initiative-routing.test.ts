@@ -9,11 +9,14 @@
 
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import type { SpecType } from '../../lib/specs.js';
 import { UNIFIED_SCOPING_FLOW } from '../../commands/tui.js';
 import { buildActionItems, type ToggleState } from '../../tui/actions.js';
 import { getFlowsDirectory } from '../../lib/flows.js';
+
+/** Resolve .allhands/workflows/ relative to .allhands/flows/ */
+const workflowsDir = join(dirname(getFlowsDirectory()), 'workflows');
 
 const ALL_SPEC_TYPES: SpecType[] = [
   'milestone',
@@ -37,59 +40,36 @@ describe('Unified scoping flow routing', () => {
     expect(existsSync(fullPath)).toBe(true);
   });
 
-  it('all spec types resolve to the same unified flow path', () => {
-    const flowsDir = getFlowsDirectory();
-    const expectedPath = join(flowsDir, UNIFIED_SCOPING_FLOW);
-
-    for (const _specType of ALL_SPEC_TYPES) {
-      // All types now route to the unified flow — no per-type mapping
-      const flowOverride = join(flowsDir, UNIFIED_SCOPING_FLOW);
-      expect(flowOverride).toBe(expectedPath);
+  it.each(ALL_SPEC_TYPES)(
+    '%s has a corresponding workflow domain config file on disk',
+    (specType) => {
+      const domainPath = join(workflowsDir, `${specType}.md`);
+      expect(existsSync(domainPath)).toBe(true);
     }
-  });
+  );
 });
 
 // ─── Task 2: WORKFLOW_DOMAIN_PATH resolution per spec type ───────────────────
 
 describe('WORKFLOW_DOMAIN_PATH resolution', () => {
   it.each(ALL_SPEC_TYPES)(
-    '%s resolves to .allhands/workflows/%s.md',
+    '%s workflow domain config exists at .allhands/workflows/%s.md',
     (specType) => {
-      // Mirrors the resolution logic in handleAction's new-initiative case
-      const cwd = process.cwd();
-      const domainPath = join(cwd, '.allhands', 'workflows', `${specType}.md`);
-
-      expect(domainPath).toContain('.allhands/workflows/');
-      expect(domainPath).toContain(`${specType}.md`);
+      const domainPath = join(workflowsDir, `${specType}.md`);
+      expect(existsSync(domainPath)).toBe(true);
     }
   );
 
-  it('each spec type produces a unique WORKFLOW_DOMAIN_PATH', () => {
-    const cwd = process.cwd();
-    const paths = ALL_SPEC_TYPES.map((t) =>
-      join(cwd, '.allhands', 'workflows', `${t}.md`)
-    );
-    const uniquePaths = new Set(paths);
-    expect(uniquePaths.size).toBe(ALL_SPEC_TYPES.length);
-  });
-
-  it('flowOverride config shape includes WORKFLOW_DOMAIN_PATH', () => {
-    const cwd = process.cwd();
-    const specType = 'investigation';
-
-    // Construct the same config shape the handler builds
-    const context = {
-      WORKFLOW_DOMAIN_PATH: join(cwd, '.allhands', 'workflows', `${specType}.md`),
-    };
-    const config = {
-      agentName: 'ideation',
-      context,
-      focusWindow: true,
-      flowOverride: join(getFlowsDirectory(), UNIFIED_SCOPING_FLOW),
-    };
-
-    expect(config.flowOverride).toContain('IDEATION_SCOPING.md');
-    expect(config.context.WORKFLOW_DOMAIN_PATH).toContain('investigation.md');
+  it('initiative-steering action is present in buildActionItems', () => {
+    const items = buildActionItems({
+      loopEnabled: false,
+      parallelEnabled: false,
+      prActionState: 'create-pr',
+    });
+    const steering = items.find((item) => item.id === 'initiative-steering');
+    expect(steering).toBeDefined();
+    expect(steering!.type).toBe('action');
+    expect(steering!.key).toBe('=');
   });
 });
 
