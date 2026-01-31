@@ -314,6 +314,28 @@ async function handleAction(
     }
   }
 
+  // Pre-spawn gate: sync with origin/main before compounding
+  if (action === 'compound') {
+    const syncResult = syncWithOriginMain(cwd);
+    if (!syncResult.success && syncResult.conflicts.length > 0) {
+      // Merge conflicts — already aborted by syncWithOriginMain
+      await tui.showConfirmation(
+        'Compounding Aborted',
+        'Merge conflicts with main — compounding aborted',
+        'Conflicting files:\n' + syncResult.conflicts.map(f => '  - ' + f).join('\n') + '\n\nResolve conflicts manually, push, and retry compounding.'
+      );
+      return;
+    } else if (!syncResult.success) {
+      // Fetch failure (no conflicts — network/remote issue)
+      await tui.showConfirmation(
+        'Compounding Aborted',
+        'Failed to sync with remote main — compounding aborted',
+        'Could not fetch origin/main. Check your network connection and remote configuration.'
+      );
+      return;
+    }
+  }
+
   // Try to handle as a profile-based agent spawn
   const handledByProfile = await spawnAgentsForAction(tui, action, planningKey, currentSpec, branch, status, cwd, contextOverrides);
   if (handledByProfile) {
