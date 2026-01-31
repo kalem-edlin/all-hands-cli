@@ -6,7 +6,7 @@
  *
  * Each AGENT_ID gets its own daemon instance, enabling parallel sessions.
  *
- * Socket path: .allhands/harness/.cache/sessions/{AGENT_ID}.sock
+ * Socket path: /tmp/ah-sessions-<hash>/{AGENT_ID}.sock
  *
  * Commands:
  * - { cmd: "call", server: string, tool: string, params: object, config: McpServerConfig }
@@ -34,6 +34,7 @@
 
 import { createServer, type Server, type Socket } from 'net';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
+import { createHash } from 'crypto';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -44,7 +45,12 @@ import { resolveEnvVars, DAEMON_DEFAULT_MCP_TIMEOUT } from './mcp-runtime.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Path: harness/src/lib/ -> harness/src/ -> harness/
 const HARNESS_ROOT = join(__dirname, '..', '..');
-const SESSIONS_DIR = join(HARNESS_ROOT, '.cache', 'sessions');
+// Derive project root: harness/ -> .allhands/ -> project/
+const PROJECT_ROOT = join(HARNESS_ROOT, '..', '..');
+// Use /tmp with hash of project root to stay under macOS 104-byte Unix socket path limit.
+// Project-relative paths can exceed this in deep directory trees or worktrees.
+const SESSIONS_HASH = createHash('sha256').update(PROJECT_ROOT).digest('hex').slice(0, 16);
+const SESSIONS_DIR = `/tmp/ah-sessions-${SESSIONS_HASH}`;
 
 /**
  * How often to check for session timeouts (30 seconds).

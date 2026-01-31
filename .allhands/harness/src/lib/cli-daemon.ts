@@ -8,12 +8,13 @@
  * The daemon runs hooks by intercepting stdout and process.exit(),
  * so hooks don't need any modification.
  *
- * Socket path: .allhands/harness/.cache/cli-daemon.sock
+ * Socket path: /tmp/ah-daemon-<hash>.sock (hash of project root)
  */
 
 import { createServer, createConnection, type Server, type Socket } from 'net';
 import { existsSync, mkdirSync, unlinkSync } from 'fs';
-import { dirname, join } from 'path';
+import { createHash } from 'crypto';
+import { dirname } from 'path';
 import type { HookInput } from '../hooks/shared.js';
 
 // Signal class to catch process.exit() calls
@@ -39,9 +40,15 @@ export interface DaemonCommand {
 
 /**
  * Get the socket path for the CLI daemon.
+ *
+ * Uses /tmp with a hash of the project directory to keep the path short.
+ * macOS limits Unix domain socket paths to 104 bytes — project-relative
+ * paths like .allhands/harness/.cache/cli-daemon.sock can exceed that
+ * in deep directory trees or multi-worktree setups.
  */
 export function getSocketPath(projectDir: string): string {
-  return join(projectDir, '.allhands', 'harness', '.cache', 'cli-daemon.sock');
+  const hash = createHash('sha256').update(projectDir).digest('hex').slice(0, 16);
+  return `/tmp/ah-daemon-${hash}.sock`;
 }
 
 /**

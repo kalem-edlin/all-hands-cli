@@ -6,7 +6,7 @@
  *
  * For stateless servers, uses direct one-shot connections.
  *
- * Daemon socket path: .allhands/harness/.cache/sessions/{AGENT_ID}.sock
+ * Daemon socket path: /tmp/ah-sessions-<hash>/{AGENT_ID}.sock
  *
  * Session Lifecycle (stateful servers):
  * - Sessions are auto-started on first tool call.
@@ -18,6 +18,7 @@
 import { connect, type Socket } from 'net';
 import { spawn } from 'child_process';
 import { existsSync, readFileSync, mkdirSync } from 'fs';
+import { createHash } from 'crypto';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -28,7 +29,12 @@ import { resolveEnvVars } from './mcp-runtime.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Path: harness/src/lib/ -> harness/src/ -> harness/
 const HARNESS_ROOT = join(__dirname, '..', '..');
-const SESSIONS_DIR = join(HARNESS_ROOT, '.cache', 'sessions');
+// Derive project root: harness/ -> .allhands/ -> project/
+const PROJECT_ROOT = join(HARNESS_ROOT, '..', '..');
+// Use /tmp with hash of project root to stay under macOS 104-byte Unix socket path limit.
+// Project-relative paths can exceed this in deep directory trees or worktrees.
+const SESSIONS_HASH = createHash('sha256').update(PROJECT_ROOT).digest('hex').slice(0, 16);
+const SESSIONS_DIR = `/tmp/ah-sessions-${SESSIONS_HASH}`;
 const DAEMON_SCRIPT = join(__dirname, 'mcp-daemon.ts');
 
 /**

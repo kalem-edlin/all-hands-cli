@@ -46,8 +46,16 @@ if [ ! -d "$SCRIPT_DIR/node_modules" ] || ! cmp -s "$SCRIPT_DIR/package.json" "$
     cp "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/node_modules/.package.json.cache" 2>/dev/null || true
 fi
 
-# CLI daemon socket path
-DAEMON_SOCKET="$SCRIPT_DIR/.cache/cli-daemon.sock"
+# CLI daemon socket path - use /tmp with hash to stay under macOS 104-byte socket path limit
+if command -v shasum >/dev/null 2>&1; then
+    DAEMON_HASH=$(printf '%s' "$PROJECT_ROOT" | shasum -a 256 | cut -c1-16)
+elif command -v sha256sum >/dev/null 2>&1; then
+    DAEMON_HASH=$(printf '%s' "$PROJECT_ROOT" | sha256sum | cut -c1-16)
+else
+    echo "ERROR: neither shasum nor sha256sum found" >&2
+    exit 1
+fi
+DAEMON_SOCKET="/tmp/ah-daemon-${DAEMON_HASH}.sock"
 SETTINGS_FILE="$ALLHANDS_DIR/settings.json"
 
 # Check if daemon is enabled in settings (default: true)
