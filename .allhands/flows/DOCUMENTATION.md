@@ -73,13 +73,14 @@ Full documentation effort for new repos or out-of-sync docs.
 2. **Domain Detection**
    - Resolve docs config per **Config Resolution** above (optional — projects don't need either file)
    - Load `domains` and `exclude` glob patterns from the resolved config
+   - Each domain has a `paths` property — either a single string or an array of strings indicating the source directories/files for that domain
    - If domains not declared, infer:
      - Run `tldr structure .` or `ah complexity .` on project root
      - Check for monorepo markers: `pnpm-workspace.yaml`, `lerna.json`, `turbo.json`, `nx.json`
      - If monorepo: each workspace package is a domain, plus root-level coordination docs
      - Otherwise: identify main product areas from directory structure
    - Present detected domains to user for confirmation
-   - Persist confirmed domains (and any existing `exclude` patterns) back to the resolved config file. Always write this file, whether user adjusted or accepted defaults — it codifies the domain map for future incremental runs.
+   - Persist confirmed domains (and any existing `exclude` patterns) back to the resolved config file. Always write this file, whether user adjusted or accepted defaults — it codifies the domain map for future incremental runs. Use array format for `paths` when persisting.
 
 3. **Proceed to Core Flow** with:
    ```yaml
@@ -140,10 +141,11 @@ Per **Context is Precious**, spawn discovery sub-agents:
 
 - One sub-agent per domain
 - Instruct each to read `.allhands/flows/shared/DOCUMENTATION_DISCOVERY.md`
+- Normalize `paths` to an array (if a single string, wrap it: `[path]`)
 - Provide each:
   ```yaml
   domain: "<domain-name>"
-  source_paths: ["<path/to/domain>"]  # or changed files in incremental
+  source_paths: ["<path1>", "<path2>", ...]  # all paths from domain.paths; or changed files in incremental
   exclude: ["<glob>", ...]  # from docs.json, may be empty
   mode: "<fill-gaps|incremental>"
   session_context: "<summary from alignment doc>"  # incremental only
