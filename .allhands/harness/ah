@@ -16,6 +16,11 @@ ALLHANDS_DIR="$(dirname "$SCRIPT_DIR")"
 # PROJECT_ROOT = parent of .allhands/
 PROJECT_ROOT="$(dirname "$ALLHANDS_DIR")"
 
+# Export project root so TypeScript code can resolve paths correctly
+# even when the caller's cwd is different from the project directory.
+# Preserves CLAUDE_PROJECT_DIR if already set by Claude Code.
+export CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}"
+
 # Load .env.ai from project root if exists
 if [ -f "$PROJECT_ROOT/.env.ai" ]; then
     set -a
