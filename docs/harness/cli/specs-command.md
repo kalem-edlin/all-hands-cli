@@ -37,18 +37,18 @@ Each spec file (`*.spec.md` or `*.md`) contains frontmatter with:
 
 Two discovery implementations exist for different contexts:
 
-**Library layer** ([ref:.allhands/harness/src/lib/specs.ts:loadAllSpecs:79b9873]): Scans `specs/roadmap/`, `specs/`, and `specs/completed/` directories. Returns specs grouped by category with full metadata including title extraction from H1 headings via [ref:.allhands/harness/src/lib/specs.ts:extractTitle:79b9873].
+**Library layer** ([ref:.allhands/harness/src/lib/specs.ts:loadAllSpecs:ce6f7c5]): Scans `specs/roadmap/`, `specs/`, and `specs/completed/` directories. Returns specs grouped by category with full metadata including title extraction from H1 headings via [ref:.allhands/harness/src/lib/specs.ts:extractTitle:ce6f7c5].
 
-**Command layer** ([ref:.allhands/harness/src/commands/specs.ts:loadAllSpecs:79b9873]): Scans `specs/` and `specs/roadmap/` for `.spec.md` files specifically. Used by CLI subcommands for listing and status changes.
+**Command layer** ([ref:.allhands/harness/src/commands/specs.ts:loadAllSpecs:6d7289a]): Scans `specs/` and `specs/roadmap/` for `.spec.md` files specifically. Used by CLI subcommands for listing and status changes.
 
 ## Branch-Spec Linking
 
 The `branch` field in spec frontmatter is the source of truth for which branch implements a spec. Two lookup functions serve different use cases:
 
-- [ref:.allhands/harness/src/lib/specs.ts:findSpecByBranch:79b9873] -- strict match: scans all specs for one whose `branch` field matches the given branch name exactly
-- [ref:.allhands/harness/src/lib/specs.ts:getSpecForBranch:79b9873] -- enhanced match: tries `findSpecByBranch` first, then falls back to initializing a planning directory if the branch has a spec assigned
+- [ref:.allhands/harness/src/lib/specs.ts:findSpecByBranch:ce6f7c5] -- strict match: scans all specs for one whose `branch` field matches the given branch name exactly
+- [ref:.allhands/harness/src/lib/specs.ts:getSpecForBranch:ce6f7c5] -- enhanced match: tries `findSpecByBranch` first, then falls back to initializing a planning directory if the branch has a spec assigned
 
-[ref:.allhands/harness/src/lib/specs.ts:findSpecById:79b9873] provides ID-based lookup, searching across all category groups.
+[ref:.allhands/harness/src/lib/specs.ts:findSpecById:ce6f7c5] provides ID-based lookup, searching across all category groups.
 
 ## CLI Subcommands
 
@@ -66,16 +66,16 @@ Lists all specs grouped by `domain_name`. Supports filtering:
 
 ### `ah specs current`
 
-Shows the spec linked to the current git branch. Uses [ref:.allhands/harness/src/lib/specs.ts:getSpecForBranch:79b9873] with the current branch to display spec ID, title, path, domain, status, and dependencies.
+Shows the spec linked to the current git branch. Uses [ref:.allhands/harness/src/lib/specs.ts:getSpecForBranch:ce6f7c5] with the current branch to display spec ID, title, path, domain, status, and dependencies.
 
 ### `ah specs complete <name>`
 
 Marks a spec as completed:
 
-1. Finds the spec by name via [ref:.allhands/harness/src/commands/specs.ts:findSpecByName:79b9873]
-2. Updates frontmatter status to `completed` via [ref:.allhands/harness/src/commands/specs.ts:updateSpecStatus:79b9873]
+1. Finds the spec by name via [ref:.allhands/harness/src/commands/specs.ts:findSpecByName:6d7289a]
+2. Updates frontmatter status to `completed` via [ref:.allhands/harness/src/commands/specs.ts:updateSpecStatus:6d7289a]
 3. If the spec was in `specs/roadmap/`, moves it to `specs/`
-4. Triggers knowledge reindexing via [ref:.allhands/harness/src/commands/specs.ts:reindexAfterMove:79b9873]
+4. Triggers knowledge reindexing via [ref:.allhands/harness/src/commands/specs.ts:reindexAfterMove:6d7289a]
 
 ### `ah specs resurrect <name>`
 
@@ -87,7 +87,7 @@ Creates a branch for a spec, updates the spec frontmatter with the branch name, 
 
 ## Knowledge Reindexing on Move
 
-When specs move between directories (complete or resurrect), the knowledge indexes must be updated to reflect the new file paths. [ref:.allhands/harness/src/commands/specs.ts:reindexAfterMove:79b9873] handles this:
+When specs move between directories (complete or resurrect), the knowledge indexes must be updated to reflect the new file paths. [ref:.allhands/harness/src/commands/specs.ts:reindexAfterMove:6d7289a] handles this:
 
 - If the old path was in `specs/roadmap/`, mark it as deleted in the `roadmap` index
 - If the new path is in `specs/roadmap/`, mark it as added in the `roadmap` index
@@ -97,6 +97,6 @@ This ensures semantic search returns results with correct file paths immediately
 
 ## TUI Integration
 
-[ref:.allhands/harness/src/lib/specs.ts:specsToModalItems:79b9873] converts spec groups into a format suitable for TUI selection modals, with category headers and selectable items. When no specs exist, it provides a helpful message directing users to create spec files.
+[ref:.allhands/harness/src/lib/specs.ts:specsToModalItems:ce6f7c5] converts spec groups into a format suitable for TUI selection modals, with category headers and selectable items. When no specs exist, it provides a helpful message directing users to create spec files.
 
-[ref:.allhands/harness/src/lib/specs.ts:loadSpecsByDomain:79b9873] groups specs by `domain_name` for domain-oriented views, sorting both domains and specs within each domain alphabetically.
+[ref:.allhands/harness/src/lib/specs.ts:loadSpecsByDomain:ce6f7c5] groups specs by `domain_name` for domain-oriented views, sorting both domains and specs within each domain alphabetically.

@@ -27,7 +27,7 @@ The harness now supports six spec types, each representing a distinct initiative
 - `documentation` -- knowledge artifact production
 - `triage` -- issue diagnosis and resolution
 
-The spec type is parsed from frontmatter and made available via the [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:aa2cf15] `SPEC_TYPE` variable. Agents receive this at spawn, enabling type-aware behavior without separate workflow configuration files.
+The spec type is parsed from frontmatter and made available via the [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:730f114] `SPEC_TYPE` variable. Agents receive this at spawn, enabling type-aware behavior without separate workflow configuration files.
 
 ## Hypothesis Domains
 
@@ -35,7 +35,7 @@ Hypothesis domains remain the creative constraint mechanism for the emergent age
 
 The domain list now comes from `settings.json` under `emergent.hypothesisDomains` (`EmergentSettings`), rather than from per-workflow YAML files. This centralizes domain configuration alongside other emergent agent settings.
 
-The emergent agent's [ref:.allhands/agents/emergent.yaml::48bd111] template receives domains via the `HYPOTHESIS_DOMAINS` template variable. The agent selects a domain that diversifies from prior prompts, creating organic coverage across quality dimensions.
+The emergent agent's [ref:.allhands/agents/emergent.yaml::9b6a9d4] template receives domains via the `HYPOTHESIS_DOMAINS` template variable. The agent selects a domain that diversifies from prior prompts, creating organic coverage across quality dimensions.
 
 ## How Domains Flow to the Emergent Agent
 

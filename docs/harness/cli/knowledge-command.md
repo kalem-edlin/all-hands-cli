@@ -24,7 +24,7 @@ flowchart TD
 
 ## Index Configuration
 
-[ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:79b9873] manages multiple named indexes, each configured for a specific document domain:
+[ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:0f31ba1] manages multiple named indexes, each configured for a specific document domain:
 
 | Index | Paths Scanned | Description |
 |-------|---------------|-------------|
@@ -39,9 +39,9 @@ Files named `memories.md` are excluded from indexing -- they contain project-spe
 
 ## Embedding and Search
 
-[ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:79b9873] exposes an `embed` method that generates 768-dimensional embeddings using the `gtr-t5-quant` model from `@visheratin/web-ai-node`. The model is lazy-loaded on first use and cached for the process lifetime.
+[ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:0f31ba1] exposes an `embed` method that generates 768-dimensional embeddings using the `gtr-t5-quant` model from `@visheratin/web-ai-node`. The model is lazy-loaded on first use and cached for the process lifetime.
 
-The `search` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:79b9873] executes similarity search with several filtering layers:
+The `search` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:0f31ba1] executes similarity search with several filtering layers:
 
 | Filter | Threshold | Purpose |
 |--------|-----------|---------|
@@ -55,7 +55,7 @@ Thresholds are configurable via project settings under `knowledge.similarityThre
 
 ## Search Command with Aggregation
 
-[ref:.allhands/harness/src/commands/knowledge.ts:SearchCommand:79b9873] adds an AI aggregation layer on top of raw search results. When the total token count of results exceeds 3500 tokens, it invokes an aggregator agent that synthesizes the raw results into structured output: an insight summary, LSP entry points for code navigation, and design notes.
+[ref:.allhands/harness/src/commands/knowledge.ts:SearchCommand:681f3dc] adds an AI aggregation layer on top of raw search results. When the total token count of results exceeds 3500 tokens, it invokes an aggregator agent that synthesizes the raw results into structured output: an insight summary, LSP entry points for code navigation, and design notes.
 
 The aggregation can be disabled with `--no-aggregate` for raw results, or `--metadata-only` for just file paths and descriptions without content.
 
@@ -63,7 +63,7 @@ The aggregation can be disabled with `--no-aggregate` for raw results, or `--met
 
 ### Full Reindex
 
-The `reindexAll` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:79b9873] rebuilds an index from scratch:
+The `reindexAll` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:0f31ba1] rebuilds an index from scratch:
 
 1. Discovers all files matching the index configuration (paths + extensions)
 2. Parses frontmatter from markdown files for metadata (description, relevant_files)
@@ -73,19 +73,19 @@ The `reindexAll` method on [ref:.allhands/harness/src/lib/knowledge.ts:Knowledge
 
 ### Incremental Reindex
 
-The `reindexFromChanges` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:79b9873] updates an existing index based on a list of file changes:
+The `reindexFromChanges` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:0f31ba1] updates an existing index based on a list of file changes:
 
 - **Added/Modified files**: Re-embed and upsert into the index
 - **Deleted files**: Remove from metadata (vector remains in index but is filtered during search)
 
-[ref:.allhands/harness/src/commands/knowledge.ts:getChangesFromGit:79b9873] detects changes by comparing the current branch against the base branch using `git diff --name-status`. This powers the `--from-changes` flag on reindex commands.
+[ref:.allhands/harness/src/commands/knowledge.ts:getChangesFromGit:681f3dc] detects changes by comparing the current branch against the base branch using `git diff --name-status`. This powers the `--from-changes` flag on reindex commands.
 
-[ref:.allhands/harness/src/commands/knowledge.ts:ReindexCommand:79b9873] supports both full and incremental modes, and can operate on a single index or all indexes at once.
+[ref:.allhands/harness/src/commands/knowledge.ts:ReindexCommand:681f3dc] supports both full and incremental modes, and can operate on a single index or all indexes at once.
 
 ### Document Indexing
 
-The `indexDocument` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:79b9873] handles individual document insertion. It assigns or reuses numeric IDs, removes old entries before re-adding (USearch requires unique keys), generates embeddings, and stores metadata including description, relevant files, and estimated token count.
+The `indexDocument` method on [ref:.allhands/harness/src/lib/knowledge.ts:KnowledgeService:0f31ba1] handles individual document insertion. It assigns or reuses numeric IDs, removes old entries before re-adding (USearch requires unique keys), generates embeddings, and stores metadata including description, relevant files, and estimated token count.
 
 ## Status Checking
 
-[ref:.allhands/harness/src/commands/knowledge.ts:StatusCommand:79b9873] reports which indexes exist on disk, enabling agents to determine whether they need to trigger a reindex before searching.
+[ref:.allhands/harness/src/commands/knowledge.ts:StatusCommand:681f3dc] reports which indexes exist on disk, enabling agents to determine whether they need to trigger a reindex before searching.

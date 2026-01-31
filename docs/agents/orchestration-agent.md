@@ -8,7 +8,7 @@ The coordinator is the only agent explicitly designed for **cross-phase orchestr
 
 ## Configuration
 
-[ref:.allhands/agents/coordinator.yaml::48bd111]
+[ref:.allhands/agents/coordinator.yaml::27a9130]
 
 | Field | Value |
 |-------|-------|

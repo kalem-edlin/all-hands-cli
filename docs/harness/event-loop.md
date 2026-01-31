@@ -19,20 +19,20 @@ graph TD
     P & G & A & F --> L[checkPromptLoop]
 ```
 
-[ref:.allhands/harness/src/lib/event-loop.ts:EventLoop:4eddba4] stores all state in an [ref:.allhands/harness/src/lib/event-loop.ts:EventLoopState:4eddba4] object that tracks the current branch, spec, PR URL, active agents, executor prompts, tick count, and hypothesis planner backoff counters (`emergentSpawnCount`, `emergentLastPromptCount`).
+[ref:.allhands/harness/src/lib/event-loop.ts:EventLoop:940f18a] stores all state in an [ref:.allhands/harness/src/lib/event-loop.ts:EventLoopState:940f18a] object that tracks the current branch, spec, PR URL, active agents, executor prompts, tick count, and hypothesis planner backoff counters (`emergentSpawnCount`, `emergentLastPromptCount`).
 
 ## Check: PR Review Feedback
 
-[ref:.allhands/harness/src/lib/pr-review.ts:checkPRReviewStatus:4eddba4] polls GitHub for PR review comments. The event loop only runs this check every N ticks (configured via `settings.prReview.checkFrequency`, default 3) since reviews take minutes to complete.
+[ref:.allhands/harness/src/lib/pr-review.ts:checkPRReviewStatus:ca5f05b] polls GitHub for PR review comments. The event loop only runs this check every N ticks (configured via `settings.prReview.checkFrequency`, default 3) since reviews take minutes to complete.
 
 The detection pipeline:
-1. [ref:.allhands/harness/src/lib/pr-review.ts:parsePRUrl:4eddba4] validates the PR URL format
+1. [ref:.allhands/harness/src/lib/pr-review.ts:parsePRUrl:ca5f05b] validates the PR URL format
 2. Reads `lastReviewRunTime` from `status.yaml` to filter old comments
 3. Checks for comments matching the configured `reviewDetectionString` (default: "greptile")
-4. [ref:.allhands/harness/src/lib/pr-review.ts:hasNewReview:4eddba4] compares previous and current `PRReviewState` to detect new reviews
+4. [ref:.allhands/harness/src/lib/pr-review.ts:hasNewReview:ca5f05b] compares previous and current `PRReviewState` to detect new reviews
 5. On detection, fires `onPRReviewFeedback` callback and updates `status.yaml`
 
-[ref:.allhands/harness/src/lib/pr-review.ts:triggerPRReview:4eddba4] posts a comment (default: "@greptile") to trigger a new review cycle.
+[ref:.allhands/harness/src/lib/pr-review.ts:triggerPRReview:ca5f05b] posts a comment (default: "@greptile") to trigger a new review cycle.
 
 ## Check: Git Branch
 
@@ -58,7 +58,7 @@ The reconciliation step also runs proactively: if `activeExecutorPrompts` contai
 
 ## Check: Prompt Files
 
-[ref:.allhands/harness/src/lib/prompts.ts:loadAllPrompts:4eddba4] reads all prompt files from the current planning directory. The event loop computes a hash-based snapshot of prompt filenames, statuses, and numbers. When the hash changes, it fires `onPromptsChange` with the full prompt list and a `PromptSnapshot` containing counts by status.
+[ref:.allhands/harness/src/lib/prompts.ts:loadAllPrompts:89011a7] reads all prompt files from the current planning directory. The event loop computes a hash-based snapshot of prompt filenames, statuses, and numbers. When the hash changes, it fires `onPromptsChange` with the full prompt list and a `PromptSnapshot` containing counts by status.
 
 When new pending prompts are detected (snapshot pending count increases), the hypothesis planner backoff resets to zero -- external prompt creation signals productive work.
 
@@ -66,7 +66,7 @@ This makes the harness the coordinator: it detects when agents create, modify, o
 
 ## Prompt Execution Loop
 
-The prompt loop is the sequential check that runs after all parallel checks complete, implemented in [ref:.allhands/harness/src/lib/event-loop.ts:EventLoop:4eddba4]. It implements a unified decision path:
+The prompt loop is the sequential check that runs after all parallel checks complete, implemented in [ref:.allhands/harness/src/lib/event-loop.ts:EventLoop:940f18a]. It implements a unified decision path:
 
 ```mermaid
 stateDiagram-v2
@@ -96,20 +96,20 @@ stateDiagram-v2
 1. **One agent per tick** -- Only one agent spawns per event loop cycle, preventing thundering herds
 2. **Hypothesis planner singleton** -- At most one emergent planner runs at a time; the planner spawns only when all prompts are done (none pending, none in_progress)
 3. **Parallel executors** -- When parallel mode is enabled, up to `settings.spawn.maxParallelPrompts` (default 3) executors can run simultaneously
-4. **10-second base cooldown** -- [ref:.allhands/harness/src/lib/event-loop.ts:SPAWN_COOLDOWN_MS:4eddba4] prevents race conditions where tmux hasn't registered the new window yet
+4. **10-second base cooldown** -- [ref:.allhands/harness/src/lib/event-loop.ts:SPAWN_COOLDOWN_MS:940f18a] prevents race conditions where tmux hasn't registered the new window yet
 5. **Prompt exclusion** -- `activeExecutorPrompts` tracks which prompts have running agents, preventing duplicate assignment
 
 Two toggles control execution: **Loop** (O) enables/disables the entire prompt loop, **Parallel** (P) toggles multi-executor mode.
 
 ### Prompt Selection
 
-[ref:.allhands/harness/src/lib/prompts.ts:pickNextPrompt:4eddba4] selects the next prompt to execute:
+[ref:.allhands/harness/src/lib/prompts.ts:pickNextPrompt:89011a7] selects the next prompt to execute:
 - Filters to `pending` status only
-- Checks dependency satisfaction via [ref:.allhands/harness/src/lib/prompts.ts:dependenciesSatisfied:4eddba4] -- all dependency prompt numbers must be `done`
+- Checks dependency satisfaction via [ref:.allhands/harness/src/lib/prompts.ts:dependenciesSatisfied:89011a7] -- all dependency prompt numbers must be `done`
 - Excludes prompts already being worked on (`excludePrompts` parameter)
 - Returns the lowest-numbered eligible prompt (FIFO ordering)
 
-[ref:.allhands/harness/src/lib/prompts.ts:markPromptInProgress:4eddba4] atomically updates the prompt's frontmatter status to `in_progress` using file locking via [ref:.allhands/harness/src/lib/prompts.ts:withFileLock:4eddba4].
+[ref:.allhands/harness/src/lib/prompts.ts:markPromptInProgress:89011a7] atomically updates the prompt's frontmatter status to `in_progress` using file locking via [ref:.allhands/harness/src/lib/prompts.ts:withFileLock:89011a7].
 
 ## Hypothesis Planner Backoff
 
@@ -117,7 +117,7 @@ When no pending or in-progress prompts remain, the event loop spawns a hypothesi
 
 ### Tracking Productivity
 
-[ref:.allhands/harness/src/lib/event-loop.ts:EventLoopState:4eddba4] tracks two fields:
+[ref:.allhands/harness/src/lib/event-loop.ts:EventLoopState:940f18a] tracks two fields:
 
 | Field | Purpose |
 |-------|---------|
@@ -140,7 +140,7 @@ cooldown = SPAWN_COOLDOWN_MS * 2^min(emergentSpawnCount, 4)
 | 3 | 80s |
 | 4+ | 160s (cap) |
 
-The base cooldown is [ref:.allhands/harness/src/lib/event-loop.ts:SPAWN_COOLDOWN_MS:4eddba4] (10 seconds). The exponent caps at 4, giving a maximum wait of 160 seconds.
+The base cooldown is [ref:.allhands/harness/src/lib/event-loop.ts:SPAWN_COOLDOWN_MS:940f18a] (10 seconds). The exponent caps at 4, giving a maximum wait of 160 seconds.
 
 ### Backoff Resets
 
@@ -152,7 +152,7 @@ Backoff status is traced via the `onLoopStatus` callback, logging messages like 
 
 ## Event Loop Callbacks
 
-[ref:.allhands/harness/src/lib/event-loop.ts:EventLoopCallbacks:4eddba4] defines the callback interface:
+[ref:.allhands/harness/src/lib/event-loop.ts:EventLoopCallbacks:940f18a] defines the callback interface:
 
 | Callback | Trigger |
 |----------|---------|

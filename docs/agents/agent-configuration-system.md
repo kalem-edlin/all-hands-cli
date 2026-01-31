@@ -8,7 +8,7 @@ Agent profiles are YAML declarations that define how agents are spawned, what co
 
 ## Profile Schema Fields
 
-Every agent YAML file is validated against [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:RawAgentProfileSchema:aa2cf15], which enforces this contract:
+Every agent YAML file is validated against [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:RawAgentProfileSchema:fb892e5], which enforces this contract:
 
 | Field | Type | Default | Purpose |
 |-------|------|---------|---------|
@@ -24,7 +24,7 @@ Every agent YAML file is validated against [ref:.allhands/harness/src/lib/schema
 
 ## Template Variable System
 
-Template variables are the mechanism through which agents receive runtime context at spawn. The variable registry lives in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:aa2cf15] and defines four categories:
+Template variables are the mechanism through which agents receive runtime context at spawn. The variable registry lives in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:730f114] and defines four categories:
 
 **Path variables** -- resolve to filesystem locations:
 - `SPEC_PATH`, `ALIGNMENT_PATH`, `PROMPTS_FOLDER`, `PROMPT_PATH`, `OUTPUT_PATH`, `PLANNING_FOLDER`
@@ -43,7 +43,7 @@ Template variables are the mechanism through which agents receive runtime contex
 
 > **Change note**: `WORKFLOW_TYPE` has been removed. It was replaced by `SPEC_TYPE`, which reads directly from spec frontmatter rather than from workflow YAML files (which have been deleted). `PROMPT_NUMBER` is no longer used by the emergent agent but remains in the registry for other agents.
 
-Template resolution validates that every `${VAR}` in `message_template` maps to a registered variable name in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TEMPLATE_VAR_NAMES:aa2cf15], and that the runtime context provides non-empty values for all declared `template_vars`.
+Template resolution validates that every `${VAR}` in `message_template` maps to a registered variable name in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TEMPLATE_VAR_NAMES:730f114], and that the runtime context provides non-empty values for all declared `template_vars`.
 
 ## Validation Pipeline
 
@@ -57,12 +57,12 @@ flowchart LR
     Semantic --> Valid["Ready to Spawn"]
 ```
 
-1. **Schema validation** -- [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:RawAgentProfileSchema:aa2cf15] checks types, applies defaults, and rejects unknown fields
-2. **Normalization** -- [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:normalizeProfile:aa2cf15] transforms snake_case YAML fields to camelCase TypeScript, producing the [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:AgentProfile:aa2cf15] interface
-3. **Semantic validation** -- [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:validateProfileSemantics:aa2cf15] performs cross-field checks:
+1. **Schema validation** -- [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:RawAgentProfileSchema:fb892e5] checks types, applies defaults, and rejects unknown fields
+2. **Normalization** -- [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:normalizeProfile:fb892e5] transforms snake_case YAML fields to camelCase TypeScript, producing the [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:AgentProfile:fb892e5] interface
+3. **Semantic validation** -- [ref:.allhands/harness/src/lib/schemas/agent-profile.ts:validateProfileSemantics:fb892e5] performs cross-field checks:
    - Every `${VAR}` in `message_template` must exist in `template_vars`
    - Every entry in `template_vars` must be referenced in `message_template`
-   - Template variables must be registered in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:aa2cf15]
+   - Template variables must be registered in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TemplateVars:730f114]
 
 Semantic validation returns warnings (not errors) for unused variables, allowing forward-compatible profiles.
 
@@ -81,6 +81,6 @@ The emergent agent was rearchitected from a coding execution agent to a non-codi
 ## Key Design Decisions
 
 - **Snake_case YAML, camelCase TypeScript**: Agent configs are authored in YAML-idiomatic snake_case. The normalization layer bridges to TypeScript conventions, keeping both sides natural.
-- **Closed variable registry**: Only variables registered in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TEMPLATE_VAR_NAMES:aa2cf15] can be used. This prevents typos and ensures every variable has a documented purpose via Zod `.describe()`.
+- **Closed variable registry**: Only variables registered in [ref:.allhands/harness/src/lib/schemas/template-vars.ts:TEMPLATE_VAR_NAMES:730f114] can be used. This prevents typos and ensures every variable has a documented purpose via Zod `.describe()`.
 - **Prompt-scoped multiplexing**: The `prompt_scoped` flag distinguishes singleton agents (planner, judge, coordinator) from parallelizable agents (executor, emergent). The TUI uses this to spawn N instances for N prompts. Note that prompt-scoped does not imply coding -- the emergent agent is prompt-scoped but non-coding.
 - **TUI as first-class concern**: The `tui_action`, `tui_label`, and `tui_requires_spec` fields embed presentation logic directly in the profile, avoiding a separate UI configuration layer.

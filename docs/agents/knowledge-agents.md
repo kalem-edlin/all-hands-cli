@@ -10,7 +10,7 @@ Knowledge agents run **after execution completes**. They do not produce features
 
 | Aspect | Compounder | Documentor |
 |--------|------------|------------|
-| Config | [ref:.allhands/agents/compounder.yaml::48bd111] | [ref:.allhands/agents/documentor.yaml::48bd111] |
+| Config | [ref:.allhands/agents/compounder.yaml::c9f0e13] | [ref:.allhands/agents/documentor.yaml::b4246b9] |
 | Flow | `COMPOUNDING.md` | `DOCUMENTATION.md` |
 | TUI label | Compounder | Documentor |
 | TUI action | `compound` | `compound` |

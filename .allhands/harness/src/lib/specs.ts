@@ -2,8 +2,8 @@
  * Spec File Management
  *
  * Handles discovery and loading of spec files for spec selection.
- * Scans specs/roadmap/ for planned specs and specs/ for others.
- * Parses YAML frontmatter for domain_name and status fields.
+ * Scans specs/roadmap/ for planned/in-progress specs and specs/ for completed specs.
+ * Only .spec.md files are matched. Parses YAML frontmatter for domain_name and status fields.
  */
 
 import { existsSync, readdirSync, readFileSync } from 'fs';
@@ -86,7 +86,7 @@ export function scanSpecDir(
   }
 
   const files = readdirSync(dir).filter(
-    (f) => f.endsWith('.spec.md') || (f.endsWith('.md') && !f.startsWith('_'))
+    (f) => f.endsWith('.spec.md')
   );
 
   return files.map((filename) => {
@@ -129,20 +129,9 @@ export function loadAllSpecs(cwd?: string): SpecGroup[] {
     });
   }
 
-  // Active specs (in specs/ root, not in subdirs)
+  // Completed specs (in specs/ root)
   const specsDir = join(basePath, 'specs');
-  const activeSpecs = scanSpecDir(specsDir, 'active');
-  if (activeSpecs.length > 0) {
-    groups.push({
-      category: 'active',
-      label: 'Active',
-      specs: activeSpecs,
-    });
-  }
-
-  // Completed specs
-  const completedDir = join(basePath, 'specs', 'completed');
-  const completedSpecs = scanSpecDir(completedDir, 'completed');
+  const completedSpecs = scanSpecDir(specsDir, 'completed');
   if (completedSpecs.length > 0) {
     groups.push({
       category: 'completed',

@@ -11,26 +11,26 @@
  */
 
 import { Command } from "commander";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
-import { join, relative, extname, dirname } from "path";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { dirname, extname, join, relative } from "path";
 import {
-  executeCommand,
-  parseContext,
   addCommonOptions,
   CommandResult,
+  executeCommand,
+  parseContext,
 } from "../lib/base-command.js";
-import { getProjectRoot } from "../lib/git.js";
 import {
   checkCtagsAvailable,
   findSymbolInFile,
   generateCtagsIndex,
 } from "../lib/ctags.js";
 import {
-  batchGetFileHashes,
+  batchGetBlobHashes,
   findMarkdownFiles,
   isCodeFile,
   validateDocsAsync,
 } from "../lib/docs-validation.js";
+import { getProjectRoot } from "../lib/git.js";
 
 /**
  * Validate all documentation references.
@@ -256,7 +256,7 @@ function finalizeSingleFile(
     // For file-only refs (empty symbol), just add the hash
     if (!placeholder.symbol || placeholder.symbol.trim() === "") {
       const fullRef = `[ref:${placeholder.file}::${hashResult.hash}]`;
-      finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+      finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
       replacements.push({ from: placeholder.match, to: fullRef });
       continue;
     }
@@ -264,7 +264,7 @@ function finalizeSingleFile(
     // For non-code files (markdown, yaml, json, etc.), treat symbol as a label (no ctags lookup)
     if (!isCodeFile(placeholder.file)) {
       const fullRef = `[ref:${placeholder.file}:${placeholder.symbol}:${hashResult.hash}]`;
-      finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+      finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
       replacements.push({ from: placeholder.match, to: fullRef });
       continue;
     }
@@ -281,7 +281,7 @@ function finalizeSingleFile(
 
     // Create full ref
     const fullRef = `[ref:${placeholder.file}:${placeholder.symbol}:${hashResult.hash}]`;
-    finalizedContent = finalizedContent.replace(placeholder.match, fullRef);
+    finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
     replacements.push({ from: placeholder.match, to: fullRef });
   }
 
@@ -294,12 +294,72 @@ function finalizeSingleFile(
 }
 
 /**
+ * Refresh a single documentation file by updating all finalized ref hashes to current blob hashes.
+ */
+function refreshSingleFile(
+  absolutePath: string,
+  projectRoot: string,
+  hashCache: Map<string, { hash: string; success: boolean }>
+): { path: string; updated: number; unchanged: number; errors: number } {
+  const relativePath = relative(projectRoot, absolutePath);
+  const content = readFileSync(absolutePath, "utf-8");
+
+  // Find all finalized refs matching REF_PATTERN
+  const pattern = new RegExp(REF_PATTERN.source, "g");
+  const matches: Array<{ full: string; file: string; symbol: string; hash: string }> = [];
+  let match;
+  while ((match = pattern.exec(content)) !== null) {
+    matches.push({ full: match[0], file: match[1], symbol: match[2], hash: match[3] });
+  }
+
+  if (matches.length === 0) {
+    return { path: relativePath, updated: 0, unchanged: 0, errors: 0 };
+  }
+
+  let updated = 0;
+  let unchanged = 0;
+  let errors = 0;
+  let refreshedContent = content;
+
+  for (const m of matches) {
+    const absoluteFilePath = join(projectRoot, m.file);
+    const hashResult = hashCache.get(absoluteFilePath) || hashCache.get(m.file);
+    if (!hashResult || !hashResult.success) {
+      errors++;
+      continue;
+    }
+
+    if (m.hash === hashResult.hash) {
+      unchanged++;
+      continue;
+    }
+
+    // Replace old hash with current blob hash
+    const oldRef = m.full;
+    const newRef = m.symbol === ""
+      ? `[ref:${m.file}::${hashResult.hash}]`
+      : `[ref:${m.file}:${m.symbol}:${hashResult.hash}]`;
+    refreshedContent = refreshedContent.replaceAll(oldRef, newRef);
+    updated++;
+  }
+
+  if (updated > 0) {
+    writeFileSync(absolutePath, refreshedContent, "utf-8");
+  }
+
+  return { path: relativePath, updated, unchanged, errors };
+}
+
+/**
  * Finalize documentation files by replacing placeholder refs with full refs.
  * Supports both single file and directory (batch) operation.
  * This allows writers to use [ref:file:symbol] syntax without hashes during writing,
  * then batch-process all refs in a single pass.
+ *
+ * When refresh=true, operates on ALL finalized refs (not just placeholders),
+ * replacing stored hashes with current blob hashes.
  */
-async function finalize(docsPath: string): Promise<CommandResult> {
+async function finalize(docsPath: string, options?: { refresh?: boolean }): Promise<CommandResult> {
   const projectRoot = getProjectRoot();
   const absolutePath = docsPath.startsWith("/") ? docsPath : join(projectRoot, docsPath);
   const relativePath = relative(projectRoot, absolutePath);
@@ -344,6 +404,52 @@ async function finalize(docsPath: string): Promise<CommandResult> {
     };
   }
 
+  // --refresh mode: update all finalized ref hashes to current blob hashes
+  if (options?.refresh) {
+    // Collect all referenced files from finalized refs across all files
+    const allRefFiles: Set<string> = new Set();
+    for (const docFile of filesToProcess) {
+      const content = readFileSync(docFile, "utf-8");
+      const refPattern = new RegExp(REF_PATTERN.source, "g");
+      let match;
+      while ((match = refPattern.exec(content)) !== null) {
+        allRefFiles.add(match[1]);
+      }
+    }
+
+    // Batch get blob hashes for all referenced files
+    const absoluteRefFiles = [...allRefFiles].map((f) => join(projectRoot, f));
+    const refreshHashCache = batchGetBlobHashes(absoluteRefFiles, projectRoot);
+
+    // Process each file
+    let totalUpdated = 0;
+    let totalUnchanged = 0;
+    let totalRefreshErrors = 0;
+    const refreshResults: Array<{ path: string; updated: number; unchanged: number; errors: number }> = [];
+
+    for (const docFile of filesToProcess) {
+      const result = refreshSingleFile(docFile, projectRoot, refreshHashCache);
+      refreshResults.push(result);
+      totalUpdated += result.updated;
+      totalUnchanged += result.unchanged;
+      totalRefreshErrors += result.errors;
+    }
+
+    return {
+      success: totalRefreshErrors === 0,
+      error: totalRefreshErrors > 0 ? `Refresh had ${totalRefreshErrors} hash lookup error(s)` : undefined,
+      data: {
+        mode: "refresh",
+        path: relativePath,
+        filesProcessed: filesToProcess.length,
+        totalUpdated,
+        totalUnchanged,
+        totalErrors: totalRefreshErrors,
+        files: refreshResults.filter((r) => r.updated > 0 || r.errors > 0),
+      },
+    };
+  }
+
   // Collect all placeholder refs across all files to batch hash lookup
   const allPlaceholders: Array<{ file: string; docPath: string }> = [];
   for (const docFile of filesToProcess) {
@@ -359,7 +465,7 @@ async function finalize(docsPath: string): Promise<CommandResult> {
   // Batch get file hashes for all referenced files
   const uniqueFiles = [...new Set(allPlaceholders.map((p) => p.file))];
   const absoluteFiles = uniqueFiles.map((f) => join(projectRoot, f));
-  const hashCache = batchGetFileHashes(absoluteFiles, projectRoot);
+  const hashCache = batchGetBlobHashes(absoluteFiles, projectRoot);
 
   // Process each file
   const results: Array<{ path: string; replacements: number; errors: number }> = [];
@@ -437,12 +543,15 @@ export function register(program: Command): void {
   const finalizeCmd = docs
     .command("finalize")
     .description("Replace placeholder refs [ref:file:symbol] with full refs including hashes")
-    .option("--path <path>", "Docs path (file or directory)", "docs/");
+    .option("--path <path>", "Docs path (file or directory)", "docs/")
+    .option("--refresh", "Re-stamp all finalized refs with current blob hashes", false);
 
   addCommonOptions(finalizeCmd);
 
   finalizeCmd.action(async (options) => {
     const context = parseContext(options);
-    await executeCommand("docs:finalize", context, () => finalize(options.path));
+    await executeCommand("docs:finalize", context, () =>
+      finalize(options.path, { refresh: options.refresh })
+    );
   });
 }

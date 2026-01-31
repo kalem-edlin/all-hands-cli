@@ -8,7 +8,7 @@ The plan review jury runs after planning is complete but before any prompt execu
 
 ## Jury Composition
 
-The plan review jury has four members, each spawned as a parallel subtask during the planning phase described in [ref:.allhands/flows/SPEC_PLANNING.md::79b9873]:
+The plan review jury has four members, each spawned as a parallel subtask during the planning phase described in [ref:.allhands/flows/SPEC_PLANNING.md::cc0b192]:
 
 ```mermaid
 flowchart TD
@@ -29,7 +29,7 @@ flowchart TD
 
 ## Expectations Fit
 
-[ref:.allhands/flows/shared/jury/PROMPTS_EXPECTATIONS_FIT.md::79b9873]
+[ref:.allhands/flows/shared/jury/PROMPTS_EXPECTATIONS_FIT.md::7fee0b6]
 
 Treats the spec doc as ground truth and traces every engineer expectation to the prompts that address it. Detects:
 
@@ -42,7 +42,7 @@ Output is gap-oriented: P1 for missing coverage, P2 for inconsistencies, P3 for 
 
 ## Flow Analysis
 
-[ref:.allhands/flows/shared/jury/PROMPTS_FLOW_ANALYSIS.md::79b9873]
+[ref:.allhands/flows/shared/jury/PROMPTS_FLOW_ANALYSIS.md::16202d3]
 
 Analyzes prompt dependencies and ordering with a derisking lens. The core questions come from thinking like a tech lead:
 
@@ -58,7 +58,7 @@ The analysis builds a dependency graph, identifies the critical path, recommends
 
 ## YAGNI
 
-[ref:.allhands/flows/shared/jury/PROMPTS_YAGNI.md::79b9873]
+[ref:.allhands/flows/shared/jury/PROMPTS_YAGNI.md::3b8082f]
 
 Evaluates planning artifacts for over-engineering with decision-source awareness:
 
@@ -71,7 +71,7 @@ Detects premature abstraction, future-proofing, over-configuration, defensive co
 
 ## Premortem
 
-[ref:.allhands/flows/shared/jury/PROMPT_PREMORTEM.md::79b9873]
+[ref:.allhands/flows/shared/jury/PROMPT_PREMORTEM.md::aef49b5]
 
 Identifies failure modes before they happen, using a verification protocol that prevents false alarms:
 
@@ -93,7 +93,7 @@ The premortem works through four systematic categories: prompt completeness (acc
 
 ## Feedback Synthesis
 
-All four jury members' findings flow into [ref:.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md::79b9873], which ranks items P1/P2/P3, deduplicates across reviewers, and presents options to the engineer.
+All four jury members' findings flow into [ref:.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md::739ad0a], which ranks items P1/P2/P3, deduplicates across reviewers, and presents options to the engineer.
 
 ### Premortem Integration Rules
 
@@ -109,6 +109,6 @@ The engineer's decisions -- including explicitly accepted risks -- are documente
 
 ## Quick Premortem Variant
 
-[ref:.allhands/flows/shared/QUICK_PREMORTEM.md::79b9873]
+[ref:.allhands/flows/shared/QUICK_PREMORTEM.md::1aa1d20]
 
 For single prompts (emergent refinement, review-fix, PR-review), a lightweight 3-minute premortem variant exists. It answers five questions (biggest failure mode, external dependency risk, rollback feasibility, uncovered edge cases, unclear requirements) and returns a go/adjust/block recommendation. Full premortems are reserved for complete milestone prompt sets.

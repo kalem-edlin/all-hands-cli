@@ -8,7 +8,7 @@ The sync-cli wraps both `git` and `gh` (GitHub CLI) behind thin abstraction laye
 
 ## Result Type Convention
 
-Both [ref:src/lib/git.ts:git:827a9fa] and [ref:src/lib/gh.ts:gh:827a9fa] return the same shape:
+Both [ref:src/lib/git.ts:git:70a743c] and [ref:src/lib/gh.ts:gh:64ba656] return the same shape:
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -20,27 +20,27 @@ Both use `spawnSync` (not `execSync`) for structured access to exit codes and st
 
 ## Git Operations
 
-[ref:src/lib/git.ts::827a9fa] exposes four capabilities:
+[ref:src/lib/git.ts::70a743c] exposes four capabilities:
 
 | Function | Used By | Purpose |
 |---|---|---|
-| [ref:src/lib/git.ts:checkGitInstalled:827a9fa] | CLI entrypoint | Pre-flight: is `git` available? |
-| [ref:src/lib/git.ts:isGitRepo:827a9fa] | sync, push, pull-manifest | Guards commands that require a repo context |
-| [ref:src/lib/git.ts:getStagedFiles:827a9fa] | sync | Detects staged changes that would conflict with sync |
-| [ref:src/lib/git.ts:getGitFiles:827a9fa] | push | Lists tracked + untracked-but-not-ignored files |
+| [ref:src/lib/git.ts:checkGitInstalled:70a743c] | CLI entrypoint | Pre-flight: is `git` available? |
+| [ref:src/lib/git.ts:isGitRepo:70a743c] | sync, push, pull-manifest | Guards commands that require a repo context |
+| [ref:src/lib/git.ts:getStagedFiles:70a743c] | sync | Detects staged changes that would conflict with sync |
+| [ref:src/lib/git.ts:getGitFiles:70a743c] | push | Lists tracked + untracked-but-not-ignored files |
 
-[ref:src/lib/git.ts:getGitFiles:827a9fa] combines `git ls-files` (tracked) with `git ls-files --others --exclude-standard` (untracked, not ignored) to produce a complete view of files the user's repo considers relevant. This is critical for the push command's gitignore-respecting file collection.
+[ref:src/lib/git.ts:getGitFiles:70a743c] combines `git ls-files` (tracked) with `git ls-files --others --exclude-standard` (untracked, not ignored) to produce a complete view of files the user's repo considers relevant. This is critical for the push command's gitignore-respecting file collection.
 
 ## GitHub CLI Operations
 
-[ref:src/lib/gh.ts::827a9fa] provides authentication and identity primitives:
+[ref:src/lib/gh.ts::64ba656] provides authentication and identity primitives:
 
 | Function | Used By | Purpose |
 |---|---|---|
-| [ref:src/lib/gh.ts:checkGhInstalled:827a9fa] | push | Pre-flight: is `gh` available? |
-| [ref:src/lib/gh.ts:checkGhAuth:827a9fa] | push | Is the user authenticated with GitHub? |
-| [ref:src/lib/gh.ts:getGhUser:827a9fa] | push | Resolves the authenticated GitHub username |
-| [ref:src/lib/gh.ts:gh:827a9fa] | push (fork, clone, PR) | General-purpose gh command runner |
+| [ref:src/lib/gh.ts:checkGhInstalled:64ba656] | push | Pre-flight: is `gh` available? |
+| [ref:src/lib/gh.ts:checkGhAuth:64ba656] | push | Is the user authenticated with GitHub? |
+| [ref:src/lib/gh.ts:getGhUser:64ba656] | push | Resolves the authenticated GitHub username |
+| [ref:src/lib/gh.ts:gh:64ba656] | push (fork, clone, PR) | General-purpose gh command runner |
 
 The push command is the sole consumer of the gh layer -- sync and pull-manifest only need local git operations.
 

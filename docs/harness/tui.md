@@ -31,8 +31,8 @@ The TUI is the primary operator interface for the harness. It renders a three-pa
 
 ### Pane Components
 
-**Actions Pane** -- [ref:.allhands/harness/src/tui/actions.ts:createActionsPane:e48fa30]
-Renders agent spawn buttons, toggle switches, and control actions. All actions are always visible -- agents exit early if preconditions are not met. [ref:.allhands/harness/src/tui/actions.ts:buildActionItems:e48fa30] constructs the full item list; [ref:.allhands/harness/src/tui/actions.ts:getSelectableItems:e48fa30] filters to navigable items.
+**Actions Pane** -- [ref:.allhands/harness/src/tui/actions.ts:createActionsPane:17c53c1]
+Renders agent spawn buttons, toggle switches, and control actions. All actions are always visible -- agents exit early if preconditions are not met. [ref:.allhands/harness/src/tui/actions.ts:buildActionItems:17c53c1] constructs the full item list; [ref:.allhands/harness/src/tui/actions.ts:getSelectableItems:17c53c1] filters to navigable items.
 
 The complete action list:
 
@@ -57,15 +57,15 @@ Two toggles follow the action list:
 | O | Loop | Enable/disable the prompt execution loop |
 | P | Parallel | Enable/disable multi-executor parallel mode |
 
-**Prompts Pane** -- [ref:.allhands/harness/src/tui/prompts-pane.ts:createPromptsPane:e48fa30]
-Displays all prompts sorted by status: in_progress first, then pending, then done. Each prompt shows its number, title, and status icon via [ref:.allhands/harness/src/tui/prompts-pane.ts:getStatusIcon:e48fa30]. Selecting a prompt opens the file viewer.
+**Prompts Pane** -- [ref:.allhands/harness/src/tui/prompts-pane.ts:createPromptsPane:822e9a7]
+Displays all prompts sorted by status: in_progress first, then pending, then done. Each prompt shows its number, title, and status icon via [ref:.allhands/harness/src/tui/prompts-pane.ts:getStatusIcon:822e9a7]. Selecting a prompt opens the file viewer.
 
-**Status Pane** -- [ref:.allhands/harness/src/tui/status-pane.ts:createStatusPane:e48fa30]
-Shows the current spec, branch, base branch, active agents, and a scrolling activity log. [ref:.allhands/harness/src/tui/status-pane.ts:getSelectableItems:e48fa30] builds a navigable list of spec, alignment doc, E2E test plan, and running agents. [ref:.allhands/harness/src/tui/status-pane.ts:formatAgentStatus:e48fa30] renders each agent's running state.
+**Status Pane** -- [ref:.allhands/harness/src/tui/status-pane.ts:createStatusPane:ada300c]
+Shows the current spec, branch, base branch, active agents, and a scrolling activity log. [ref:.allhands/harness/src/tui/status-pane.ts:getSelectableItems:ada300c] builds a navigable list of spec, alignment doc, E2E test plan, and running agents. [ref:.allhands/harness/src/tui/status-pane.ts:formatAgentStatus:ada300c] renders each agent's running state.
 
 ## Navigation
 
-The TUI uses vim-style keyboard navigation defined in the [ref:.allhands/harness/src/tui/index.ts:TUI:e48fa30] class:
+The TUI uses vim-style keyboard navigation defined in the [ref:.allhands/harness/src/tui/index.ts:TUI:5e4554b] class:
 
 | Key | Action |
 |-----|--------|
@@ -83,13 +83,13 @@ Focused pane borders highlight in bright purple (`#a78bfa`); unfocused panes use
 
 ## Modals and File Viewer
 
-[ref:.allhands/harness/src/tui/modal.ts:createModal:e48fa30] renders overlay modals with navigable item lists. Used for spec selection, log viewing, flow selection, and spec type selection (New Initiative). Supports optional `onClear` for deselection and `scrollable` mode for long content.
+[ref:.allhands/harness/src/tui/modal.ts:createModal:8c117c4] renders overlay modals with navigable item lists. Used for spec selection, log viewing, flow selection, and spec type selection (New Initiative). Supports optional `onClear` for deselection and `scrollable` mode for long content.
 
-[ref:.allhands/harness/src/tui/file-viewer-modal.ts:createFileViewer:e48fa30] opens files in a read-only scrollable overlay. Used for viewing prompts, specs, alignment docs, and E2E test plans. [ref:.allhands/harness/src/tui/file-viewer-modal.ts:getPlanningFilePath:e48fa30] resolves planning artifacts by branch and type. [ref:.allhands/harness/src/tui/file-viewer-modal.ts:getSpecFilePath:e48fa30] locates spec files by ID.
+[ref:.allhands/harness/src/tui/file-viewer-modal.ts:createFileViewer:812eabd] opens files in a read-only scrollable overlay. Used for viewing prompts, specs, alignment docs, and E2E test plans. [ref:.allhands/harness/src/tui/file-viewer-modal.ts:getPlanningFilePath:812eabd] resolves planning artifacts by branch and type. [ref:.allhands/harness/src/tui/file-viewer-modal.ts:getSpecFilePath:812eabd] locates spec files by ID.
 
 ## State Management
 
-[ref:.allhands/harness/src/tui/index.ts:TUI:e48fa30] maintains a `TUIState` object tracking:
+[ref:.allhands/harness/src/tui/index.ts:TUI:5e4554b] maintains a `TUIState` object tracking:
 - **Toggle states**: `loopEnabled`, `parallelEnabled`
 - **Prompt state**: Array of `PromptItem` with number, title, status, path
 - **Agent state**: Array of `AgentInfo` with name, type, running status
@@ -112,10 +112,10 @@ Selecting **New Initiative** (key `2`) opens a spec type selection modal present
 | documentation | Coverage gaps |
 | triage | External signal analysis |
 
-On selection, the TUI dispatches a `new-initiative` action with the chosen `specType`. [ref:.allhands/harness/src/commands/tui.ts:handleAction:4eddba4] routes this through the ideation agent with an optional `flowOverride`:
+On selection, the TUI dispatches a `new-initiative` action with the chosen `specType`. [ref:.allhands/harness/src/commands/tui.ts:handleAction:4ca2008] routes this through the ideation agent with an optional `flowOverride`:
 
 - **Milestone** gets `null` flow override (uses the ideation agent's default profile flow)
-- **All other types** get a scoping flow path resolved via [ref:.allhands/harness/src/commands/tui.ts:SCOPING_FLOW_MAP:4eddba4]
+- **All other types** get a scoping flow path resolved via [ref:.allhands/harness/src/commands/tui.ts:SCOPING_FLOW_MAP:4ca2008]
 
 `SCOPING_FLOW_MAP` is exported as `Record<SpecType, string | null>`:
 
@@ -128,7 +128,7 @@ On selection, the TUI dispatches a `new-initiative` action with the chosen `spec
 | documentation | `DOCUMENTATION_SCOPING.md` |
 | triage | `TRIAGE_SCOPING.md` |
 
-[ref:.allhands/harness/src/tui/actions.ts:buildActionItems:e48fa30] is exported for testability alongside `SCOPING_FLOW_MAP`.
+[ref:.allhands/harness/src/tui/actions.ts:buildActionItems:17c53c1] is exported for testability alongside `SCOPING_FLOW_MAP`.
 
 ## Uncommitted Changes Guards
 
@@ -137,11 +137,11 @@ Three actions check for a dirty working tree before proceeding:
 - **rerun-pr-review** -- Warns that uncommitted changes will not be included in the PR
 - **mark-completed** -- Warns that uncommitted changes will not be included in the final push
 
-All three use the shared `confirmProceedWithUncommittedChanges()` helper in [ref:.allhands/harness/src/commands/tui.ts:handleAction:4eddba4], which calls [ref:.allhands/harness/src/lib/git.ts:hasUncommittedChanges:4eddba4] and shows a confirmation modal via `tui.showConfirmation()`. The user can press Enter to proceed or Escape to cancel.
+All three use the shared `confirmProceedWithUncommittedChanges()` helper in [ref:.allhands/harness/src/commands/tui.ts:handleAction:4ca2008], which calls [ref:.allhands/harness/src/lib/git.ts:hasUncommittedChanges:d6d6363] and shows a confirmation modal via `tui.showConfirmation()`. The user can press Enter to proceed or Escape to cancel.
 
 ## Event Loop Integration
 
-The TUI constructor starts an [ref:.allhands/harness/src/lib/event-loop.ts:EventLoop:4eddba4] instance that monitors external state. Callback bindings connect event loop events to TUI state:
+The TUI constructor starts an [ref:.allhands/harness/src/lib/event-loop.ts:EventLoop:940f18a] instance that monitors external state. Callback bindings connect event loop events to TUI state:
 
 - `onBranchChange` -- Updates branch/spec context and reloads prompts for the new planning directory
 - `onAgentsChange` -- Updates the active agents display
@@ -153,13 +153,13 @@ The TUI constructor starts an [ref:.allhands/harness/src/lib/event-loop.ts:Event
 
 ## CLI Daemon Integration
 
-When enabled in project settings (default: true), the TUI starts a [ref:.allhands/harness/src/lib/cli-daemon.ts:CLIDaemon:4eddba4] for fast hook execution. This eliminates Node.js startup overhead for every hook invocation during active development.
+When enabled in project settings (default: true), the TUI starts a [ref:.allhands/harness/src/lib/cli-daemon.ts:CLIDaemon:e269aee] for fast hook execution. This eliminates Node.js startup overhead for every hook invocation during active development.
 
 ## Launch and Teardown
 
-[ref:.allhands/harness/src/commands/tui.ts:launchTUI:4eddba4] initializes the TUI with the working directory, loads initial state from git branch and planning directory, and starts background indexing (semantic index, call graph, knowledge bases, doc validation).
+[ref:.allhands/harness/src/commands/tui.ts:launchTUI:4ca2008] initializes the TUI with the working directory, loads initial state from git branch and planning directory, and starts background indexing (semantic index, call graph, knowledge bases, doc validation).
 
-[ref:.allhands/harness/src/commands/tui.ts:handleAction:4eddba4] dispatches TUI actions to their implementations: spawning agents via [ref:.allhands/harness/src/commands/tui.ts:spawnAgentsForAction:4eddba4], managing PR workflows, switching specs, and running compound operations.
+[ref:.allhands/harness/src/commands/tui.ts:handleAction:4ca2008] dispatches TUI actions to their implementations: spawning agents via [ref:.allhands/harness/src/commands/tui.ts:spawnAgentsForAction:4ca2008], managing PR workflows, switching specs, and running compound operations.
 
 On destroy, the TUI kills all spawned tmux windows (tracked by the session registry), stops the event loop and CLI daemon, clears session state, and restores stdout/stderr interceptors with a 100ms delay to catch deferred terminal output.
 
@@ -167,9 +167,9 @@ On destroy, the TUI kills all spawned tmux windows (tracked by the session regis
 
 On startup, the TUI runs a non-blocking indexing pipeline:
 1. Ensures the TLDR daemon is running
-2. Builds or rebuilds the semantic index (branch-aware via [ref:.allhands/harness/src/lib/tldr.ts:needsSemanticRebuild:4eddba4])
+2. Builds or rebuilds the semantic index (branch-aware via [ref:.allhands/harness/src/lib/tldr.ts:needsSemanticRebuild:702ae0d])
 3. Warms the call graph cache
-4. Validates agent profiles via [ref:.allhands/harness/src/lib/opencode/profiles.ts:loadAllProfiles:1ca9f06]
+4. Validates agent profiles via [ref:.allhands/harness/src/lib/opencode/profiles.ts:loadAllProfiles:ef20442]
 5. Indexes knowledge bases (roadmap, docs) with incremental updates from git
 6. Validates documentation references
 

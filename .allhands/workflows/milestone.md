@@ -6,9 +6,7 @@ jury_required: true
 max_tangential_hypotheses: 5
 required_ideation_questions:
   - "What are you trying to accomplish?"
-  - "Why does this matter?"
-  - "What worries you about this?"
-  - "What would ideal look like?"
+  - "Why does this matter and what worries you about this?"
   - "What can you handle vs need automated?"
   - "What would success look like?"
 ---

@@ -12,7 +12,7 @@ Every emergent prompt starts with a hypothesis: "If I implement X, then Y outcom
 
 The emergent agent is a **plan-only** agent -- it creates `type: emergent` prompt files but never executes them. Executors pick up these prompts through the standard execution loop. This separation of planning and execution keeps each concern bounded in its own context window.
 
-[ref:.allhands/flows/EMERGENT_PLANNING.md::4eddba4]
+[ref:.allhands/flows/EMERGENT_PLANNING.md::4f1d9bf]
 
 ## Planning Lifecycle
 
@@ -71,7 +71,7 @@ The planner must always produce at least one prompt. If core goals are met, it c
 
 ## Post-Refinement Analysis
 
-[ref:.allhands/flows/shared/EMERGENT_REFINEMENT_ANALYSIS.md::4eddba4]
+[ref:.allhands/flows/shared/EMERGENT_REFINEMENT_ANALYSIS.md::f3f4914]
 
 After a batch of emergent prompts completes, an analysis phase evaluates each one:
 

@@ -4,7 +4,7 @@ description: "Allhands root path resolution that discovers the package source di
 
 # Path Resolution
 
-[ref:src/lib/paths.ts:getAllhandsRoot:827a9fa] is the single function responsible for answering: "where are the allhands source files?" Every command depends on this answer to locate the manifest, distributable files, and configuration.
+[ref:src/lib/paths.ts:getAllhandsRoot:696872e] is the single function responsible for answering: "where are the allhands source files?" Every command depends on this answer to locate the manifest, distributable files, and configuration.
 
 ## Resolution Strategy
 
@@ -39,4 +39,4 @@ After esbuild bundles the CLI into `bin/cli.js`, the runtime `import.meta.url` r
 
 ## Upstream Constants
 
-[ref:src/lib/paths.ts:UPSTREAM_REPO:827a9fa] and [ref:src/lib/paths.ts:UPSTREAM_OWNER:827a9fa] define the canonical upstream repository coordinates. These are used exclusively by the push command for fork and PR operations. Hardcoding them (rather than reading from git remotes) ensures push always targets the correct upstream regardless of the user's remote configuration.
+[ref:src/lib/paths.ts:UPSTREAM_REPO:696872e] and [ref:src/lib/paths.ts:UPSTREAM_OWNER:696872e] define the canonical upstream repository coordinates. These are used exclusively by the push command for fork and PR operations. Hardcoding them (rather than reading from git remotes) ensures push always targets the correct upstream regardless of the user's remote configuration.

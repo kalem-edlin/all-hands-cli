@@ -13,7 +13,7 @@
  * - buildPR() - Create PR via gh CLI with generated description
  */
 
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { z } from 'zod';
@@ -28,7 +28,7 @@ import {
   sanitizeBranchForDir,
   getCurrentBranch,
 } from './planning.js';
-import { getBaseBranch } from './git.js';
+import { getBaseBranch, gitExec, validateGitRef, syncWithOriginMain } from './git.js';
 import { logEvent } from './trace-store.js';
 
 // ============================================================================
@@ -158,21 +158,15 @@ function getGitDiffFromBase(cwd?: string, maxLines: number = 300): string {
   try {
     // Use the configured base branch
     const baseBranch = getBaseBranch();
+    validateGitRef(baseBranch, 'baseBranch');
 
     // Get diff stat summary
-    const diffStat = execSync(`git diff ${baseBranch}...HEAD --stat`, {
-      encoding: 'utf-8',
-      cwd: workingDir,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    const diffStatResult = gitExec(['diff', `${baseBranch}...HEAD`, '--stat'], workingDir);
+    const diffStat = diffStatResult.success ? diffStatResult.stdout : '';
 
     // Get actual diff (truncated)
-    const diff = execSync(`git diff ${baseBranch}...HEAD`, {
-      encoding: 'utf-8',
-      cwd: workingDir,
-      maxBuffer: 1024 * 1024 * 10,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const diffResult = gitExec(['diff', `${baseBranch}...HEAD`], workingDir);
+    const diff = diffResult.stdout;
 
     const lines = diff.split('\n');
     const truncatedDiff = lines.length > maxLines
@@ -568,16 +562,21 @@ export async function buildPR(
   // If PR already exists, UPDATE instead of creating
   if (existingPR?.url && existingPR?.number) {
     try {
-      // Push any new changes first
-      try {
-        execSync('git push -u origin HEAD', {
-          encoding: 'utf-8',
-          cwd: workingDir,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-      } catch {
-        // Ignore push errors - might already be up to date
+      // Sync with origin/main before push
+      const syncResult = syncWithOriginMain(workingDir);
+      if (!syncResult.success) {
+        const failureReason = syncResult.conflicts.length > 0
+          ? `Merge conflicts with main must be resolved before updating PR:\n${syncResult.conflicts.join('\n')}`
+          : 'Failed to sync with main. This can be caused by uncommitted changes or network issues. Please resolve and try again.';
+        return {
+          success: false,
+          title: prContent.title,
+          body: failureReason,
+        };
       }
+
+      // Push any new changes first
+      gitExec(['push', '-u', 'origin', 'HEAD'], workingDir);
 
       // Update PR description
       updatePRDescription(existingPR.number, prContent.body, workingDir);
@@ -606,35 +605,54 @@ export async function buildPR(
 
   // No existing PR - create new one
   try {
-    // Push branch to remote before creating PR
-    try {
-      execSync('git push -u origin HEAD', {
-        encoding: 'utf-8',
-        cwd: workingDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } catch (pushError) {
-      // If push fails, it might already be pushed or there's an auth issue
-      // Try to continue with PR creation anyway
-      const pushMessage = pushError instanceof Error ? pushError.message : String(pushError);
-      if (!pushMessage.includes('Everything up-to-date')) {
-        return {
-          success: false,
-          title: prContent.title,
-          body: `Failed to push branch: ${pushMessage}`,
-        };
-      }
+    // Sync with origin/main before push
+    const syncResult = syncWithOriginMain(workingDir);
+    if (!syncResult.success) {
+      const failureReason = syncResult.conflicts.length > 0
+        ? `Merge conflicts with main must be resolved before creating PR:\n${syncResult.conflicts.join('\n')}`
+        : 'Failed to sync with main. This can be caused by uncommitted changes or network issues. Please resolve and try again.';
+      return {
+        success: false,
+        title: prContent.title,
+        body: failureReason,
+      };
     }
 
-    // Create PR via gh CLI using stdin for body to avoid shell escaping issues
-    const output = execSync(
-      `gh pr create --title "${prContent.title.replace(/"/g, '\\"')}" --body-file -`,
-      {
-        encoding: 'utf-8',
-        cwd: workingDir,
-        input: prContent.body,
+    // Push branch to remote before creating PR
+    const pushResult = gitExec(['push', '-u', 'origin', 'HEAD'], workingDir);
+    if (!pushResult.success && !pushResult.stderr.includes('Everything up-to-date')) {
+      return {
+        success: false,
+        title: prContent.title,
+        body: `Failed to push branch: ${pushResult.stderr}`,
+      };
+    }
+
+    // Create PR via gh CLI with argument arrays — no shell interpolation
+    const prCreateResult = spawnSync('gh', [
+      'pr', 'create',
+      '--title', prContent.title,
+      '--body-file', '-',
+    ], {
+      encoding: 'utf-8',
+      cwd: workingDir,
+      input: prContent.body,
+    });
+
+    if (prCreateResult.status !== 0) {
+      const errOutput = prCreateResult.stderr || '';
+      // Check if PR already exists (race condition) - update instead
+      if (errOutput.includes('already exists') || errOutput.includes('pull request already')) {
+        return handleExistingPRRace(prContent, spec, workingDir);
       }
-    );
+      return {
+        success: false,
+        title: prContent.title,
+        body: `PR creation failed: ${errOutput}`,
+      };
+    }
+
+    const output = prCreateResult.stdout || '';
 
     // Parse PR URL from output
     const urlMatch = output.match(/https:\/\/github\.com\/[^\s]+\/pull\/(\d+)/);
@@ -657,46 +675,54 @@ export async function buildPR(
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-
-    // Check if PR already exists (race condition) - update instead
-    if (errorMsg.includes('already exists') || errorMsg.includes('pull request already')) {
-      try {
-        // Get existing PR info via gh pr view
-        const prViewOutput = execSync('gh pr view --json url,number', {
-          encoding: 'utf-8',
-          cwd: workingDir,
-        });
-        const prInfo = JSON.parse(prViewOutput);
-        const raceExistingUrl = prInfo.url;
-        const raceExistingNumber = prInfo.number;
-
-        if (raceExistingUrl && raceExistingNumber) {
-          // Record and update the existing PR
-          updatePRStatus(raceExistingUrl, raceExistingNumber, spec, workingDir);
-          updatePRDescription(raceExistingNumber, prContent.body, workingDir);
-          updatePRComments(raceExistingNumber, prContent.reviewSteps, spec, workingDir);
-
-          return {
-            success: true,
-            prUrl: raceExistingUrl,
-            prNumber: raceExistingNumber,
-            title: prContent.title,
-            body: prContent.body,
-            reviewSteps: prContent.reviewSteps,
-            existingPR: true,
-          };
-        }
-      } catch {
-        // Couldn't get existing PR info, fall through to error
-      }
-    }
-
     return {
       success: false,
       title: prContent.title,
       body: `PR creation failed: ${errorMsg}`,
     };
   }
+}
+
+/**
+ * Handle race condition where PR already exists during creation.
+ * Fetches existing PR info and updates it instead.
+ */
+function handleExistingPRRace(
+  prContent: PRContent,
+  spec: string,
+  workingDir: string
+): BuildPRResult {
+  try {
+    const prViewResult = spawnSync('gh', ['pr', 'view', '--json', 'url,number'], {
+      encoding: 'utf-8',
+      cwd: workingDir,
+    });
+    if (prViewResult.status !== 0) {
+      return { success: false, title: prContent.title, body: 'PR already exists but could not retrieve info' };
+    }
+    const prInfo = JSON.parse(prViewResult.stdout || '{}');
+    const raceExistingUrl = prInfo.url;
+    const raceExistingNumber = prInfo.number;
+
+    if (raceExistingUrl && raceExistingNumber) {
+      updatePRStatus(raceExistingUrl, raceExistingNumber, spec, workingDir);
+      updatePRDescription(raceExistingNumber, prContent.body, workingDir);
+      updatePRComments(raceExistingNumber, prContent.reviewSteps, spec, workingDir);
+
+      return {
+        success: true,
+        prUrl: raceExistingUrl,
+        prNumber: raceExistingNumber,
+        title: prContent.title,
+        body: prContent.body,
+        reviewSteps: prContent.reviewSteps,
+        existingPR: true,
+      };
+    }
+  } catch {
+    // Couldn't get existing PR info
+  }
+  return { success: false, title: prContent.title, body: 'PR already exists but could not retrieve info' };
 }
 
 /**
@@ -711,16 +737,12 @@ function postPRComments(
 ): void {
   // Post review steps FIRST
   if (reviewSteps) {
-    try {
-      execSync(
-        `gh pr comment ${prNumber} --body-file -`,
-        {
-          encoding: 'utf-8',
-          cwd: workingDir,
-          input: reviewSteps,
-        }
-      );
-    } catch {
+    const result = spawnSync('gh', ['pr', 'comment', String(prNumber), '--body-file', '-'], {
+      encoding: 'utf-8',
+      cwd: workingDir,
+      input: reviewSteps,
+    });
+    if (result.status !== 0) {
       console.error('Warning: Could not add review steps comment to PR');
     }
   }
@@ -729,19 +751,15 @@ function postPRComments(
   const planningPaths = getPlanningPaths(spec, workingDir);
   const e2eTestPlanPath = join(planningPaths.root, 'e2e-test-plan.md');
   if (existsSync(e2eTestPlanPath)) {
-    try {
-      let e2eTestPlan = readFileSync(e2eTestPlanPath, 'utf-8');
-      // Strip YAML frontmatter if present
-      e2eTestPlan = e2eTestPlan.replace(/^---\n[\s\S]*?\n---\n*/, '').trim();
-      execSync(
-        `gh pr comment ${prNumber} --body-file -`,
-        {
-          encoding: 'utf-8',
-          cwd: workingDir,
-          input: `## E2E Test Plan\n\n${e2eTestPlan}`,
-        }
-      );
-    } catch {
+    let e2eTestPlan = readFileSync(e2eTestPlanPath, 'utf-8');
+    // Strip YAML frontmatter if present
+    e2eTestPlan = e2eTestPlan.replace(/^---\n[\s\S]*?\n---\n*/, '').trim();
+    const result = spawnSync('gh', ['pr', 'comment', String(prNumber), '--body-file', '-'], {
+      encoding: 'utf-8',
+      cwd: workingDir,
+      input: `## E2E Test Plan\n\n${e2eTestPlan}`,
+    });
+    if (result.status !== 0) {
       console.error('Warning: Could not add e2e test plan comment to PR');
     }
   }
@@ -755,20 +773,16 @@ function updatePRDescription(
   body: string,
   workingDir: string
 ): boolean {
-  try {
-    execSync(
-      `gh pr edit ${prNumber} --body-file -`,
-      {
-        encoding: 'utf-8',
-        cwd: workingDir,
-        input: body,
-      }
-    );
-    return true;
-  } catch {
+  const result = spawnSync('gh', ['pr', 'edit', String(prNumber), '--body-file', '-'], {
+    encoding: 'utf-8',
+    cwd: workingDir,
+    input: body,
+  });
+  if (result.status !== 0) {
     console.error('Warning: Could not update PR description');
     return false;
   }
+  return true;
 }
 
 interface PRComment {
@@ -784,21 +798,23 @@ interface PRComment {
 function getPRComments(prNumber: number, workingDir: string): PRComment[] {
   try {
     // Get repo owner/name
-    const repoInfo = execSync('gh repo view --json owner,name', {
+    const repoResult = spawnSync('gh', ['repo', 'view', '--json', 'owner,name'], {
       encoding: 'utf-8',
       cwd: workingDir,
     });
-    const { owner, name } = JSON.parse(repoInfo);
+    if (repoResult.status !== 0) return [];
+    const { owner, name } = JSON.parse(repoResult.stdout || '{}');
 
     // Get issue comments (top-level PR comments)
-    const commentsJson = execSync(
-      `gh api repos/${owner.login}/${name}/issues/${prNumber}/comments --jq '[.[] | {id: .id, body: .body, author: {login: .user.login}, createdAt: .created_at}]'`,
-      {
-        encoding: 'utf-8',
-        cwd: workingDir,
-      }
-    );
-    return JSON.parse(commentsJson);
+    const commentsResult = spawnSync('gh', [
+      'api', `repos/${owner.login}/${name}/issues/${prNumber}/comments`,
+      '--jq', '[.[] | {id: .id, body: .body, author: {login: .user.login}, createdAt: .created_at}]',
+    ], {
+      encoding: 'utf-8',
+      cwd: workingDir,
+    });
+    if (commentsResult.status !== 0) return [];
+    return JSON.parse(commentsResult.stdout || '[]');
   } catch {
     return [];
   }
@@ -814,21 +830,23 @@ function updatePRComment(
 ): boolean {
   try {
     // Get repo owner/name
-    const repoInfo = execSync('gh repo view --json owner,name', {
+    const repoResult = spawnSync('gh', ['repo', 'view', '--json', 'owner,name'], {
       encoding: 'utf-8',
       cwd: workingDir,
     });
-    const { owner, name } = JSON.parse(repoInfo);
+    if (repoResult.status !== 0) return false;
+    const { owner, name } = JSON.parse(repoResult.stdout || '{}');
 
-    execSync(
-      `gh api --method PATCH repos/${owner.login}/${name}/issues/comments/${commentId} -f body=@-`,
-      {
-        encoding: 'utf-8',
-        cwd: workingDir,
-        input: body,
-      }
-    );
-    return true;
+    const patchResult = spawnSync('gh', [
+      'api', '--method', 'PATCH',
+      `repos/${owner.login}/${name}/issues/comments/${commentId}`,
+      '-f', 'body=@-',
+    ], {
+      encoding: 'utf-8',
+      cwd: workingDir,
+      input: body,
+    });
+    return patchResult.status === 0;
   } catch {
     return false;
   }
@@ -864,16 +882,12 @@ function updatePRComments(
       updatePRComment(reviewComment.id, reviewSteps, workingDir);
     } else {
       // No matching comment found, post new one
-      try {
-        execSync(
-          `gh pr comment ${prNumber} --body-file -`,
-          {
-            encoding: 'utf-8',
-            cwd: workingDir,
-            input: reviewSteps,
-          }
-        );
-      } catch {
+      const result = spawnSync('gh', ['pr', 'comment', String(prNumber), '--body-file', '-'], {
+        encoding: 'utf-8',
+        cwd: workingDir,
+        input: reviewSteps,
+      });
+      if (result.status !== 0) {
         console.error('Warning: Could not add review steps comment to PR');
       }
     }
@@ -899,16 +913,12 @@ function updatePRComments(
       }
     } else {
       // No E2E comment exists, post new one
-      try {
-        execSync(
-          `gh pr comment ${prNumber} --body-file -`,
-          {
-            encoding: 'utf-8',
-            cwd: workingDir,
-            input: e2eBody,
-          }
-        );
-      } catch {
+      const result = spawnSync('gh', ['pr', 'comment', String(prNumber), '--body-file', '-'], {
+        encoding: 'utf-8',
+        cwd: workingDir,
+        input: e2eBody,
+      });
+      if (result.status !== 0) {
         console.error('Warning: Could not add e2e test plan comment to PR');
       }
     }

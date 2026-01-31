@@ -14,10 +14,10 @@ The flow presents six services to the engineer, each addressing a different inte
 
 | Service | Purpose | Delegation |
 |---------|---------|------------|
-| Quick Patch | Deterministic fix for a specific issue | [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::79b9873] |
+| Quick Patch | Deterministic fix for a specific issue | [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::1abf30b] |
 | Interjection | Insert new prompt into active dependency graph | Internal (see below) |
-| Emergent Surgery | Triage emergent refinement prompts | [ref:.allhands/flows/shared/EMERGENT_REFINEMENT_ANALYSIS.md::79b9873] |
-| Prompt Edit | Modify prompts given engineer concerns | [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::79b9873] |
+| Emergent Surgery | Triage emergent refinement prompts | [ref:.allhands/flows/shared/EMERGENT_REFINEMENT_ANALYSIS.md::f3f4914] |
+| Prompt Edit | Modify prompts given engineer concerns | [ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::1abf30b] |
 | Agent Status | Check tmux windows and agent health | Tmux patterns |
 | Kill/Restart | Terminate broken agents and fix prompts | Tmux + prompt edit |
 
@@ -69,4 +69,4 @@ Per **Ideation First**, the coordinator always clarifies before acting. It asks 
 
 ## Source Flow
 
-[ref:.allhands/flows/COORDINATION.md::79b9873]
+[ref:.allhands/flows/COORDINATION.md::607d330]

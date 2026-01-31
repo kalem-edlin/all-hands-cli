@@ -40,15 +40,15 @@ stateDiagram-v2
 
 ## Conflict Resolution Strategy
 
-[ref:src/commands/sync.ts:cmdSync:827a9fa] employs a two-phase conflict detection approach:
+[ref:src/commands/sync.ts:cmdSync:ca521c9] employs a two-phase conflict detection approach:
 
-1. **Staged file guard** -- Before any file operations, checks if the target repo has staged git changes that overlap with managed files. This prevents the sync from silently overwriting work the user intends to commit. Uses [ref:src/lib/manifest.ts:Manifest:827a9fa] to determine the managed file set and [ref:src/lib/git.ts:getStagedFiles:827a9fa] to detect staging conflicts.
+1. **Staged file guard** -- Before any file operations, checks if the target repo has staged git changes that overlap with managed files. This prevents the sync from silently overwriting work the user intends to commit. Uses [ref:src/lib/manifest.ts:Manifest:e06b487] to determine the managed file set and [ref:src/lib/git.ts:getStagedFiles:70a743c] to detect staging conflicts.
 
-2. **Content-level diff** -- Iterates all distributable files and uses [ref:src/lib/manifest.ts:filesAreDifferent:827a9fa] (byte-level comparison) to identify files that differ between source and target. The user is then presented with three options via [ref:src/lib/ui.ts:askConflictResolution:827a9fa]:
+2. **Content-level diff** -- Iterates all distributable files and uses [ref:src/lib/manifest.ts:filesAreDifferent:e06b487] (byte-level comparison) to identify files that differ between source and target. The user is then presented with three options via [ref:src/lib/ui.ts:askConflictResolution:6374626]:
 
 | Resolution | Behavior |
 |---|---|
-| **Backup** | Creates `file.backup_N.ext` via [ref:src/lib/ui.ts:getNextBackupPath:827a9fa], then overwrites |
+| **Backup** | Creates `file.backup_N.ext` via [ref:src/lib/ui.ts:getNextBackupPath:6374626], then overwrites |
 | **Overwrite** | Replaces target files directly (local changes lost) |
 | **Cancel** | Aborts with no changes made |
 
@@ -58,13 +58,13 @@ The `--yes` flag forces overwrite mode, skipping all interactive prompts.
 
 After file copying, three post-processing steps run in sequence:
 
-- **Dotfile restoration** -- [ref:src/lib/dotfiles.ts:restoreDotfiles:827a9fa] renames npm-safe names back to dotfiles (e.g., `gitignore` to `.gitignore`). This is necessary because npm strips dotfiles during package publishing.
-- **Target-line injection** -- [ref:src/lib/target-lines.ts:ensureTargetLines:827a9fa] appends required lines to target-repo files (like `.gitignore`, `CLAUDE.md`, `.tldrignore`) without duplicating existing entries.
+- **Dotfile restoration** -- [ref:src/lib/dotfiles.ts:restoreDotfiles:8d2662f] renames npm-safe names back to dotfiles (e.g., `gitignore` to `.gitignore`). This is necessary because npm strips dotfiles during package publishing.
+- **Target-line injection** -- [ref:src/lib/target-lines.ts:ensureTargetLines:c2f18b9] appends required lines to target-repo files (like `.gitignore`, `CLAUDE.md`, `.tldrignore`) without duplicating existing entries.
 - **Deleted file cleanup** (update only) -- Detects files that exist in the target but were removed from the source, prompting the user to delete them.
 
 ## The `ah` CLI Shim
 
-On first-time init, [ref:src/commands/sync.ts:setupAhShim:827a9fa] installs a bash shim to `~/.local/bin/ah`. The shim walks up the directory tree from `$PWD` looking for `.allhands/harness/ah`, enabling project-local `ah` invocation from anywhere within a synced repository. It warns if `~/.local/bin` is not in `PATH`.
+On first-time init, [ref:src/commands/sync.ts:setupAhShim:ca521c9] installs a bash shim to `~/.local/bin/ah`. The shim walks up the directory tree from `$PWD` looking for `.allhands/harness/ah`, enabling project-local `ah` invocation from anywhere within a synced repository. It warns if `~/.local/bin` is not in `PATH`.
 
 ## Full Replace Alternative
 

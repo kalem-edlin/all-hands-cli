@@ -40,8 +40,8 @@ While the interview proceeds, parallel subtasks run codebase and research explor
 
 | Subtask Type | Flow | Purpose |
 |-------------|------|---------|
-| Codebase grounding (1-3 tasks) | [ref:.allhands/flows/shared/IDEATION_CODEBASE_GROUNDING.md::4eddba4] | Discover existing implementations, roadmap dependencies, and hard constraints |
-| Research (0-2 tasks) | [ref:.allhands/flows/shared/RESEARCH_GUIDANCE.md::4eddba4] | Find high-level solution approaches for novel problems |
+| Codebase grounding (1-3 tasks) | [ref:.allhands/flows/shared/IDEATION_CODEBASE_GROUNDING.md::ff98c47] | Discover existing implementations, roadmap dependencies, and hard constraints |
+| Research (0-2 tasks) | [ref:.allhands/flows/shared/RESEARCH_GUIDANCE.md::eb9185c] | Find high-level solution approaches for novel problems |
 
 The grounding subtask overlays codebase findings against the roadmap, distinguishing between what exists now and what is planned -- because ideation must account for future state, not just current state.
 
@@ -66,7 +66,7 @@ This matters because downstream planning agents use this language to determine h
 
 ## Spec Creation and Persistence
 
-[ref:.allhands/flows/shared/CREATE_SPEC.md::4eddba4]
+[ref:.allhands/flows/shared/CREATE_SPEC.md::e145081]
 
 The spec is written to `specs/roadmap/{name}.spec.md`, persisted via `ah specs persist`, and its branch is created. The roadmap is reindexed so future ideation sessions can discover this spec as a dependency.
 
@@ -76,8 +76,8 @@ Not all specs follow the ideation interview. Several specialized spec types exis
 
 | Spec Type | Flow | Trigger |
 |-----------|------|---------|
-| Harness improvement | [ref:.allhands/flows/shared/CREATE_HARNESS_SPEC.md::4eddba4] | Compounding identifies systemic harness issues |
-| Validation tooling | [ref:.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md::4eddba4] | Gap analysis reveals missing validation infrastructure |
+| Harness improvement | [ref:.allhands/flows/shared/CREATE_HARNESS_SPEC.md::c486457] | Compounding identifies systemic harness issues |
+| Validation tooling | [ref:.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md::9750183] | Gap analysis reveals missing validation infrastructure |
 | Investigation | [ref:.allhands/flows/INVESTIGATION_SCOPING.md::4eddba4] | Engineer scopes a hypothesis-driven diagnosis |
 | Optimization | [ref:.allhands/flows/OPTIMIZATION_SCOPING.md::4eddba4] | Engineer scopes a performance improvement |
 | Refactor | [ref:.allhands/flows/REFACTOR_SCOPING.md::4eddba4] | Engineer scopes a structural transformation |
@@ -88,13 +88,13 @@ Harness and validation specs follow `CREATE_SPEC.md` for persistence but have di
 
 ### Optional: Flow Analysis
 
-[ref:.allhands/flows/shared/SPEC_FLOW_ANALYSIS.md::4eddba4]
+[ref:.allhands/flows/shared/SPEC_FLOW_ANALYSIS.md::513806f]
 
 For user-facing features with multiple paths, the spec can be analyzed for user flow completeness. This identifies missing flows, ambiguous transitions, undefined error states, and scope boundaries -- all presented as questions, not mandates.
 
 ## Planning Depth by Spec Type
 
-[ref:.allhands/flows/SPEC_PLANNING.md::4eddba4]
+[ref:.allhands/flows/SPEC_PLANNING.md::cc0b192]
 
 Per **Frontier Models are Capable**, the spec `type` field determines planning depth. This branching happens after spec persistence, when planning begins:
 
@@ -117,9 +117,9 @@ Planning spawns parallel research subtasks before presenting any options:
 
 | Research Type | Flow | Purpose |
 |--------------|------|---------|
-| Codebase understanding (1-4 tasks) | [ref:.allhands/flows/shared/CODEBASE_UNDERSTANDING.md::4eddba4] | Ground implementation approaches in existing patterns |
-| Solution research (0-3 tasks) | [ref:.allhands/flows/shared/RESEARCH_GUIDANCE.md::4eddba4] | Isolate optimal solutions for novel problems |
-| External tech (as needed) | [ref:.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md::4eddba4] | Acquire documentation and implementation guidance |
+| Codebase understanding (1-4 tasks) | [ref:.allhands/flows/shared/CODEBASE_UNDERSTANDING.md::b10cce8] | Ground implementation approaches in existing patterns |
+| Solution research (0-3 tasks) | [ref:.allhands/flows/shared/RESEARCH_GUIDANCE.md::eb9185c] | Isolate optimal solutions for novel problems |
+| External tech (as needed) | [ref:.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md::9766b03] | Acquire documentation and implementation guidance |
 
 ### Disposable Variant Architecture
 

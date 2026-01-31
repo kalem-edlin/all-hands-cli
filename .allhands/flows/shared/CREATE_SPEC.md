@@ -1,5 +1,5 @@
 <goal>
-Write a spec file with proper schema, create its branch, and persist to base. Single source of truth for spec creation.
+Write a spec file with proper schema, persist to base branch. Single source of truth for spec creation.
 </goal>
 
 ## Write Spec
@@ -21,11 +21,11 @@ Per **Frontier Models are Capable**, derive the default branch prefix from the s
 
 The `branch` field on the spec is always the source of truth — this convention applies to the default suggestion when the spec doesn't specify one.
 
-## Persist
+## Create
 
-Run: `ah specs persist specs/roadmap/{name}.spec.md --json`
+Run: `ah specs create specs/roadmap/{name}.spec.md --json`
 
-This creates the branch, resolves naming collisions, and commits. Parse `specBranch` from response for the final branch name.
+This assigns the branch name (using type-based prefix convention with collision handling), commits the spec file to the base branch, and pushes to origin. Parse `branch` from response for the final branch name. No branch is created at this step — branch creation happens at activation time.
 
 Run: `ah knowledge roadmap reindex`
 
@@ -35,8 +35,7 @@ Report spec name and branch to engineer.
 
 Ask: "Would you like to start working on this now?"
 
-If yes:
+If yes, activate the spec (which creates the branch and sets up planning):
 ```bash
-git checkout {branch}
-ah planning ensure
+ah specs activate {name}
 ```

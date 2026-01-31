@@ -4,7 +4,7 @@ description: "Core tooling directives shared by all agents, establishing tldr an
 
 # Core Harness Integration
 
-Every agent in the harness loads [ref:.allhands/flows/CORE.md::79b9873] as its foundation. This flow exists because of a single principle: **Context is Precious**. Agents degrade with large context windows, so codebase discovery must be targeted and structured rather than brute-force file reading.
+Every agent in the harness loads [ref:.allhands/flows/CORE.md::ae9924a] as its foundation. This flow exists because of a single principle: **Context is Precious**. Agents degrade with large context windows, so codebase discovery must be targeted and structured rather than brute-force file reading.
 
 ## Two Mandatory Discovery Tools
 

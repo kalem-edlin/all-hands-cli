@@ -4,7 +4,7 @@ description: "Smaller CLI utilities: skills discovery from YAML frontmatter, des
 
 ## Skills Discovery
 
-[ref:.allhands/harness/src/commands/skills.ts:listSkills:79b9873] scans `.allhands/skills/*/SKILL.md` for skill definitions. Each skill file must have YAML frontmatter with `name`, `description`, and `globs` fields. The command outputs a JSON array of discovered skills with their glob patterns, enabling agents to find domain-specific expertise.
+[ref:.allhands/harness/src/commands/skills.ts:listSkills:4fb6c9f] scans `.allhands/skills/*/SKILL.md` for skill definitions. Each skill file must have YAML frontmatter with `name`, `description`, and `globs` fields. The command outputs a JSON array of discovered skills with their glob patterns, enabling agents to find domain-specific expertise.
 
 Skills are organized as directories under `.allhands/skills/`, where each directory contains a `SKILL.md` file. The frontmatter schema:
 
@@ -22,7 +22,7 @@ The notification system uses jamf/Notifier (macOS) for system-level desktop noti
 
 ### Notification Layout
 
-[ref:.allhands/harness/src/lib/notification.ts:sendNotification:79b9873] constructs notifications with three parts:
+[ref:.allhands/harness/src/lib/notification.ts:sendNotification:8f14a76] constructs notifications with three parts:
 - **Title**: Event type (e.g., "Agent Stopped", "Plan Gate")
 - **Subtitle**: Auto-detected from `repo + branch` context
 - **Message**: Specific details for the user
@@ -31,8 +31,8 @@ The notification system uses jamf/Notifier (macOS) for system-level desktop noti
 
 | Function | Type | Behavior |
 |----------|------|----------|
-| [ref:.allhands/harness/src/lib/notification.ts:sendNotification:79b9873] | Configurable | Base function, supports banner or alert |
-| [ref:.allhands/harness/src/lib/notification.ts:sendGateNotification:79b9873] | `alert` | Persists until dismissed. Used for decisions requiring human input |
+| [ref:.allhands/harness/src/lib/notification.ts:sendNotification:8f14a76] | Configurable | Base function, supports banner or alert |
+| [ref:.allhands/harness/src/lib/notification.ts:sendGateNotification:8f14a76] | `alert` | Persists until dismissed. Used for decisions requiring human input |
 | `sendHookNotification` | `banner` | Auto-dismisses. Used for informational hook events |
 
 Banners auto-dismiss after the system default; alerts persist until the user interacts with them. The `--sound` option triggers a macOS system sound.
@@ -41,7 +41,7 @@ The notifier binary is located at `/Applications/Utilities/Notifier.app/Contents
 
 ## Complexity Analysis
 
-[ref:.allhands/harness/src/commands/complexity.ts:complexity:79b9873] provides complexity metrics for files and directories using ctags for symbol counting rather than language-specific AST parsers.
+[ref:.allhands/harness/src/commands/complexity.ts:complexity:ec1532e] provides complexity metrics for files and directories using ctags for symbol counting rather than language-specific AST parsers.
 
 ### File Metrics
 
@@ -62,4 +62,4 @@ For a single file, the output includes:
 
 For directories, the command recursively scans source files (`.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`, `.java`), generates a ctags index for the subtree, and aggregates line counts and symbol counts across all files. The output includes `file_count` alongside the aggregated metrics.
 
-Both modes require Universal Ctags to be installed ([ref:.allhands/harness/src/lib/ctags.ts:checkCtagsAvailable:79b9873]).
+Both modes require Universal Ctags to be installed ([ref:.allhands/harness/src/lib/ctags.ts:checkCtagsAvailable:45c4520]).

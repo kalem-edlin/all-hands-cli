@@ -69,7 +69,7 @@ Per **Agentic Validation Tooling**, the tooling signals phase also evaluates eac
 - Should new deterministic tests be added to the suite's Deterministic Integration section?
 - Are there stochastic exploration patterns that should be documented for future agents?
 
-This evaluation feeds directly into the Harness Improvement phase as evidence for suite refinement per [ref:.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md::4eddba4].
+This evaluation feeds directly into the Harness Improvement phase as evidence for suite refinement per [ref:.allhands/flows/shared/CREATE_VALIDATION_TOOLING_SPEC.md::9750183].
 
 A key design decision: emergent prompts are never framed as "scope creep." Per **Quality Engineering**, emergent work discovers valuable variants. Reverted emergent work is expected experimentation cost per **Software is Cheap**.
 
@@ -112,15 +112,15 @@ Inline updates (skills, validation suites) require engineer approval. Structural
 
 ### Crystallization Promotion
 
-Per [ref:.allhands/flows/COMPOUNDING.md::4eddba4], validation suite refinements include **crystallization promotion**: stable stochastic patterns discovered during execution are promoted into deterministic checks in the suite's Deterministic Integration section. This shifts stochastic exploration to the frontier -- agents no longer need to rediscover patterns that have been automated. The crystallization lifecycle ensures validation compounds across spec executions.
+Per [ref:.allhands/flows/COMPOUNDING.md::905aed8], validation suite refinements include **crystallization promotion**: stable stochastic patterns discovered during execution are promoted into deterministic checks in the suite's Deterministic Integration section. This shifts stochastic exploration to the frontier -- agents no longer need to rediscover patterns that have been automated. The crystallization lifecycle ensures validation compounds across spec executions.
 
 ## Key Design Decisions
 
 - **Engineer interview is mandatory** before finalizing the compounding summary -- the flow must not finalize without sign-off on classified issues
-- **Harness modification requires first principle justification** -- changes must trace back to principles in [ref:.allhands/principles.md::6668667]
+- **Harness modification requires first principle justification** -- changes must trace back to principles in [ref:.allhands/principles.md::0610b13]
 - **Spec finalization preserves original Goals and Non-Goals** unmodified for historical contrast against the new Implementation Reality section
 - **The per-tool impact map is evidence, not a stored artifact** -- it feeds directly into harness improvement specs rather than being persisted separately
 
 ## Source Flow
 
-[ref:.allhands/flows/COMPOUNDING.md::4eddba4]
+[ref:.allhands/flows/COMPOUNDING.md::905aed8]

@@ -34,17 +34,17 @@ Per **Agentic Validation Tooling**, the two validation dimensions apply at diffe
 | **Implementation** | Stochastic | Agent reads suite **Stochastic Validation** sections; uses model intuition to probe edge cases, test user flows, verify quality beyond deterministic checks |
 | **Validation Gate** | Deterministic | Agent runs suite **Deterministic Integration** commands; binary pass/fail gates completion |
 
-Stochastic exploration during implementation informs quality but is not an acceptance criterion. Acceptance criteria must be deterministic -- drawn from suite Deterministic Integration sections per [ref:.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md::c0bdef0].
+Stochastic exploration during implementation informs quality but is not an acceptance criterion. Acceptance criteria must be deterministic -- drawn from suite Deterministic Integration sections per [ref:.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md::1df56ac].
 
 ## Context Gathering
 
-[ref:.allhands/flows/PROMPT_TASK_EXECUTION.md::79b9873]
+[ref:.allhands/flows/PROMPT_TASK_EXECUTION.md::9baf478]
 
 The executor reads the prompt file and the alignment doc. If FAILURE SUMMARY sections exist from prior attempts, the agent adapts to their redirections. Additional codebase search is available but typically unnecessary -- per **Context is Precious**, prompts should contain sufficient context from the planning phase.
 
 ## Prompt Curation Principles
 
-[ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::79b9873]
+[ref:.allhands/flows/shared/PROMPT_TASKS_CURATION.md::1abf30b]
 
 Prompts are designed with strict context budget awareness:
 
@@ -81,7 +81,7 @@ The boundary is clear: executors can fix anything within the prompt's conceptual
 
 ## Validation Gate
 
-[ref:.allhands/flows/shared/PROMPT_VALIDATION_REVIEW.MD::79b9873]
+[ref:.allhands/flows/shared/PROMPT_VALIDATION_REVIEW.MD::cfed59b]
 
 Every prompt must pass validation review before completion. The reviewer is a separate subtask that provides independent judgment.
 
