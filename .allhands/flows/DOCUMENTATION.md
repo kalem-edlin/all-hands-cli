@@ -46,6 +46,17 @@ The documentor agent passes `SPEC_PATH`, `ALIGNMENT_PATH`, and `PROMPTS_FOLDER` 
 
 **Default behavior**: If no message/prompt is provided and no context variables are set, proceed directly with Fill-the-Gaps mode. Do not ask the user what to do - just start documenting.
 
+## Config Resolution
+
+Documentation config uses a **local-first** resolution — the same pattern as `.claude/settings.local.json`:
+
+```
+.allhands/docs.local.json  →  exists? use it (repo-specific, never distributed)
+.allhands/docs.json         →  fallback (ships to target repos on --init)
+```
+
+Read whichever file resolves. All subsequent reads and writes in this flow use that resolved path. When persisting detected domains or exclusions, write back to the same file that was read.
+
 ---
 
 ## Fill-the-Gaps Mode
@@ -60,19 +71,21 @@ Full documentation effort for new repos or out-of-sync docs.
    - Missing frontmatter
 
 2. **Domain Detection**
-   - Read `.allhands/docs.json` at project root for declared domains (optional - projects don't need this file)
-   - If not declared, infer:
+   - Resolve docs config per **Config Resolution** above (optional — projects don't need either file)
+   - Load `domains` and `exclude` glob patterns from the resolved config
+   - If domains not declared, infer:
      - Run `tldr structure .` or `ah complexity .` on project root
      - Check for monorepo markers: `pnpm-workspace.yaml`, `lerna.json`, `turbo.json`, `nx.json`
      - If monorepo: each workspace package is a domain, plus root-level coordination docs
      - Otherwise: identify main product areas from directory structure
    - Present detected domains to user for confirmation
-   - Persist confirmed domains to `.allhands/docs.json` at project root (using the schema from `ah schema docs-config`). Always write this file, whether user adjusted or accepted defaults — it codifies the domain map for future incremental runs.
+   - Persist confirmed domains (and any existing `exclude` patterns) back to the resolved config file. Always write this file, whether user adjusted or accepted defaults — it codifies the domain map for future incremental runs.
 
 3. **Proceed to Core Flow** with:
    ```yaml
    mode: "fill-gaps"
    domains: [<confirmed domains>]
+   exclude: [<glob patterns from resolved config>]  # may be empty
    validation_issues: <from initial validation>
    existing_docs: []
    session_knowledge: null
@@ -89,12 +102,14 @@ Feature branch documentation with session knowledge.
 1. **Context Gathering**
    - Read alignment doc at `ALIGNMENT_PATH` for milestone context and key decisions
    - Read prompt files in `PROMPTS_FOLDER` for task details and learnings
+   - Resolve docs config per **Config Resolution** above for `exclude` glob patterns
    - Run `git diff $(git merge-base HEAD main)..HEAD --name-only` for changed files
+   - Filter changed files against `exclude` patterns — excluded files are not documented even if changed
 
 2. **Initial Validation** - Run `ah docs validate --json` to identify current staleness
 
 3. **Impact Analysis**
-   - Run `ah knowledge docs search` with changed file paths to find related docs
+   - Run `ah knowledge docs search` with changed file paths (post-exclusion) to find related docs
    - Categorize changes:
      - **Edit**: existing docs reference changed code
      - **Create**: new functionality without doc coverage
@@ -104,6 +119,7 @@ Feature branch documentation with session knowledge.
    ```yaml
    mode: "incremental"
    domains: [<affected domains only>]
+   exclude: [<glob patterns from resolved config>]  # may be empty
    validation_issues: <from initial validation>
    existing_docs: [<docs needing edits>]
    session_knowledge:
@@ -128,6 +144,7 @@ Per **Context is Precious**, spawn discovery sub-agents:
   ```yaml
   domain: "<domain-name>"
   source_paths: ["<path/to/domain>"]  # or changed files in incremental
+  exclude: ["<glob>", ...]  # from docs.json, may be empty
   mode: "<fill-gaps|incremental>"
   session_context: "<summary from alignment doc>"  # incremental only
   ```

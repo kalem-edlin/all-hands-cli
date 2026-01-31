@@ -18,10 +18,10 @@ import blessed from 'blessed';
 import { join } from 'path';
 import { loadProjectSettings } from '../hooks/shared.js';
 import { CLIDaemon } from '../lib/cli-daemon.js';
-import { validateDocs } from '../lib/docs-validation.js';
+import { validateDocsAsync } from '../lib/docs-validation.js';
 import { EventLoop } from '../lib/event-loop.js';
 import { flowsToModalItems, loadAllFlows } from '../lib/flows.js';
-import { KnowledgeService } from '../lib/knowledge.js';
+import { KnowledgeService, reindexAllInWorker, reindexFromChangesInWorker } from '../lib/knowledge.js';
 import { loadAllProfiles } from '../lib/opencode/index.js';
 import { planningDirExists, readStatus, sanitizeBranchForDir } from '../lib/planning.js';
 import { loadAllPrompts, type PromptFile } from '../lib/prompts.js';
@@ -405,9 +405,17 @@ export class TUI {
       }
       this.render();
 
-      const service = new KnowledgeService(this.options.cwd, { quiet: true });
+      // GC hint: reclaim memory from TLDR child process buffers before knowledge indexing
+      if (global.gc) {
+        global.gc();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      const cwd = this.options.cwd;
+      const service = new KnowledgeService(cwd, { quiet: true });
 
       // Smart incremental indexing: check if indexes exist before deciding strategy
+      // indexExists and getChangesFromGit are lightweight (no model needed) - keep in-process
       const roadmapExists = service.indexExists('roadmap');
       const docsExists = service.indexExists('docs');
 
@@ -416,21 +424,26 @@ export class TUI {
         roadmapExists,
         docsExists,
         strategy: (!roadmapExists || !docsExists) ? 'full' : 'incremental',
-      }, this.options.cwd);
+      }, cwd);
+
+      const workerProgress = (msg: string) => {
+        this.log(msg);
+        this.render();
+      };
 
       if (!roadmapExists || !docsExists) {
-        // Cold start: full index required
+        // Cold start: full index required (via worker process)
         if (!roadmapExists) {
           this.log('Building roadmap index (first run)...');
-          logTuiLifecycle('indexing.full', { index: 'roadmap', reason: 'index_missing' }, this.options.cwd);
+          logTuiLifecycle('indexing.full', { index: 'roadmap', reason: 'index_missing' }, cwd);
           this.render();
-          await service.reindexAll('roadmap');
+          await reindexAllInWorker(cwd, 'roadmap', workerProgress);
         }
         if (!docsExists) {
           this.log('Building docs index (first run)...');
-          logTuiLifecycle('indexing.full', { index: 'docs', reason: 'index_missing' }, this.options.cwd);
+          logTuiLifecycle('indexing.full', { index: 'docs', reason: 'index_missing' }, cwd);
           this.render();
-          await service.reindexAll('docs');
+          await reindexAllInWorker(cwd, 'docs', workerProgress);
         }
       } else {
         // Warm start: incremental update from git changes
@@ -443,38 +456,37 @@ export class TUI {
           docsChanges: docsChanges.length,
           roadmapChangeFiles: roadmapChanges.slice(0, 10).map(c => c.path),
           docsChangeFiles: docsChanges.slice(0, 10).map(c => c.path),
-        }, this.options.cwd);
+        }, cwd);
 
         if (roadmapChanges.length > 0) {
           this.log(`Updating roadmap index (${roadmapChanges.length} changes)...`);
-          logTuiLifecycle('indexing.incremental', { index: 'roadmap', changeCount: roadmapChanges.length }, this.options.cwd);
+          logTuiLifecycle('indexing.incremental', { index: 'roadmap', changeCount: roadmapChanges.length }, cwd);
           this.render();
-          await service.reindexFromChanges('roadmap', roadmapChanges);
+          await reindexFromChangesInWorker(cwd, 'roadmap', roadmapChanges, workerProgress);
         } else {
           this.log('Roadmap index up to date ✓');
-          logTuiLifecycle('indexing.skip', { index: 'roadmap', reason: 'no_changes' }, this.options.cwd);
+          logTuiLifecycle('indexing.skip', { index: 'roadmap', reason: 'no_changes' }, cwd);
         }
 
         if (docsChanges.length > 0) {
           this.log(`Updating docs index (${docsChanges.length} changes)...`);
-          logTuiLifecycle('indexing.incremental', { index: 'docs', changeCount: docsChanges.length }, this.options.cwd);
+          logTuiLifecycle('indexing.incremental', { index: 'docs', changeCount: docsChanges.length }, cwd);
           this.render();
-          await service.reindexFromChanges('docs', docsChanges);
+          await reindexFromChangesInWorker(cwd, 'docs', docsChanges, workerProgress);
         } else {
           this.log('Docs index up to date ✓');
-          logTuiLifecycle('indexing.skip', { index: 'docs', reason: 'no_changes' }, this.options.cwd);
+          logTuiLifecycle('indexing.skip', { index: 'docs', reason: 'no_changes' }, cwd);
         }
       }
 
-      logTuiLifecycle('indexing.complete', {}, this.options.cwd);
+      logTuiLifecycle('indexing.complete', {}, cwd);
 
       // Run docs validation
       this.log('Validating documentation...');
       this.render();
-      const cwd = this.options.cwd;
       const docsPath = join(cwd, 'docs');
       const excludePaths = ["docs/memories.md", "docs/solutions"].map((p) => join(cwd, p));
-      const validation = validateDocs(docsPath, cwd, { excludePaths });
+      const validation = await validateDocsAsync(docsPath, cwd, { excludePaths });
 
       if (validation.frontmatter_error_count > 0) {
         this.log(`⚠ ${validation.frontmatter_error_count} frontmatter errors`);

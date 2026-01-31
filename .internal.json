@@ -28,7 +28,8 @@
     "target-lines.json",
     ".reposearch/**",
     "concerns.md",
-    "specs/**"
+    "specs/**",
+    ".allhands/docs.local.json"
   ],
   "initOnly": [
     ".allhands/skills/**",

@@ -30,6 +30,14 @@
         "required": ["name", "path"],
         "additionalProperties": false
       }
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Glob patterns for files and directories to exclude from documentation. Matched relative to project root. Excluded paths are filtered out before discovery agents scan the codebase.",
+      "items": {
+        "type": "string",
+        "description": "Glob pattern (e.g., \"**/test/**\", \"src/generated/**\", \"**/*.spec.ts\")"
+      }
     }
   },
   "additionalProperties": false

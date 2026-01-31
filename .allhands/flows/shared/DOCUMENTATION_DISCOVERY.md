@@ -7,6 +7,7 @@ Engineering knowledge sources: prompts, commit messages, and alignment docs when
 <inputs>
 - `domain`: Name of the domain to analyze
 - `source_paths`: Directories/files to scan
+- `exclude`: Glob patterns for files/directories to skip (from `.allhands/docs.json`)
 - `mode`: "fill-gaps" or "incremental"
 - `session_context`: (incremental only) Summary from alignment doc
 </inputs>
@@ -26,7 +27,9 @@ Engineering knowledge sources: prompts, commit messages, and alignment docs when
 
 ## Analysis Strategy
 
-Run `tldr structure <source_path>` to get full codemap, then identify **user-facing features and systems**:
+Run `tldr structure <source_path>` to get full codemap, then identify **user-facing features and systems**.
+
+**Exclusion filtering**: If `exclude` patterns are provided, skip any files or directories matching those globs before analysis. Do not propose approaches for excluded paths and do not list excluded files in approach `files` arrays. Patterns are matched relative to project root.
 
 ### What makes a good approach (= one doc file)?
 - A CLI command with all its implementation details

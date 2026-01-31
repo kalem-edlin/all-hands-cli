@@ -3,7 +3,7 @@
  * Uses @visheratin/web-ai-node for embeddings and usearch for HNSW indexing.
  */
 
-import { spawnSync } from "child_process";
+import { spawn } from "child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import matter from "gray-matter";
 import { basename, extname, join, relative } from "path";
@@ -61,7 +61,7 @@ interface IndexConfig {
 const INDEX_CONFIGS: Record<string, IndexConfig> = {
   docs: {
     name: "docs",
-    paths: ["docs/", "specs/"],
+    paths: ["docs/"],
     extensions: [".md"],
     description: "Project documentation and specifications",
     hasFrontmatter: true,
@@ -656,6 +656,154 @@ export class KnowledgeService {
   static getIndexNames(): string[] {
     return Object.keys(INDEX_CONFIGS);
   }
+}
+
+/**
+ * Spawn a child process to run reindexAll in an isolated worker.
+ * The ONNX model loads and dies entirely within the child process.
+ */
+export async function reindexAllInWorker(
+  projectRoot: string,
+  indexName: IndexName,
+  onProgress?: (message: string) => void,
+): Promise<ReindexResult> {
+  const workerPath = join(import.meta.dirname, "knowledge-worker.ts");
+
+  return new Promise((resolve) => {
+    const child = spawn("npx", ["tsx", workerPath, "reindexAll", indexName, projectRoot], {
+      cwd: join(projectRoot, ".allhands", "harness"),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+
+    child.stderr?.on("data", (data: Buffer) => {
+      stderrBuffer += data.toString();
+      const lines = stderrBuffer.split("\n");
+      stderrBuffer = lines.pop() || "";
+      for (const line of lines) {
+        if (line.trim() && onProgress) {
+          onProgress(line.trim());
+        }
+      }
+    });
+
+    child.stdout?.on("data", (data: Buffer) => {
+      stdoutBuffer += data.toString();
+    });
+
+    // 5 minute timeout (matching TLDR pattern)
+    const timeout = setTimeout(() => {
+      child.kill();
+      resolve({ files_indexed: 0, total_tokens: 0 });
+    }, 300000);
+
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      // Flush remaining stderr
+      if (stderrBuffer.trim() && onProgress) {
+        onProgress(stderrBuffer.trim());
+      }
+
+      if (code === 0 && stdoutBuffer.trim()) {
+        try {
+          const result = JSON.parse(stdoutBuffer.trim());
+          if (result.success) {
+            resolve({
+              files_indexed: result.files_indexed ?? 0,
+              total_tokens: result.total_tokens ?? 0,
+            });
+            return;
+          }
+        } catch {
+          // Parse error - fall through
+        }
+      }
+      resolve({ files_indexed: 0, total_tokens: 0 });
+    });
+
+    child.on("error", () => {
+      clearTimeout(timeout);
+      resolve({ files_indexed: 0, total_tokens: 0 });
+    });
+  });
+}
+
+/**
+ * Spawn a child process to run reindexFromChanges in an isolated worker.
+ * Changes are passed via stdin as JSON.
+ */
+export async function reindexFromChangesInWorker(
+  projectRoot: string,
+  indexName: IndexName,
+  changes: FileChange[],
+  onProgress?: (message: string) => void,
+): Promise<{ success: boolean; message: string; files: { path: string; action: string }[] }> {
+  const workerPath = join(import.meta.dirname, "knowledge-worker.ts");
+
+  return new Promise((resolve) => {
+    const child = spawn("npx", ["tsx", workerPath, "reindexFromChanges", indexName, projectRoot], {
+      cwd: join(projectRoot, ".allhands", "harness"),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+
+    child.stderr?.on("data", (data: Buffer) => {
+      stderrBuffer += data.toString();
+      const lines = stderrBuffer.split("\n");
+      stderrBuffer = lines.pop() || "";
+      for (const line of lines) {
+        if (line.trim() && onProgress) {
+          onProgress(line.trim());
+        }
+      }
+    });
+
+    child.stdout?.on("data", (data: Buffer) => {
+      stdoutBuffer += data.toString();
+    });
+
+    // Write changes to stdin
+    child.stdin?.write(JSON.stringify(changes));
+    child.stdin?.end();
+
+    // 5 minute timeout
+    const timeout = setTimeout(() => {
+      child.kill();
+      resolve({ success: false, message: "Worker timed out", files: [] });
+    }, 300000);
+
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      // Flush remaining stderr
+      if (stderrBuffer.trim() && onProgress) {
+        onProgress(stderrBuffer.trim());
+      }
+
+      if (code === 0 && stdoutBuffer.trim()) {
+        try {
+          const result = JSON.parse(stdoutBuffer.trim());
+          resolve({
+            success: result.success ?? false,
+            message: result.message ?? "Worker completed",
+            files: result.files ?? [],
+          });
+          return;
+        } catch {
+          // Parse error - fall through
+        }
+      }
+      resolve({ success: false, message: "Worker failed", files: [] });
+    });
+
+    child.on("error", () => {
+      clearTimeout(timeout);
+      resolve({ success: false, message: "Worker spawn failed", files: [] });
+    });
+  });
 }
 
 export { INDEX_CONFIGS };

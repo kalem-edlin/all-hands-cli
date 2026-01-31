@@ -11,15 +11,14 @@
  */
 
 import { Command } from "commander";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
-import { join, relative, extname, dirname } from "path";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { dirname, extname, join, relative } from "path";
 import {
-  executeCommand,
-  parseContext,
   addCommonOptions,
   CommandResult,
+  executeCommand,
+  parseContext,
 } from "../lib/base-command.js";
-import { getProjectRoot } from "../lib/git.js";
 import {
   checkCtagsAvailable,
   findSymbolInFile,
@@ -29,9 +28,9 @@ import {
   batchGetBlobHashes,
   findMarkdownFiles,
   isCodeFile,
-  REF_PATTERN,
-  validateDocs,
+  validateDocsAsync,
 } from "../lib/docs-validation.js";
+import { getProjectRoot } from "../lib/git.js";
 
 /**
  * Validate all documentation references.
@@ -57,7 +56,7 @@ async function validate(docsPath: string, options?: { useCache?: boolean }): Pro
   const excludePaths = EXCLUDED_DOC_PATHS.map((p) => join(projectRoot, p));
 
   // Run validation (with optional caching)
-  const result = validateDocs(absoluteDocsPath, projectRoot, {
+  const result = await validateDocsAsync(absoluteDocsPath, projectRoot, {
     useCache: options?.useCache ?? false,
     excludePaths,
   });

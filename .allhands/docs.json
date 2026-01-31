@@ -1,25 +1,5 @@
 {
   "$schema": ".allhands/harness/src/schemas/docs.schema.json",
-  "domains": [
-    {
-      "name": "harness",
-      "path": ".allhands/harness",
-      "description": "Core CLI tool with commands, hooks, TUI, MCP integration, and schema validation"
-    },
-    {
-      "name": "flows",
-      "path": ".allhands/flows",
-      "description": "Workflow definitions guiding agents through tasks"
-    },
-    {
-      "name": "agents",
-      "path": ".allhands/agents",
-      "description": "Agent configuration YAML files defining agent types and behaviors"
-    },
-    {
-      "name": "sync-cli",
-      "path": "src",
-      "description": "CLI for syncing the all-hands framework to other repositories"
-    }
-  ]
+  "domains": [],
+  "exclude": []
 }

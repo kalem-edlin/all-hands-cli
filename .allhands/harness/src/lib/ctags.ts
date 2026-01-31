@@ -5,7 +5,7 @@
  * This enables documentation reference validation without AST parsing.
  */
 
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { existsSync } from "fs";
 
 /**
@@ -369,4 +369,129 @@ export function findSymbolInFile(
 
   // Return first match (usually there's only one)
   return entries.find((e) => e.name === symbolName) || null;
+}
+
+/**
+ * Generate a ctags index asynchronously (non-blocking).
+ *
+ * Same behavior as generateCtagsIndex but uses spawn instead of spawnSync,
+ * keeping the event loop free during the ctags process.
+ */
+export async function generateCtagsIndexAsync(
+  cwd: string,
+  options?: {
+    /** Additional exclude patterns */
+    exclude?: string[];
+    /** Specific file or directory to index (relative to cwd) */
+    target?: string;
+  }
+): Promise<{ index: CtagsIndex; success: boolean; error?: string; entryCount: number }> {
+  const check = checkCtagsAvailable();
+  if (!check.available) {
+    return {
+      index: new Map(),
+      success: false,
+      error: check.error,
+      entryCount: 0,
+    };
+  }
+
+  const excludes = [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ...(options?.exclude || []),
+  ];
+
+  const args = [
+    "-R",
+    "--output-format=json",
+    "--fields=+nKS",
+    "-o",
+    "-",
+  ];
+
+  for (const exclude of excludes) {
+    args.push(`--exclude=${exclude}`);
+  }
+
+  const target = options?.target || ".";
+  args.push(target);
+
+  const ctagsPath = getCtagsPath()!;
+
+  return new Promise((resolve) => {
+    const child = spawn(ctagsPath, args, {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    const chunks: Buffer[] = [];
+    let stderrOutput = "";
+
+    child.stdout?.on("data", (data: Buffer) => {
+      chunks.push(data);
+    });
+
+    child.stderr?.on("data", (data: Buffer) => {
+      stderrOutput += data.toString();
+    });
+
+    child.on("close", (code) => {
+      if (code !== 0) {
+        resolve({
+          index: new Map(),
+          success: false,
+          error: `ctags failed: ${stderrOutput || "unknown error"}`,
+          entryCount: 0,
+        });
+        return;
+      }
+
+      const stdout = Buffer.concat(chunks).toString("utf-8");
+      const index: CtagsIndex = new Map();
+      let entryCount = 0;
+
+      const lines = stdout.split("\n");
+      for (const line of lines) {
+        if (!line.trim()) continue;
+
+        const entry = parseCtagsLine(line);
+        if (!entry) continue;
+
+        entryCount++;
+
+        let fileMap = index.get(entry.path);
+        if (!fileMap) {
+          fileMap = new Map();
+          index.set(entry.path, fileMap);
+        }
+
+        let symbols = fileMap.get(entry.name);
+        if (!symbols) {
+          symbols = [];
+          fileMap.set(entry.name, symbols);
+        }
+
+        symbols.push(entry);
+      }
+
+      resolve({ index, success: true, entryCount });
+    });
+
+    child.on("error", (err) => {
+      resolve({
+        index: new Map(),
+        success: false,
+        error: `ctags spawn error: ${err.message}`,
+        entryCount: 0,
+      });
+    });
+  });
 }
