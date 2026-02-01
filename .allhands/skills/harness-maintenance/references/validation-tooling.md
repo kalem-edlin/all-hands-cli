@@ -42,9 +42,18 @@ Per **Frontier Models are Capable** and **Context is Precious**:
 - **`--help` as prerequisite**: Suites MUST instruct agents to pull `<tool> --help` before any exploration — command vocabulary shapes exploration quality. The suite MUST NOT replicate full command docs.
 - **Inline command examples**: Weave brief examples into use-case motivations as calibration anchors — not exhaustive catalogs, not separated command reference sections.
 - **Motivation framing**: Frame around harness value: reducing human-in-loop supervision, verifying code quality, confirming implementation matches expectations.
-- **Exploration categories**: Describe with enough command specificity to orient, not prescriptive sequences that constrain.
+- **Exploration categories**: Describe with enough command specificity to orient. For untested territory, prefer motivations over prescriptive sequences — the agent extrapolates better from goals than rigid steps. For patterns verified through testing, state them authoritatively (see below).
 
 Formula: **motivations backed by inline command examples + `--help` as prerequisite and progressive disclosure**. Commands woven into use cases give direction; `--help` reveals depth.
+
+### Proven vs Untested Guidance
+
+Validation suites should be grounded in hands-on testing against the actual repo, not theoretical instructions. The level of authority in how guidance is written depends on whether it has been verified:
+
+- **Proven patterns** (verified via the Tool Validation Phase): State authoritatively within use-case motivations — the pattern is established fact, not a suggestion. These override generic tool documentation when they conflict. Example: "xctrace requires `--device '<UDID>'` for simulator" is a hard requirement discovered through testing, stated directly alongside the motivation (why: xctrace can't find simulator processes without it). The motivation formula still applies — proven patterns are *authoritative examples within motivations*, not raw command catalogs.
+- **Untested edge cases** (not yet exercised in this repo): Define the **motivation** (what the agent should achieve and why) and reference **analogous solved examples** from proven patterns. Do NOT write prescriptive step-by-step instructions for scenarios that haven't been verified — unverified prescriptions can mislead the agent into rigid sequences that don't match reality. Instead, trust that a frontier model given clear motivation and a reference example of how a similar problem was solved will extrapolate the correct approach through stochastic exploration.
+
+**Why this matters**: Frontier models produce emergent, adaptive behavior when given goals and reference points. Unverified prescriptive instructions constrain this emergence and risk encoding incorrect assumptions. Motivation + examples activate the model's reasoning about the problem space; rigid untested instructions bypass it. The Tool Validation Phase exists to convert untested guidance into proven patterns over time — the crystallization lifecycle in action.
 
 ### Evidence Capture
 
