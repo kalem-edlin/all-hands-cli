@@ -29,7 +29,8 @@
     ".reposearch/**",
     "concerns.md",
     "specs/**",
-    ".allhands/docs.local.json"
+    ".allhands/docs.local.json",
+    ".allhands/.sync-state.json"
   ],
   "initOnly": [
     ".allhands/skills/**",

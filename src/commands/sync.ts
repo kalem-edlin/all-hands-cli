@@ -8,6 +8,7 @@ import { ConflictResolution, askConflictResolution, confirm, getNextBackupPath }
 import { SYNC_CONFIG_FILENAME, SYNC_CONFIG_TEMPLATE } from '../lib/constants.js';
 import { restoreDotfiles } from '../lib/dotfiles.js';
 import { ensureTargetLines } from '../lib/target-lines.js';
+import { writeSyncState } from '../lib/sync-state.js';
 
 const AH_SHIM_SCRIPT = `#!/bin/bash
 # AllHands CLI shim - finds and executes project-local .allhands/harness/ah
@@ -169,11 +170,15 @@ export async function cmdSync(target: string = '.', autoYes: boolean = false, in
   console.log('\nCopying allhands files...');
   console.log(`Found ${distributable.size} files to distribute`);
 
+  const syncedFiles = new Set<string>();
+
   for (const relPath of [...distributable].sort()) {
     const sourceFile = join(allhandsRoot, relPath);
     const targetFile = join(resolvedTarget, relPath);
 
     if (!existsSync(sourceFile)) continue;
+
+    syncedFiles.add(relPath);
 
     mkdirSync(dirname(targetFile), { recursive: true });
 
@@ -192,6 +197,9 @@ export async function cmdSync(target: string = '.', autoYes: boolean = false, in
 
   // Restore dotfiles (gitignore → .gitignore, etc.)
   restoreDotfiles(resolvedTarget);
+
+  // Write sync-state manifest for push false-positive detection
+  writeSyncState(resolvedTarget, allhandsRoot, syncedFiles);
 
   // Update-only: Handle deleted files
   if (!isFirstTime && deletedInSource.length > 0) {
