@@ -7,6 +7,7 @@
  * - ah specs list              - List all specs grouped by domain_name
  * - ah specs complete <name>   - Mark spec completed, move spec out of roadmap
  * - ah specs create <path>     - Create spec: validate, assign branch, commit and push
+ * - ah specs graph             - Render dependency graph with availability markers
  */
 
 import { Command } from 'commander';
@@ -347,6 +348,195 @@ export function register(program: Command): void {
         console.log(`  Moved to: ${targetPath}`);
         console.log('  Knowledge indexes updated ✓');
       }
+    });
+
+  // ah specs graph
+  specs
+    .command('graph')
+    .description('Render dependency graph showing spec relationships and availability')
+    .option('--json', 'Output as JSON')
+    .option('--roadmap', 'Only show roadmap/in-progress specs')
+    .action((options: { json?: boolean; roadmap?: boolean }) => {
+      const allSpecs = loadAllSpecGroups().flatMap((g) => g.specs);
+
+      if (allSpecs.length === 0) {
+        if (options.json) {
+          console.log(JSON.stringify({ success: true, count: 0, available: [], tree: [], summary: { completed: 0, in_progress: 0, roadmap: 0, available: 0 } }, null, 2));
+        } else {
+          console.log('No specs found.');
+        }
+        return;
+      }
+
+      // Index all specs by id for lookups
+      const specById = new Map<string, typeof allSpecs[0]>();
+      for (const spec of allSpecs) {
+        specById.set(spec.id, spec);
+      }
+
+      // Compute availability: roadmap + all deps completed (against full unfiltered set)
+      // Dangling deps (unknown spec ids) are treated as satisfied
+      function isAvailable(spec: typeof allSpecs[0]): boolean {
+        if (spec.status !== 'roadmap') return false;
+        return spec.dependencies.every((depId) => {
+          const dep = specById.get(depId);
+          return !dep || dep.status === 'completed';
+        });
+      }
+
+      const availableIds = allSpecs.filter(isAvailable).map((s) => s.id).sort();
+
+      // Build display set (filtered or full)
+      let displaySpecs = allSpecs;
+      if (options.roadmap) {
+        displaySpecs = allSpecs.filter((s) => s.status !== 'completed');
+        if (displaySpecs.length === 0) {
+          if (options.json) {
+            console.log(JSON.stringify({ success: true, count: 0, available: availableIds, tree: [], summary: { completed: allSpecs.filter((s) => s.status === 'completed').length, in_progress: 0, roadmap: 0, available: availableIds.length } }, null, 2));
+          } else {
+            console.log('No roadmap specs found.');
+          }
+          return;
+        }
+      }
+
+      const displayIds = new Set(displaySpecs.map((s) => s.id));
+
+      // Build parent→children edges and find roots in one pass
+      const childrenOf = new Map<string, string[]>();
+      const roots: string[] = [];
+      for (const spec of displaySpecs) {
+        const visibleDeps = spec.dependencies.filter((depId) => depId !== spec.id && displayIds.has(depId));
+        if (visibleDeps.length === 0) {
+          roots.push(spec.id);
+        }
+        for (const depId of visibleDeps) {
+          if (!childrenOf.has(depId)) childrenOf.set(depId, []);
+          childrenOf.get(depId)!.push(spec.id);
+        }
+      }
+
+      // Detect orphaned cycles: specs not reachable from roots
+      const reachable = new Set<string>();
+      function markReachable(id: string): void {
+        if (reachable.has(id)) return;
+        reachable.add(id);
+        for (const childId of childrenOf.get(id) || []) {
+          markReachable(childId);
+        }
+      }
+      for (const rootId of roots) {
+        markReachable(rootId);
+      }
+      for (const spec of displaySpecs) {
+        if (!reachable.has(spec.id)) {
+          roots.push(spec.id);
+          markReachable(spec.id);
+        }
+      }
+
+      // Sort roots alphabetically
+      roots.sort();
+
+      // Summary counts
+      const summary = {
+        completed: displaySpecs.filter((s) => s.status === 'completed').length,
+        in_progress: displaySpecs.filter((s) => s.status === 'in_progress').length,
+        roadmap: displaySpecs.filter((s) => s.status === 'roadmap').length,
+        available: availableIds.length,
+      };
+
+      // JSON output
+      if (options.json) {
+        interface TreeNode {
+          id: string;
+          domain_name: string;
+          status: string;
+          available: boolean;
+          children: TreeNode[];
+        }
+
+        function buildJsonTree(id: string, path: Set<string>): TreeNode | null {
+          const spec = specById.get(id);
+          if (!spec) return null;
+          const node: TreeNode = {
+            id: spec.id,
+            domain_name: spec.domain_name,
+            status: spec.status,
+            available: availableIds.includes(spec.id),
+            children: [],
+          };
+          if (path.has(id)) return node; // cycle: return node without children
+          path.add(id);
+          const children = (childrenOf.get(id) || []).slice().sort();
+          for (const childId of children) {
+            const child = buildJsonTree(childId, path);
+            if (child) node.children.push(child);
+          }
+          path.delete(id);
+          return node;
+        }
+
+        const tree: TreeNode[] = [];
+        for (const rootId of roots) {
+          const node = buildJsonTree(rootId, new Set());
+          if (node) tree.push(node);
+        }
+
+        console.log(JSON.stringify({
+          success: true,
+          count: displaySpecs.length,
+          available: availableIds,
+          tree,
+          summary,
+        }, null, 2));
+        return;
+      }
+
+      // Human-readable tree output
+      const lines: string[] = [];
+      lines.push(`Dependency Tree (${displaySpecs.length} specs):\n`);
+
+      function statusIcon(status: string): string {
+        if (status === 'completed') return '[x]';
+        if (status === 'in_progress') return '[>]';
+        return '[ ]';
+      }
+
+      function renderNode(id: string, prefix: string, isLast: boolean, isRoot: boolean, pathSet: Set<string>): void {
+        const spec = specById.get(id);
+        if (!spec) return;
+
+        const connector = isRoot ? '' : isLast ? '└── ' : '├── ';
+        const icon = statusIcon(spec.status);
+        const avail = availableIds.includes(spec.id) ? ' ★' : '';
+
+        if (pathSet.has(id)) {
+          lines.push(`${prefix}${connector}${icon} ${spec.id} (${spec.domain_name}) [cycle]`);
+          return;
+        }
+
+        lines.push(`${prefix}${connector}${icon} ${spec.id} (${spec.domain_name})${avail}`);
+
+        const children = (childrenOf.get(id) || []).slice().sort();
+        if (children.length === 0) return;
+
+        pathSet.add(id);
+        const childPrefix = isRoot ? prefix : prefix + (isLast ? '    ' : '│   ');
+        for (let i = 0; i < children.length; i++) {
+          renderNode(children[i], childPrefix, i === children.length - 1, false, pathSet);
+        }
+        pathSet.delete(id);
+      }
+
+      for (const rootId of roots) {
+        renderNode(rootId, '', true, true, new Set());
+      }
+
+      lines.push('');
+      lines.push('Legend: [x] completed  [>] in_progress  [ ] roadmap  ★ available');
+
+      console.log(lines.join('\n'));
     });
 
   // ah specs create <path>
