@@ -178,10 +178,10 @@ async function tree(pathArg: string, maxDepth: number): Promise<CommandResult> {
 }
 
 /**
- * Placeholder ref pattern - matches [ref:file:symbol] without hash
+ * Placeholder ref pattern - matches [ref:file:symbol] without hash.
+ * Supports balanced brackets in file paths for Next.js dynamic routes (e.g. [trpc]).
  */
-// Matches both [ref:file:symbol] and [ref:file] (file-only refs)
-const PLACEHOLDER_REF_PATTERN = /\[ref:([^:\]]+)(?::([^\]]*))?\]/g;
+const PLACEHOLDER_REF_PATTERN = /\[ref:((?:[^:\[\]]|\[[^\]]*\])+)(?::((?:[^\[\]]|\[[^\]]*\])*))?\]/g;
 
 /**
  * Finalize a single documentation file by replacing placeholder refs with full refs.

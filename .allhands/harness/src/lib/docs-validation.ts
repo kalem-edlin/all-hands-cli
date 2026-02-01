@@ -70,20 +70,24 @@ function saveValidationCache(projectRoot: string, cache: ValidationCache): void 
 /**
  * Reference pattern matching both symbol and file-only refs.
  * Captures: [1]=file, [2]=symbol (empty for file-only), [3]=hash (min 7 chars)
+ *
+ * File paths may contain balanced brackets for Next.js dynamic routes (e.g. [trpc]).
+ * The sub-pattern (?:[^:\[\]]|\[[^\]]*\])+ matches path segments and bracketed groups
+ * while stopping at bare : and ] delimiters.
  */
-export const REF_PATTERN = /\[ref:([^:\]]+):([^:\]]*):([a-f0-9]{7,})\]/g;
+export const REF_PATTERN = /\[ref:((?:[^:\[\]]|\[[^\]]*\])+):((?:[^:\[\]]|\[[^\]]*\])*):([a-f0-9]{7,})\]/g;
 
 /**
  * Placeholder hash patterns (fake/test hashes that should be replaced).
  */
 export const PLACEHOLDER_PATTERN =
-  /\[ref:[^\]]+:(abc123[0-9]?|123456[0-9]?|000000[0-9]?|hash[a-f0-9]{0,4}|test[a-f0-9]{0,4})\]/gi;
+  /\[ref:(?:[^\[\]]|\[[^\]]*\])+:(abc123[0-9]?|123456[0-9]?|000000[0-9]?|hash[a-f0-9]{0,4}|test[a-f0-9]{0,4})\]/gi;
 
 /**
  * Unfinalized ref pattern - refs without hashes that need to be finalized.
  * Matches [ref:file:symbol] or [ref:file] (no hash component).
  */
-export const UNFINALIZED_REF_PATTERN = /\[ref:([^:\]]+)(?::([^\]]*))?\](?!:)/g;
+export const UNFINALIZED_REF_PATTERN = /\[ref:((?:[^:\[\]]|\[[^\]]*\])+)(?::((?:[^\[\]]|\[[^\]]*\])*))?\](?!:)/g;
 
 /**
  * Parsed reference from documentation.
