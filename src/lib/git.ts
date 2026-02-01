@@ -71,6 +71,22 @@ export function getFileBlobHash(filePath: string, repoPath: string): string | nu
 }
 
 /**
+ * Get the HEAD commit hash of a repo. Returns null if no commits exist.
+ */
+export function getHeadCommit(repoPath: string): string | null {
+  const result = git(['rev-parse', 'HEAD'], repoPath);
+  return result.success ? result.stdout.trim() : null;
+}
+
+/**
+ * Check if a repo has uncommitted changes (staged or unstaged).
+ */
+export function hasUncommittedChanges(repoPath: string): boolean {
+  const result = git(['status', '--porcelain'], repoPath);
+  return result.success && result.stdout.length > 0;
+}
+
+/**
  * Check if a specific blob hash appears in the git history of a file path.
  * Uses a single `rev-list --objects` call instead of per-commit lookups.
  */

@@ -9,6 +9,7 @@ import { Manifest, filesAreDifferent } from '../lib/manifest.js';
 import { getAllhandsRoot, UPSTREAM_REPO } from '../lib/paths.js';
 import { askQuestion, confirm } from '../lib/ui.js';
 import { PUSH_BLOCKLIST, SYNC_CONFIG_FILENAME } from '../lib/constants.js';
+import { readSyncState, wasModifiedSinceSync, SyncState } from '../lib/sync-state.js';
 
 interface SyncConfig {
   includes?: string[];
@@ -98,12 +99,25 @@ function checkPrerequisites(cwd: string): PrerequisiteResult {
  * Determine if a file was actually modified by the target repo,
  * vs simply being out of date because upstream moved forward.
  *
- * Compares the target file's content against all historical versions
- * in the upstream repo. If it matches any previous version, the target
- * repo hasn't modified it.
+ * Prefers the sync-state manifest (written during sync) which records the
+ * exact blob hash of each source file at sync time. Falls back to git
+ * history search for repos synced before the manifest existed.
  */
-function wasModifiedByTargetRepo(cwd: string, relPath: string, allhandsRoot: string): boolean {
+function wasModifiedByTargetRepo(
+  cwd: string,
+  relPath: string,
+  allhandsRoot: string,
+  syncState: SyncState | null
+): boolean {
   const localFile = join(cwd, relPath);
+
+  // Prefer manifest check when available
+  if (syncState) {
+    const manifestResult = wasModifiedSinceSync(localFile, relPath, syncState, cwd);
+    if (manifestResult !== null) return manifestResult;
+  }
+
+  // Fall back to git history for legacy repos or files not in manifest
   const localBlobHash = getFileBlobHash(localFile, allhandsRoot);
 
   if (!localBlobHash) return true; // safe default: assume modified on error
@@ -119,6 +133,7 @@ function collectFilesToPush(
   const allhandsRoot = getAllhandsRoot();
   const manifest = new Manifest(allhandsRoot);
   const upstreamFiles = manifest.getDistributableFiles();
+  const syncState = readSyncState(cwd);
   const filesToPush: FileEntry[] = [];
 
   // Get non-ignored files in user's repo (respects .gitignore)
@@ -156,7 +171,7 @@ function collectFilesToPush(
 
     if (existsSync(localFile)) {
       if (filesAreDifferent(localFile, upstreamFile)) {
-        if (wasModifiedByTargetRepo(cwd, relPath, allhandsRoot)) {
+        if (wasModifiedByTargetRepo(cwd, relPath, allhandsRoot, syncState)) {
           filesToPush.push({ path: relPath, type: 'M' });
         }
       }
