@@ -37,42 +37,26 @@ For proprietary domains with documentation pages:
 - Extract API patterns, configuration examples
 - Note version-specific behaviors
 
-### Open Source Inspiration (Clone & Browse)
+### Open Source Inspiration (`ah spawn reposearch`)
 
-For exploring GitHub repositories locally:
+Use `ah spawn reposearch` to clone external GitHub repos and delegate research to an AI agent that searches across both the current project and external codebases.
 
-1. **Search for repositories**:
-   ```bash
-   gh search repos "<query>" --limit 5
-   ```
+**OSS codebase answers** — ask how a specific project handles something:
+```bash
+ah spawn reposearch "How does this project handle authentication?" --repos https://github.com/org/project
+```
 
-2. **Clone to local research folder**:
-   ```bash
-   # Clone into .reposearch folder (gitignored)
-   mkdir -p .reposearch
-   git clone --depth 1 <repo-url> .reposearch/<repo-name>
-   ```
+**Cross-repo comparison** — compare our implementation vs an external project:
+```bash
+ah spawn reposearch "Compare our error handling approach vs theirs" --repos https://github.com/org/project
+```
 
-   Note: Ensure `.reposearch/` is in the project's `.gitignore`.
+**Multi-framework comparison** — check out 2+ repos, compare approaches side-by-side:
+```bash
+ah spawn reposearch "How do these projects handle routing?" --repos https://github.com/a/repo,https://github.com/b/repo
+```
 
-3. **Browse locally with standard tooling**:
-   - Use `Glob` to find files by pattern
-   - Use `Grep` to search code content
-   - Use `Read` to examine specific files
-   - Use `ls` to explore directory structure
-
-4. **Clean up when done** (optional):
-   ```bash
-   rm -rf .reposearch/<repo-name>
-   ```
-
-This approach leverages the agent's superior local file navigation capabilities:
-- Full regex search across the codebase
-- Fast pattern matching and file discovery
-- Direct file reading without API encoding issues
-- Study implementation patterns in similar projects
-- Extract architectural decisions
-- Note how libraries handle similar problems
+Re-running the same command with the same repos is fast — repos are cached locally between invocations.
 
 ### Parallel Exploration
 
