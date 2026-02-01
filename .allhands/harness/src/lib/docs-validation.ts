@@ -2,11 +2,11 @@
  * Documentation validation utilities.
  *
  * Validates references in documentation files against the actual codebase
- * using ctags for symbol lookup and git for staleness detection.
+ * using git blob hashes for staleness detection.
  *
  * Reference formats:
- *   [ref:file:symbol:hash] - Symbol reference (validated via ctags)
- *   [ref:file::hash]       - File-only reference (no symbol validation)
+ *   [ref:file:symbol:hash] - Symbol reference (symbol is an author-provided label)
+ *   [ref:file::hash]       - File-only reference
  *
  * Where hash = git blob hash (content-addressable, stable across merges/rebases)
  */
@@ -14,40 +14,8 @@
 import { spawnSync } from "child_process";
 import { createHash } from "crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
-import { extname, join, relative } from "path";
+import { join, relative } from "path";
 import matter from "gray-matter";
-import { CtagsIndex, generateCtagsIndex, generateCtagsIndexAsync, lookupSymbol } from "./ctags.js";
-
-/**
- * File extensions that ctags can process (programming languages).
- * Files with other extensions are treated as non-code where symbols are just labels.
- */
-const CODE_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",  // TypeScript/JavaScript
-  ".py", ".pyw",                                   // Python
-  ".go",                                           // Go
-  ".rs",                                           // Rust
-  ".java",                                         // Java
-  ".rb",                                           // Ruby
-  ".c", ".cpp", ".cc", ".cxx", ".h", ".hpp",      // C/C++
-  ".cs",                                           // C#
-  ".php",                                          // PHP
-  ".kt", ".kts",                                   // Kotlin
-  ".swift",                                        // Swift
-  ".scala",                                        // Scala
-  ".lua",                                          // Lua
-  ".sh", ".bash", ".zsh",                         // Shell scripts
-  ".vim",                                          // Vim script
-  ".el",                                           // Emacs Lisp
-]);
-
-/**
- * Check if a file is a code file that ctags can process.
- */
-export function isCodeFile(filePath: string): boolean {
-  const ext = extname(filePath).toLowerCase();
-  return CODE_EXTENSIONS.has(ext);
-}
 
 /**
  * Validation cache for faster repeated validation runs.
@@ -484,13 +452,11 @@ export function findMarkdownFiles(dir: string, excludeReadme = false, excludePat
 /**
  * Validate a single reference.
  * @param ref - The parsed reference to validate
- * @param ctagsIndex - The ctags index for symbol lookup
  * @param projectRoot - The project root directory
  * @param hashCache - Optional pre-fetched hash map for performance
  */
 export function validateRef(
   ref: ParsedRef,
-  ctagsIndex: CtagsIndex,
   projectRoot: string,
   hashCache?: Map<string, { hash: string; success: boolean }>
 ): ValidatedRef {
@@ -525,49 +491,12 @@ export function validateRef(
     };
   }
 
-  // File-only reference: just check hash
-  if (ref.isFileOnly) {
-    if (currentHash !== ref.hash) {
-      return {
-        ...ref,
-        state: "stale",
-        reason: "File has been modified",
-        currentHash,
-      };
-    }
-    return { ...ref, state: "valid" };
-  }
-
-  // Non-code files (markdown, yaml, json, etc.): treat symbol as label, just check hash
-  if (!isCodeFile(ref.file)) {
-    if (currentHash !== ref.hash) {
-      return {
-        ...ref,
-        state: "stale",
-        reason: "File has been modified",
-        currentHash,
-      };
-    }
-    return { ...ref, state: "valid" };
-  }
-
-  // Code file symbol reference: check symbol exists via ctags
-  const entries = lookupSymbol(ctagsIndex, ref.file, ref.symbol!);
-
-  if (entries.length === 0) {
-    return {
-      ...ref,
-      state: "invalid",
-      reason: `Symbol '${ref.symbol}' not found in ${ref.file}`,
-    };
-  }
-
-  // Check hash staleness (using file-level hash for ctags approach)
+  // Check hash staleness (symbols are author-provided labels, not verified)
   if (currentHash !== ref.hash) {
     return {
       ...ref,
       state: "stale",
-      reason: "File has been modified since reference was created",
+      reason: "File has been modified",
       currentHash,
     };
   }
@@ -581,7 +510,7 @@ export function validateRef(
 export function validateDocs(
   docsPath: string,
   projectRoot: string,
-  options?: { ctagsIndex?: CtagsIndex; useCache?: boolean; excludePaths?: string[] }
+  options?: { useCache?: boolean; excludePaths?: string[] }
 ): ValidationResult {
   // Initialize result
   const result: ValidationResult = {
@@ -626,11 +555,6 @@ export function validateDocs(
     docIssues: {},
     refFileHashes: {},
   };
-
-  // Generate ctags index (or use provided one)
-  const ctagsIndex =
-    options?.ctagsIndex ||
-    generateCtagsIndex(projectRoot).index;
 
   // Helper to get/create doc file entry
   const getDocEntry = (docFile: string): DocFileIssues => {
@@ -759,7 +683,7 @@ export function validateDocs(
 
   // Validate each reference (using cached hashes)
   for (const ref of allRefs) {
-    const validated = validateRef(ref, ctagsIndex, projectRoot, hashCache);
+    const validated = validateRef(ref, projectRoot, hashCache);
 
     if (validated.state === "valid") {
       result.valid_count++;
@@ -856,52 +780,12 @@ export function validateDocs(
 
 /**
  * Validate all documentation in a directory (async version).
- *
- * Identical to validateDocs but uses generateCtagsIndexAsync to avoid
- * blocking the event loop during ctags execution.
+ * Kept async for API compatibility. Delegates directly to validateDocs.
  */
 export async function validateDocsAsync(
   docsPath: string,
   projectRoot: string,
-  options?: { ctagsIndex?: CtagsIndex; useCache?: boolean; excludePaths?: string[] }
+  options?: { useCache?: boolean; excludePaths?: string[] }
 ): Promise<ValidationResult> {
-  // If a ctags index was provided, delegate to the sync version directly
-  if (options?.ctagsIndex) {
-    return validateDocs(docsPath, projectRoot, options);
-  }
-
-  // Generate ctags index asynchronously
-  const ctagsResult = await generateCtagsIndexAsync(projectRoot);
-
-  // If ctags is unavailable or failed, run validation with the empty map
-  // (to prevent a sync fallback that would also fail), then strip out the
-  // symbol-ref invalids that are false positives from the empty index.
-  if (!ctagsResult.success) {
-    const baseResult = validateDocs(docsPath, projectRoot, {
-      ...options,
-      ctagsIndex: ctagsResult.index, // empty map — avoids sync fallback
-    });
-    // Remove symbol-ref invalid entries (they're false positives from empty index)
-    const symbolInvalidCount = baseResult.invalid.filter((i) =>
-      i.reason.startsWith("Symbol '")
-    ).length;
-    baseResult.invalid = baseResult.invalid.filter(
-      (i) => !i.reason.startsWith("Symbol '")
-    );
-    // Also strip from per-doc entries
-    for (const entry of Object.values(baseResult.by_doc_file)) {
-      entry.invalid = entry.invalid.filter(
-        (i) => !i.reason.startsWith("Symbol '")
-      );
-    }
-    baseResult.invalid_count -= symbolInvalidCount;
-    baseResult.message = `ctags unavailable: ${ctagsResult.error ?? "unknown error"} — symbol ref validation skipped`;
-    return baseResult;
-  }
-
-  // Delegate to sync validateDocs with the pre-built index
-  return validateDocs(docsPath, projectRoot, {
-    ...options,
-    ctagsIndex: ctagsResult.index,
-  });
+  return validateDocs(docsPath, projectRoot, options);
 }

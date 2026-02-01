@@ -1,8 +1,8 @@
 /**
  * Documentation commands - validation and reference finalization.
  *
- * Uses ctags for symbol lookup (instead of AST parsing) for broader language support
- * and simpler implementation.
+ * Symbols in refs are author-provided labels. Staleness is detected via
+ * file-level git blob hashes.
  *
  * Commands:
  *   ah docs validate [--path <path>]  - Validate all refs in docs/
@@ -20,14 +20,9 @@ import {
   parseContext,
 } from "../lib/base-command.js";
 import {
-  checkCtagsAvailable,
-  findSymbolInFile,
-  generateCtagsIndex,
-} from "../lib/ctags.js";
-import {
   batchGetBlobHashes,
   findMarkdownFiles,
-  isCodeFile,
+  REF_PATTERN,
   validateDocsAsync,
 } from "../lib/docs-validation.js";
 import { getProjectRoot } from "../lib/git.js";
@@ -43,15 +38,6 @@ async function validate(docsPath: string, options?: { useCache?: boolean }): Pro
   const absoluteDocsPath = docsPath.startsWith("/")
     ? docsPath
     : join(projectRoot, docsPath);
-
-  // Check ctags availability first
-  const ctagsCheck = checkCtagsAvailable();
-  if (!ctagsCheck.available) {
-    return {
-      success: false,
-      error: `ctags_unavailable: ${ctagsCheck.error}`,
-    };
-  }
 
   const excludePaths = EXCLUDED_DOC_PATHS.map((p) => join(projectRoot, p));
 
@@ -261,25 +247,7 @@ function finalizeSingleFile(
       continue;
     }
 
-    // For non-code files (markdown, yaml, json, etc.), treat symbol as a label (no ctags lookup)
-    if (!isCodeFile(placeholder.file)) {
-      const fullRef = `[ref:${placeholder.file}:${placeholder.symbol}:${hashResult.hash}]`;
-      finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
-      replacements.push({ from: placeholder.match, to: fullRef });
-      continue;
-    }
-
-    // For code files with symbol refs, verify symbol exists via ctags
-    const entry = findSymbolInFile(absoluteFilePath, placeholder.symbol, projectRoot);
-    if (!entry) {
-      errors.push({
-        placeholder: placeholder.match,
-        reason: `Symbol '${placeholder.symbol}' not found in ${placeholder.file}`,
-      });
-      continue;
-    }
-
-    // Create full ref
+    // Symbol is an author-provided label — produce the full ref with hash directly
     const fullRef = `[ref:${placeholder.file}:${placeholder.symbol}:${hashResult.hash}]`;
     finalizedContent = finalizedContent.replaceAll(placeholder.match, fullRef);
     replacements.push({ from: placeholder.match, to: fullRef });
@@ -370,18 +338,6 @@ async function finalize(docsPath: string, options?: { refresh?: boolean }): Prom
       error: `path_not_found: Path not found: ${relativePath}`,
     };
   }
-
-  // Check ctags availability
-  const ctagsCheck = checkCtagsAvailable();
-  if (!ctagsCheck.available) {
-    return {
-      success: false,
-      error: `ctags_unavailable: ${ctagsCheck.error}`,
-    };
-  }
-
-  // Generate ctags index for symbol lookup
-  generateCtagsIndex(projectRoot);
 
   // Determine if path is a file or directory
   const excludePaths = EXCLUDED_DOC_PATHS.map((p) => join(projectRoot, p));

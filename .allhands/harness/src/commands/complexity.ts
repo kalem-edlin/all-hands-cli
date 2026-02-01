@@ -1,7 +1,7 @@
 /**
  * Complexity command - Get complexity metrics for files or directories.
  *
- * Uses ctags to count symbols for broader language support.
+ * Provides line counts and estimated token counts for source files.
  *
  * Command:
  *   ah complexity <path>  - Get complexity metrics
@@ -17,15 +17,11 @@ import {
   CommandResult,
 } from "../lib/base-command.js";
 import { getProjectRoot } from "../lib/git.js";
-import {
-  checkCtagsAvailable,
-  generateCtagsIndex,
-  getFileSymbols,
-} from "../lib/ctags.js";
+
+const SOURCE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".swift", ".rb", ".kt"];
 
 /**
  * Get complexity metrics for a file or directory.
- * Uses ctags to count symbols instead of AST parsing.
  */
 async function complexity(pathArg: string): Promise<CommandResult> {
   const projectRoot = getProjectRoot();
@@ -41,70 +37,27 @@ async function complexity(pathArg: string): Promise<CommandResult> {
     };
   }
 
-  // Check ctags availability
-  const ctagsCheck = checkCtagsAvailable();
-  if (!ctagsCheck.available) {
-    return {
-      success: false,
-      error: `ctags_unavailable: ${ctagsCheck.error}`,
-    };
-  }
-
   const stat = statSync(absolutePath);
 
   if (stat.isFile()) {
-    // Single file complexity
     const content = readFileSync(absolutePath, "utf-8");
     const lines = content.split("\n").length;
-
-    // Get symbols via ctags
-    const { index } = generateCtagsIndex(projectRoot, { target: relativePath });
-    const symbols = getFileSymbols(index, relativePath);
-
-    const functions = symbols.filter(
-      (s) => s.kind === "function" || s.kind === "method"
-    ).length;
-    const classes = symbols.filter((s) => s.kind === "class").length;
-    const interfaces = symbols.filter(
-      (s) => s.kind === "interface" || s.kind === "type"
-    ).length;
-
-    // Count imports/exports with regex (simple heuristic)
-    const importMatches = content.match(/^import\s/gm);
-    const exportMatches = content.match(/^export\s/gm);
 
     return {
       success: true,
       data: {
         path: relativePath,
         type: "file",
-        metrics: {
-          lines,
-          functions,
-          classes,
-          interfaces,
-          imports: importMatches?.length || 0,
-          exports: exportMatches?.length || 0,
-          total_symbols: symbols.length,
-        },
+        metrics: { lines },
         estimated_tokens: Math.ceil(lines * 10),
       },
     };
   }
 
   // Directory complexity
-  const { index, entryCount } = generateCtagsIndex(projectRoot, {
-    target: relativePath,
-  });
-
-  // Aggregate stats
   let totalLines = 0;
-  let totalFunctions = 0;
-  let totalClasses = 0;
-  let totalInterfaces = 0;
   let fileCount = 0;
 
-  // Find source files and count lines
   const countDir = (dir: string): void => {
     const entries = readdirSync(dir);
     for (const entry of entries) {
@@ -115,7 +68,7 @@ async function complexity(pathArg: string): Promise<CommandResult> {
         countDir(fullPath);
       } else {
         const ext = extname(entry);
-        if ([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java"].includes(ext)) {
+        if (SOURCE_EXTENSIONS.includes(ext)) {
           fileCount++;
           const content = readFileSync(fullPath, "utf-8");
           totalLines += content.split("\n").length;
@@ -126,34 +79,13 @@ async function complexity(pathArg: string): Promise<CommandResult> {
 
   countDir(absolutePath);
 
-  // Count symbol types from index
-  for (const fileMap of Array.from(index.values())) {
-    for (const entries of Array.from(fileMap.values())) {
-      for (const entry of entries) {
-        if (entry.kind === "function" || entry.kind === "method") {
-          totalFunctions++;
-        } else if (entry.kind === "class") {
-          totalClasses++;
-        } else if (entry.kind === "interface" || entry.kind === "type") {
-          totalInterfaces++;
-        }
-      }
-    }
-  }
-
   return {
     success: true,
     data: {
       path: relativePath,
       type: "directory",
       file_count: fileCount,
-      metrics: {
-        lines: totalLines,
-        functions: totalFunctions,
-        classes: totalClasses,
-        interfaces: totalInterfaces,
-        total_symbols: entryCount,
-      },
+      metrics: { lines: totalLines },
       estimated_tokens: Math.ceil(totalLines * 10),
     },
   };
