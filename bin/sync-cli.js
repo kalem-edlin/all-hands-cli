@@ -4905,6 +4905,15 @@ function getGitFiles(repoPath) {
   }
   return files;
 }
+function getFileBlobHash(filePath, repoPath) {
+  const result = git(["hash-object", filePath], repoPath);
+  return result.success ? result.stdout.trim() : null;
+}
+function fileExistsInHistory(relPath, blobHash, repoPath) {
+  const result = git(["rev-list", "HEAD", "--objects", "--", relPath], repoPath);
+  if (!result.success || !result.stdout) return false;
+  return result.stdout.split("\n").some((line) => line.startsWith(blobHash + " "));
+}
 
 // src/lib/manifest.ts
 import { readFileSync as readFileSync5, existsSync as existsSync3, statSync as statSync3 } from "fs";
@@ -7224,12 +7233,28 @@ function checkPrerequisites(cwd) {
   }
   return { success: true, ghUser };
 }
+function wasModifiedByTargetRepo(cwd, relPath, allhandsRoot) {
+  const localFile = join9(cwd, relPath);
+  const localBlobHash = getFileBlobHash(localFile, allhandsRoot);
+  if (!localBlobHash) return true;
+  return !fileExistsInHistory(relPath, localBlobHash, allhandsRoot);
+}
 function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
   const allhandsRoot = getAllhandsRoot();
   const manifest = new Manifest(allhandsRoot);
   const upstreamFiles = manifest.getDistributableFiles();
   const filesToPush = [];
   const localGitFiles = new Set(getGitFiles(cwd));
+  const deletedFiles = /* @__PURE__ */ new Set();
+  for (const args of [
+    ["diff", "--name-only", "--diff-filter=D"],
+    ["diff", "--cached", "--name-only", "--diff-filter=D"]
+  ]) {
+    const result = git(args, cwd);
+    if (result.success && result.stdout) {
+      result.stdout.split("\n").filter(Boolean).forEach((f) => deletedFiles.add(f));
+    }
+  }
   for (const relPath of upstreamFiles) {
     if (manifest.isInitOnly(relPath)) {
       continue;
@@ -7240,13 +7265,19 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
     if (finalExcludes.some((pattern) => minimatch(relPath, pattern, { dot: true }))) {
       continue;
     }
-    if (!localGitFiles.has(relPath)) {
+    if (!localGitFiles.has(relPath) && !deletedFiles.has(relPath)) {
       continue;
     }
     const localFile = join9(cwd, relPath);
     const upstreamFile = join9(allhandsRoot, relPath);
-    if (existsSync11(localFile) && filesAreDifferent(localFile, upstreamFile)) {
-      filesToPush.push({ path: relPath, type: "M" });
+    if (existsSync11(localFile)) {
+      if (filesAreDifferent(localFile, upstreamFile)) {
+        if (wasModifiedByTargetRepo(cwd, relPath, allhandsRoot)) {
+          filesToPush.push({ path: relPath, type: "M" });
+        }
+      }
+    } else if (deletedFiles.has(relPath)) {
+      filesToPush.push({ path: relPath, type: "D" });
     }
   }
   for (const pattern of finalIncludes) {
@@ -7318,12 +7349,16 @@ async function createPullRequest(cwd, ghUser, filesToPush, title, body) {
       console.error("Error creating branch:", checkoutResult.stderr);
       return 1;
     }
-    console.log("Copying files...");
+    console.log("Applying changes...");
     for (const file of filesToPush) {
-      const src = join9(cwd, file.path);
-      const dest = join9(tempDir, file.path);
-      mkdirSync2(dirname8(dest), { recursive: true });
-      copyFileSync2(src, dest);
+      if (file.type === "D") {
+        git(["rm", "--ignore-unmatch", file.path], tempDir);
+      } else {
+        const src = join9(cwd, file.path);
+        const dest = join9(tempDir, file.path);
+        mkdirSync2(dirname8(dest), { recursive: true });
+        copyFileSync2(src, dest);
+      }
     }
     const addResult = git(["add", "."], tempDir);
     if (!addResult.success) {
@@ -7392,8 +7427,8 @@ async function cmdPush(include, exclude, dryRun, titleArg, bodyArg) {
   }
   console.log("\nFiles to be included in PR:");
   for (const file of filesToPush.sort((a, b) => a.path.localeCompare(b.path))) {
-    const marker = file.type === "M" ? "M" : "A";
-    const label = file.type === "M" ? "modified" : "included";
+    const marker = file.type;
+    const label = { D: "deleted", M: "modified", A: "included" }[file.type];
     console.log(`  ${marker} ${file.path} (${label})`);
   }
   console.log();
