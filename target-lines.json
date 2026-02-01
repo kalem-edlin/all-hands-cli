@@ -11,8 +11,8 @@
     ".allhands-*.backup/",
     ".claude-*.backup/",
     ".allhands/harness/.cache/",
-    "test_plan.md",
-    "problems.md"
+    ".allhands/harness/.knowledge/",
+    ".allhands/harness/.allhands/"
   ],
   ".tldrignore": [
     ".reposearch/",
