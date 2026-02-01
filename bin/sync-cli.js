@@ -7230,6 +7230,15 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
   const upstreamFiles = manifest.getDistributableFiles();
   const filesToPush = [];
   const localGitFiles = new Set(getGitFiles(cwd));
+  const deletedFiles = /* @__PURE__ */ new Set();
+  const deletedUnstaged = git(["diff", "--name-only", "--diff-filter=D"], cwd);
+  if (deletedUnstaged.success && deletedUnstaged.stdout) {
+    deletedUnstaged.stdout.split("\n").filter(Boolean).forEach((f) => deletedFiles.add(f));
+  }
+  const deletedStaged = git(["diff", "--cached", "--name-only", "--diff-filter=D"], cwd);
+  if (deletedStaged.success && deletedStaged.stdout) {
+    deletedStaged.stdout.split("\n").filter(Boolean).forEach((f) => deletedFiles.add(f));
+  }
   for (const relPath of upstreamFiles) {
     if (manifest.isInitOnly(relPath)) {
       continue;
@@ -7240,13 +7249,17 @@ function collectFilesToPush(cwd, finalIncludes, finalExcludes) {
     if (finalExcludes.some((pattern) => minimatch(relPath, pattern, { dot: true }))) {
       continue;
     }
-    if (!localGitFiles.has(relPath)) {
+    if (!localGitFiles.has(relPath) && !deletedFiles.has(relPath)) {
       continue;
     }
     const localFile = join9(cwd, relPath);
     const upstreamFile = join9(allhandsRoot, relPath);
-    if (existsSync11(localFile) && filesAreDifferent(localFile, upstreamFile)) {
-      filesToPush.push({ path: relPath, type: "M" });
+    if (existsSync11(localFile)) {
+      if (filesAreDifferent(localFile, upstreamFile)) {
+        filesToPush.push({ path: relPath, type: "M" });
+      }
+    } else if (deletedFiles.has(relPath)) {
+      filesToPush.push({ path: relPath, type: "D" });
     }
   }
   for (const pattern of finalIncludes) {
@@ -7318,12 +7331,19 @@ async function createPullRequest(cwd, ghUser, filesToPush, title, body) {
       console.error("Error creating branch:", checkoutResult.stderr);
       return 1;
     }
-    console.log("Copying files...");
+    console.log("Applying changes...");
     for (const file of filesToPush) {
-      const src = join9(cwd, file.path);
-      const dest = join9(tempDir, file.path);
-      mkdirSync2(dirname8(dest), { recursive: true });
-      copyFileSync2(src, dest);
+      if (file.type === "D") {
+        const target = join9(tempDir, file.path);
+        if (existsSync11(target)) {
+          git(["rm", file.path], tempDir);
+        }
+      } else {
+        const src = join9(cwd, file.path);
+        const dest = join9(tempDir, file.path);
+        mkdirSync2(dirname8(dest), { recursive: true });
+        copyFileSync2(src, dest);
+      }
     }
     const addResult = git(["add", "."], tempDir);
     if (!addResult.success) {
@@ -7392,8 +7412,8 @@ async function cmdPush(include, exclude, dryRun, titleArg, bodyArg) {
   }
   console.log("\nFiles to be included in PR:");
   for (const file of filesToPush.sort((a, b) => a.path.localeCompare(b.path))) {
-    const marker = file.type === "M" ? "M" : "A";
-    const label = file.type === "M" ? "modified" : "included";
+    const marker = file.type === "D" ? "D" : file.type === "M" ? "M" : "A";
+    const label = file.type === "D" ? "deleted" : file.type === "M" ? "modified" : "included";
     console.log(`  ${marker} ${file.path} (${label})`);
   }
   console.log();

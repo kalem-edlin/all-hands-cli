@@ -17,7 +17,7 @@ interface SyncConfig {
 
 interface FileEntry {
   path: string;
-  type: 'M' | 'A';
+  type: 'M' | 'A' | 'D';
 }
 
 interface PrerequisiteResult {
@@ -107,6 +107,17 @@ function collectFilesToPush(
   // Get non-ignored files in user's repo (respects .gitignore)
   const localGitFiles = new Set(getGitFiles(cwd));
 
+  // Get files deleted locally (both staged and unstaged deletions)
+  const deletedFiles = new Set<string>();
+  const deletedUnstaged = git(['diff', '--name-only', '--diff-filter=D'], cwd);
+  if (deletedUnstaged.success && deletedUnstaged.stdout) {
+    deletedUnstaged.stdout.split('\n').filter(Boolean).forEach((f) => deletedFiles.add(f));
+  }
+  const deletedStaged = git(['diff', '--cached', '--name-only', '--diff-filter=D'], cwd);
+  if (deletedStaged.success && deletedStaged.stdout) {
+    deletedStaged.stdout.split('\n').filter(Boolean).forEach((f) => deletedFiles.add(f));
+  }
+
   for (const relPath of upstreamFiles) {
     if (manifest.isInitOnly(relPath)) {
       continue;
@@ -117,16 +128,20 @@ function collectFilesToPush(
     if (finalExcludes.some((pattern) => minimatch(relPath, pattern, { dot: true }))) {
       continue;
     }
-    // Skip files that are gitignored in user's repo
-    if (!localGitFiles.has(relPath)) {
+    // Skip files that are gitignored in user's repo (but allow deleted files through)
+    if (!localGitFiles.has(relPath) && !deletedFiles.has(relPath)) {
       continue;
     }
 
     const localFile = join(cwd, relPath);
     const upstreamFile = join(allhandsRoot, relPath);
 
-    if (existsSync(localFile) && filesAreDifferent(localFile, upstreamFile)) {
-      filesToPush.push({ path: relPath, type: 'M' });
+    if (existsSync(localFile)) {
+      if (filesAreDifferent(localFile, upstreamFile)) {
+        filesToPush.push({ path: relPath, type: 'M' });
+      }
+    } else if (deletedFiles.has(relPath)) {
+      filesToPush.push({ path: relPath, type: 'D' });
     }
   }
 
@@ -220,12 +235,19 @@ async function createPullRequest(
       return 1;
     }
 
-    console.log('Copying files...');
+    console.log('Applying changes...');
     for (const file of filesToPush) {
-      const src = join(cwd, file.path);
-      const dest = join(tempDir, file.path);
-      mkdirSync(dirname(dest), { recursive: true });
-      copyFileSync(src, dest);
+      if (file.type === 'D') {
+        const target = join(tempDir, file.path);
+        if (existsSync(target)) {
+          git(['rm', file.path], tempDir);
+        }
+      } else {
+        const src = join(cwd, file.path);
+        const dest = join(tempDir, file.path);
+        mkdirSync(dirname(dest), { recursive: true });
+        copyFileSync(src, dest);
+      }
     }
 
     const addResult = git(['add', '.'], tempDir);
@@ -309,8 +331,8 @@ export async function cmdPush(
 
   console.log('\nFiles to be included in PR:');
   for (const file of filesToPush.sort((a, b) => a.path.localeCompare(b.path))) {
-    const marker = file.type === 'M' ? 'M' : 'A';
-    const label = file.type === 'M' ? 'modified' : 'included';
+    const marker = file.type === 'D' ? 'D' : file.type === 'M' ? 'M' : 'A';
+    const label = file.type === 'D' ? 'deleted' : file.type === 'M' ? 'modified' : 'included';
     console.log(`  ${marker} ${file.path} (${label})`);
   }
   console.log();
