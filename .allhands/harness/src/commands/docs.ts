@@ -23,6 +23,7 @@ import {
   batchGetBlobHashes,
   findMarkdownFiles,
   REF_PATTERN,
+  UNFINALIZED_REF_PATTERN,
   validateDocsAsync,
 } from "../lib/docs-validation.js";
 import { getProjectRoot } from "../lib/git.js";
@@ -178,13 +179,9 @@ async function tree(pathArg: string, maxDepth: number): Promise<CommandResult> {
 }
 
 /**
- * Placeholder ref pattern - matches [ref:file:symbol] without hash.
- * Supports balanced brackets in file paths for Next.js dynamic routes (e.g. [trpc]).
- */
-const PLACEHOLDER_REF_PATTERN = /\[ref:((?:[^:\[\]]|\[[^\]]*\])+)(?::((?:[^\[\]]|\[[^\]]*\])*))?\]/g;
-
-/**
  * Finalize a single documentation file by replacing placeholder refs with full refs.
+ * Uses UNFINALIZED_REF_PATTERN from docs-validation to match [ref:file:symbol] or
+ * [ref:file] placeholders, including paths with balanced brackets (e.g. [trpc]).
  */
 function finalizeSingleFile(
   absolutePath: string,
@@ -197,7 +194,7 @@ function finalizeSingleFile(
   // Find all placeholder refs (symbol may be undefined for file-only refs)
   const placeholders: Array<{ match: string; file: string; symbol: string | undefined }> = [];
   let match;
-  const pattern = new RegExp(PLACEHOLDER_REF_PATTERN.source, "g");
+  const pattern = new RegExp(UNFINALIZED_REF_PATTERN.source, "g");
   while ((match = pattern.exec(content)) !== null) {
     // Skip if it already looks like a full ref (has 3 colons indicating hash)
     if (match[0].split(":").length > 3) continue;
@@ -410,7 +407,7 @@ async function finalize(docsPath: string, options?: { refresh?: boolean }): Prom
   const allPlaceholders: Array<{ file: string; docPath: string }> = [];
   for (const docFile of filesToProcess) {
     const content = readFileSync(docFile, "utf-8");
-    const pattern = new RegExp(PLACEHOLDER_REF_PATTERN.source, "g");
+    const pattern = new RegExp(UNFINALIZED_REF_PATTERN.source, "g");
     let match;
     while ((match = pattern.exec(content)) !== null) {
       if (match[0].split(":").length > 3) continue;
