@@ -10,8 +10,8 @@ import { Command } from "commander";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import { dirname, join, basename } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
-import { AgentRunner, withDebugInfo } from "../lib/opencode/index.js";
+import { execFileSync } from "child_process";
+import { AgentRunner, withDebugInfo, type ReposearchOutput } from "../lib/opencode/index.js";
 import { BaseCommand, type CommandResult } from "../lib/base-command.js";
 import { loadProjectSettings } from "../hooks/shared.js";
 
@@ -135,22 +135,6 @@ Respond with JSON matching the required schema.`;
   }
 }
 
-// Reposearch output types
-interface RepoCodeReference {
-  repo: string;        // "current" or the GitHub URL
-  file: string;        // relative path within the repo
-  line_start: number;
-  line_end: number;
-  code: string;
-  context: string;
-}
-
-interface ReposearchOutput {
-  analysis: string;              // markdown research findings
-  code_references: RepoCodeReference[];
-  repos_analyzed: string[];
-}
-
 /**
  * Derive a directory name from a GitHub URL.
  * e.g. "https://github.com/org/repo" -> "org--repo"
@@ -178,7 +162,7 @@ function cloneOrPullRepo(reposearchDir: string, repoUrl: string): string | null 
   try {
     if (existsSync(join(repoDir, ".git"))) {
       // Repo already cloned — pull latest
-      execSync("git pull --ff-only", {
+      execFileSync("git", ["pull", "--ff-only"], {
         cwd: repoDir,
         stdio: "pipe",
         timeout: 60000,
@@ -186,7 +170,7 @@ function cloneOrPullRepo(reposearchDir: string, repoUrl: string): string | null 
     } else {
       // Fresh clone (shallow)
       mkdirSync(reposearchDir, { recursive: true });
-      execSync(`git clone --depth 1 ${repoUrl} ${repoDir}`, {
+      execFileSync("git", ["clone", "--depth", "1", repoUrl, repoDir], {
         stdio: "pipe",
         timeout: 120000,
       });
