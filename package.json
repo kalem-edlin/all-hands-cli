@@ -1,6 +1,6 @@
 {
   "name": "all-hands-cli",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Agentic harness for model-first software development",
   "type": "module",
   "bin": {
