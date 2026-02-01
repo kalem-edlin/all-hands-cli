@@ -402,24 +402,17 @@ export function register(program: Command): void {
 
       const displayIds = new Set(displaySpecs.map((s) => s.id));
 
-      // Build parent→children edges (only within display set)
-      // Edge: dependency (parent) → dependent (child)
+      // Build parent→children edges and find roots in one pass
       const childrenOf = new Map<string, string[]>();
-      for (const spec of displaySpecs) {
-        // Filter deps: remove self-deps and deps outside display set
-        const visibleDeps = spec.dependencies.filter((depId) => depId !== spec.id && displayIds.has(depId));
-        for (const depId of visibleDeps) {
-          if (!childrenOf.has(depId)) childrenOf.set(depId, []);
-          childrenOf.get(depId)!.push(spec.id);
-        }
-      }
-
-      // Find roots: specs whose dependencies are all outside the display set
       const roots: string[] = [];
       for (const spec of displaySpecs) {
         const visibleDeps = spec.dependencies.filter((depId) => depId !== spec.id && displayIds.has(depId));
         if (visibleDeps.length === 0) {
           roots.push(spec.id);
+        }
+        for (const depId of visibleDeps) {
+          if (!childrenOf.has(depId)) childrenOf.set(depId, []);
+          childrenOf.get(depId)!.push(spec.id);
         }
       }
 
@@ -477,9 +470,10 @@ export function register(program: Command): void {
           path.add(id);
           const children = (childrenOf.get(id) || []).slice().sort();
           for (const childId of children) {
-            const child = buildJsonTree(childId, new Set(path));
+            const child = buildJsonTree(childId, path);
             if (child) node.children.push(child);
           }
+          path.delete(id);
           return node;
         }
 
@@ -527,13 +521,12 @@ export function register(program: Command): void {
         const children = (childrenOf.get(id) || []).slice().sort();
         if (children.length === 0) return;
 
-        const newPathSet = new Set(pathSet);
-        newPathSet.add(id);
-
+        pathSet.add(id);
         const childPrefix = isRoot ? prefix : prefix + (isLast ? '    ' : '│   ');
         for (let i = 0; i < children.length; i++) {
-          renderNode(children[i], childPrefix, i === children.length - 1, false, newPathSet);
+          renderNode(children[i], childPrefix, i === children.length - 1, false, pathSet);
         }
+        pathSet.delete(id);
       }
 
       for (const rootId of roots) {
