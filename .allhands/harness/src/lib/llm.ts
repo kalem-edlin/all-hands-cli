@@ -48,7 +48,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   gemini: {
     name: 'gemini',
     apiKeyEnvVar: 'GEMINI_API_KEY',
-    defaultModel: 'gemini-3-pro-preview',
+    defaultModel: 'gemini-3-flash-preview',
   },
   openai: {
     name: 'openai',

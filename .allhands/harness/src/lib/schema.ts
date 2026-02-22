@@ -5,17 +5,17 @@
  * Schemas are the single source of truth for file structure requirements.
  */
 
-import { readFileSync, existsSync, readdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { parse as parseYaml } from 'yaml';
-import { minimatch } from 'minimatch';
+import { existsSync, readdirSync, readFileSync } from "fs";
+import { basename, dirname, join } from "path";
+import { fileURLToPath } from "url";
+import { minimatch } from "minimatch";
+import { parse as parseYaml } from "yaml";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export interface SchemaField {
-  type: 'string' | 'integer' | 'boolean' | 'date' | 'enum' | 'array' | 'object';
+  type: "string" | "integer" | "boolean" | "date" | "enum" | "array" | "object";
   required?: boolean;
   default?: unknown;
   description?: string;
@@ -58,7 +58,7 @@ const schemaCache = new Map<string, Schema>();
  * Path: harness/src/lib/ -> harness/src/ -> harness/ -> .allhands/ -> schemas/
  */
 function getSchemaDir(): string {
-  return join(__dirname, '..', '..', '..', 'schemas');
+  return join(__dirname, "..", "..", "..", "schemas");
 }
 
 /**
@@ -75,7 +75,7 @@ export function loadSchema(type: string): Schema | null {
   }
 
   try {
-    const content = readFileSync(schemaPath, 'utf-8');
+    const content = readFileSync(schemaPath, "utf-8");
     const schema = parseYaml(content) as Schema;
     schemaCache.set(type, schema);
     return schema;
@@ -94,8 +94,8 @@ export function listSchemas(): string[] {
   }
 
   return readdirSync(schemaDir)
-    .filter((f) => f.endsWith('.yaml'))
-    .map((f) => f.replace('.yaml', ''));
+    .filter((f) => f.endsWith(".yaml"))
+    .map((f) => f.replace(".yaml", ""));
 }
 
 /**
@@ -104,7 +104,7 @@ export function listSchemas(): string[] {
 function validateField(
   value: unknown,
   field: SchemaField,
-  fieldName: string
+  fieldName: string,
 ): ValidationError | null {
   // Check required
   if (field.required && (value === undefined || value === null)) {
@@ -112,7 +112,7 @@ function validateField(
       field: fieldName,
       message: `Required field is missing`,
       expected: field.type,
-      received: 'undefined',
+      received: "undefined",
     };
   }
 
@@ -123,75 +123,78 @@ function validateField(
 
   // Type validation
   switch (field.type) {
-    case 'string':
-      if (typeof value !== 'string') {
+    case "string":
+      if (typeof value !== "string") {
         return {
           field: fieldName,
           message: `Expected string`,
-          expected: 'string',
+          expected: "string",
           received: typeof value,
         };
       }
       break;
 
-    case 'integer':
-      if (typeof value !== 'number' || !Number.isInteger(value)) {
+    case "integer":
+      if (typeof value !== "number" || !Number.isInteger(value)) {
         return {
           field: fieldName,
           message: `Expected integer`,
-          expected: 'integer',
+          expected: "integer",
           received: typeof value,
         };
       }
       break;
 
-    case 'boolean':
-      if (typeof value !== 'boolean') {
+    case "boolean":
+      if (typeof value !== "boolean") {
         return {
           field: fieldName,
           message: `Expected boolean`,
-          expected: 'boolean',
+          expected: "boolean",
           received: typeof value,
         };
       }
       break;
 
-    case 'date':
-      if (typeof value !== 'string' || isNaN(Date.parse(value))) {
+    case "date":
+      if (typeof value !== "string" || isNaN(Date.parse(value))) {
         return {
           field: fieldName,
           message: `Expected ISO 8601 date string`,
-          expected: 'date (ISO 8601)',
+          expected: "date (ISO 8601)",
           received: String(value),
         };
       }
       break;
 
-    case 'enum':
+    case "enum":
       if (!field.values?.includes(String(value))) {
         return {
           field: fieldName,
-          message: `Value must be one of: ${field.values?.join(', ')}`,
-          expected: field.values?.join(' | '),
+          message: `Value must be one of: ${field.values?.join(", ")}`,
+          expected: field.values?.join(" | "),
           received: String(value),
         };
       }
       break;
 
-    case 'array':
+    case "array":
       if (!Array.isArray(value)) {
         return {
           field: fieldName,
           message: `Expected array`,
-          expected: 'array',
+          expected: "array",
           received: typeof value,
         };
       }
       if (field.items) {
         const itemType = field.items;
-        const invalidItems = itemType === 'integer'
-          ? value.some(item => typeof item !== 'number' || !Number.isInteger(item))
-          : value.some(item => typeof item !== itemType);
+        const invalidItems =
+          itemType === "integer"
+            ? value.some(
+                (item) => typeof item !== "number" || !Number.isInteger(item),
+              )
+            : value.some((item) => typeof item !== itemType);
         if (invalidItems) {
           return {
             field: fieldName,
@@ -203,12 +206,12 @@ function validateField(
       }
       break;
 
-    case 'object':
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    case "object":
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
         return {
           field: fieldName,
           message: `Expected object`,
-          expected: 'object',
+          expected: "object",
           received: typeof value,
         };
       }
@@ -216,7 +219,11 @@ function validateField(
       if (field.properties) {
         for (const [propName, propSchema] of Object.entries(field.properties)) {
           const propValue = (value as Record<string, unknown>)[propName];
-          const error = validateField(propValue, propSchema, `${fieldName}.${propName}`);
+          const error = validateField(
+            propValue,
+            propSchema,
+            `${fieldName}.${propName}`,
+          );
           if (error) {
             return error;
           }
@@ -233,7 +240,7 @@ function validateField(
  */
 export function validateFrontmatter(
   frontmatter: Record<string, unknown>,
-  schema: Schema
+  schema: Schema,
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const fields = schema.frontmatter || schema.fields || {};
@@ -278,13 +285,15 @@ export function extractFrontmatter(content: string): {
  */
 export function validateFile(
   content: string,
-  schemaType: string
+  schemaType: string,
 ): ValidationResult {
   const schema = loadSchema(schemaType);
   if (!schema) {
     return {
       valid: false,
-      errors: [{ field: '_schema', message: `Unknown schema type: ${schemaType}` }],
+      errors: [
+        { field: "_schema", message: `Unknown schema type: ${schemaType}` },
+      ],
     };
   }
 
@@ -292,7 +301,9 @@ export function validateFile(
   if (!frontmatter) {
     return {
       valid: false,
-      errors: [{ field: '_frontmatter', message: 'Missing or invalid frontmatter' }],
+      errors: [
+        { field: "_frontmatter", message: "Missing or invalid frontmatter" },
+      ],
     };
   }
 
@@ -304,7 +315,7 @@ export function validateFile(
  */
 export function applyDefaults(
   frontmatter: Record<string, unknown>,
-  schema: Schema
+  schema: Schema,
 ): Record<string, unknown> {
   const result = { ...frontmatter };
   const fields = schema.frontmatter || schema.fields || {};
@@ -323,7 +334,7 @@ export function applyDefaults(
  */
 export function formatErrors(result: ValidationResult): string {
   if (result.valid) {
-    return 'Validation passed';
+    return "Validation passed";
   }
 
   return result.errors
@@ -333,14 +344,21 @@ export function formatErrors(result: ValidationResult): string {
       if (e.received) msg += ` (got: ${e.received})`;
       return msg;
     })
-    .join('\n');
+    .join("\n");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schema Type Detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type SchemaType = 'prompt' | 'alignment' | 'spec' | 'documentation' | 'solution' | 'validation-suite' | 'skill' | 'workflow';
+export type SchemaType =
+  | "prompt"
+  | "alignment"
+  | "spec"
+  | "documentation"
+  | "solution"
+  | "skill"
+  | "workflow";
 
 interface SchemaPattern {
   pattern: string;
@@ -348,15 +366,14 @@ interface SchemaPattern {
 }
 
 const SCHEMA_PATTERNS: SchemaPattern[] = [
-  { pattern: '.planning/**/prompts/*.md', schemaType: 'prompt' },
-  { pattern: '.planning/**/alignment.md', schemaType: 'alignment' },
-  { pattern: 'specs/**/*.spec.md', schemaType: 'spec' },
-  { pattern: 'specs/roadmap/**/*.spec.md', schemaType: 'spec' },
-  { pattern: 'docs/solutions/**/*.md', schemaType: 'solution' },
-  { pattern: 'docs/**/*.md', schemaType: 'documentation' },
-  { pattern: '.allhands/validation/*.md', schemaType: 'validation-suite' },
-  { pattern: '.allhands/skills/*/SKILL.md', schemaType: 'skill' },
-  { pattern: '.allhands/workflows/*.md', schemaType: 'workflow' },
+  { pattern: ".planning/**/prompts/*.md", schemaType: "prompt" },
+  { pattern: ".planning/**/alignment.md", schemaType: "alignment" },
+  { pattern: "specs/**/*.spec.md", schemaType: "spec" },
+  { pattern: "specs/roadmap/**/*.spec.md", schemaType: "spec" },
+  { pattern: "docs/solutions/**/*.md", schemaType: "solution" },
+  { pattern: "docs/**/*.md", schemaType: "documentation" },
+  { pattern: ".allhands/skills/*/SKILL.md", schemaType: "skill" },
+  { pattern: ".allhands/workflows/*.md", schemaType: "workflow" },
 ];
 
 /**
@@ -367,7 +384,10 @@ const SCHEMA_PATTERNS: SchemaPattern[] = [
  * @param projectDir - Optional project root directory for relative path calculation
  * @returns The detected schema type, or null if no schema applies
  */
-export function detectSchemaType(filePath: string, projectDir?: string): SchemaType | null {
+export function detectSchemaType(
+  filePath: string,
+  projectDir?: string,
+): SchemaType | null {
   // Make path relative to project
   let relativePath = filePath;
   if (projectDir && filePath.startsWith(projectDir)) {
@@ -376,6 +396,11 @@ export function detectSchemaType(filePath: string, projectDir?: string): SchemaT
 
   for (const { pattern, schemaType } of SCHEMA_PATTERNS) {
     if (minimatch(relativePath, pattern)) {
+      // README.md and memories.md in docs/ are not schema-managed
+      if (schemaType === "documentation") {
+        const name = basename(relativePath);
+        if (name === "README.md" || name === "memories.md") return null;
+      }
       return schemaType;
     }
   }
@@ -390,29 +415,31 @@ export function detectSchemaType(filePath: string, projectDir?: string): SchemaT
  * @returns The inferred schema type, or null if unknown
  */
 export function inferSchemaType(file: string): SchemaType | null {
-  if (file.includes('/prompts/') || file.match(/prompt.*\.md$/i)) {
-    return 'prompt';
+  if (file.includes("/prompts/") || file.match(/prompt.*\.md$/i)) {
+    return "prompt";
   }
-  if (file.includes('alignment') || file.match(/alignment\.md$/i)) {
-    return 'alignment';
+  if (file.includes("alignment") || file.match(/alignment\.md$/i)) {
+    return "alignment";
   }
-  if (file.includes('/specs/') || file.endsWith('.spec.md')) {
-    return 'spec';
+  if (file.includes("/specs/") || file.endsWith(".spec.md")) {
+    return "spec";
   }
-  if (file.includes('/docs/solutions/') && file.endsWith('.md')) {
-    return 'solution';
+  if (file.includes("/docs/solutions/") && file.endsWith(".md")) {
+    return "solution";
   }
-  if (file.includes('/docs/') && file.endsWith('.md')) {
-    return 'documentation';
+  if (
+    file.includes("/docs/") &&
+    file.endsWith(".md") &&
+    basename(file) !== "README.md" &&
+    basename(file) !== "memories.md"
+  ) {
+    return "documentation";
   }
-  if (file.includes('/validation/') && file.endsWith('.md')) {
-    return 'validation-suite';
+  if (file.includes("/skills/") && file.endsWith("SKILL.md")) {
+    return "skill";
   }
-  if (file.includes('/skills/') && file.endsWith('SKILL.md')) {
-    return 'skill';
-  }
-  if (file.includes('/workflows/') && file.endsWith('.md')) {
-    return 'workflow';
+  if (file.includes("/workflows/") && file.endsWith(".md")) {
+    return "workflow";
   }
   return null;
 }

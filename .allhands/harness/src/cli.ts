@@ -14,6 +14,8 @@ import { launchTUI } from './commands/tui.js';
 async function main(): Promise<void> {
   const program = new Command();
 
+  let tuiLaunched = false;
+
   program
     .name('ah')
     .description('All Hands - Agentic harness for model-first software development')
@@ -21,6 +23,7 @@ async function main(): Promise<void> {
     .option('-s, --use-spec <spec>', 'Spec to use for TUI (defaults to active)')
     .action(async (options: { useSpec?: string }) => {
       // Default action when no subcommand - launch TUI
+      tuiLaunched = true;
       await launchTUI({ spec: options.useSpec });
     });
 
@@ -30,8 +33,11 @@ async function main(): Promise<void> {
   await program.parseAsync();
 
   // CLI subcommands may leave open handles (e.g. OpenCode SDK server sockets).
-  // TUI manages its own process.exit(), so this only affects subcommand runs.
-  process.exit(0);
+  // TUI manages its own process.exit() via the quit action, so skip here to
+  // keep the blessed event loop alive.
+  if (!tuiLaunched) {
+    process.exit(0);
+  }
 }
 
 main().catch((e) => {

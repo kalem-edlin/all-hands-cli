@@ -57,13 +57,14 @@ export interface TUIOptions {
   onAction: (action: string, data?: Record<string, unknown>) => void;
   onExit: () => void;
   onSpawnExecutor?: (prompt: PromptFile, branch: string, specId: string) => void;
-  onSpawnEmergentPlanning?: (branch: string, specId: string) => void;
+  onSpawnEmergentPlanning?: (branch: string, specId: string, emergentEnabled: boolean) => void;
   cwd?: string;
 }
 
 export interface TUIState {
   loopEnabled: boolean;
   parallelEnabled: boolean;
+  emergentEnabled: boolean;
   prompts: PromptItem[];
   activeAgents: AgentInfo[];
   spec?: string;
@@ -116,6 +117,7 @@ export class TUI {
     this.state = {
       loopEnabled: false,
       parallelEnabled: false,
+      emergentEnabled: true,
       prompts: [],
       activeAgents: [],
       prActionState: 'create-pr',
@@ -279,11 +281,11 @@ export class TUI {
             this.options.onSpawnExecutor(prompt, this.state.branch, specId);
           }
         },
-        onSpawnEmergentPlanning: () => {
+        onSpawnEmergentPlanning: (emergentEnabled: boolean) => {
           this.log('Loop: Spawning emergent planner');
           if (this.state.branch && this.options.onSpawnEmergentPlanning) {
             const specId = this.state.spec || sanitizeBranchForDir(this.state.branch);
-            this.options.onSpawnEmergentPlanning(this.state.branch, specId);
+            this.options.onSpawnEmergentPlanning(this.state.branch, specId, emergentEnabled);
           }
         },
         onLoopStatus: (message) => {
@@ -545,6 +547,7 @@ export class TUI {
     return {
       loopEnabled: this.state.loopEnabled,
       parallelEnabled: this.state.parallelEnabled,
+      emergentEnabled: this.state.emergentEnabled,
       prActionState: this.state.prActionState,
     };
   }
@@ -564,9 +567,11 @@ export class TUI {
       { id: 'switch-spec', label: 'Switch Workspace', key: '0', type: 'action' },
       { id: 'custom-flow', label: 'Custom Flow', key: '-', type: 'action' },
       { id: 'initiative-steering', label: 'Steer Initiative', key: '=', type: 'action' },
+      { id: 'quick-loop', label: 'Quick Loop', key: '`', type: 'action' },
       { id: 'separator-toggles', label: '─ Toggles ─', type: 'separator' },
       { id: 'toggle-loop', label: 'Loop', key: 'O', type: 'toggle', checked: this.state.loopEnabled },
       { id: 'toggle-parallel', label: 'Parallel', key: 'P', type: 'toggle', checked: this.state.parallelEnabled },
+      { id: 'toggle-emergent', label: 'Emergent', key: 'E', type: 'toggle', checked: this.state.emergentEnabled },
       { id: 'separator-controls', label: '─ Controls ─', type: 'separator' },
       { id: 'view-logs', label: 'View Logs', key: 'V', type: 'action' },
       { id: 'clear-logs', label: 'Clear Logs', key: 'C', type: 'action' },
@@ -672,6 +677,16 @@ export class TUI {
     this.screen.key(['p'], () => {
       if (!this.activeModal) {
         this.handleAction('toggle-parallel');
+      }
+    });
+    this.screen.key(['e'], () => {
+      if (!this.activeModal) {
+        this.handleAction('toggle-emergent');
+      }
+    });
+    this.screen.key(['`'], () => {
+      if (!this.activeModal) {
+        this.handleAction('quick-loop');
       }
     });
 
@@ -893,6 +908,15 @@ export class TUI {
           }
         }
         this.options.onAction('toggle-parallel', { enabled: this.state.parallelEnabled });
+        this.render();
+        break;
+      case 'toggle-emergent':
+        this.state.emergentEnabled = !this.state.emergentEnabled;
+        this.buildActionItems();
+        if (this.eventLoop) {
+          this.eventLoop.setEmergentEnabled(this.state.emergentEnabled);
+        }
+        this.options.onAction('toggle-emergent', { enabled: this.state.emergentEnabled });
         this.render();
         break;
       case 'view-logs':
@@ -1360,6 +1384,9 @@ export class TUI {
     // Sync toggle states to event loop if they were updated
     if ('parallelEnabled' in updates && this.eventLoop) {
       this.eventLoop.setParallelEnabled(this.state.parallelEnabled);
+    }
+    if ('emergentEnabled' in updates && this.eventLoop) {
+      this.eventLoop.setEmergentEnabled(this.state.emergentEnabled);
     }
 
     this.buildActionItems();

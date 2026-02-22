@@ -49,12 +49,17 @@ export interface ExtractSymbol {
   decorators?: string[];
 }
 
+export interface ExtractClassSymbol extends ExtractSymbol {
+  bases?: string[];
+  methods?: ExtractSymbol[];
+}
+
 export interface ExtractResult {
   file_path: string;
   language: string;
   docstring?: string;
   imports: Array<{ module: string; names: string[]; is_from: boolean }>;
-  classes: ExtractSymbol[];
+  classes: ExtractClassSymbol[];
   functions: ExtractSymbol[];
   call_graph?: {
     calls: Record<string, string[]>;

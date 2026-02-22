@@ -119,6 +119,7 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
   const initialState: Partial<TUIState> = {
     loopEnabled: false, // Always start disabled, regardless of saved status
     parallelEnabled: status?.loop?.parallel ?? false,
+    emergentEnabled: true, // Always starts enabled (not persisted, like loopEnabled)
     prompts: promptItems,
     activeAgents,
     spec: currentSpec?.id,
@@ -146,8 +147,8 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
     onSpawnExecutor: (prompt, executorBranch, specId) => {
       spawnExecutorForPrompt(tui, prompt, executorBranch, specId);
     },
-    onSpawnEmergentPlanning: (emergentBranch, specId) => {
-      spawnEmergentPlanningAgent(tui, emergentBranch, specId);
+    onSpawnEmergentPlanning: (emergentBranch, specId, emergentEnabled) => {
+      spawnEmergentPlanningAgent(tui, emergentBranch, specId, emergentEnabled);
     },
     cwd: process.cwd(),
   });
@@ -157,6 +158,8 @@ export async function launchTUI(options: { spec?: string } = {}): Promise<void> 
   tui.log(`Branch: ${branch}`);
   if (currentSpec) {
     tui.log(`Spec: ${currentSpec.id} (${status?.stage || 'no planning'})`);
+  } else if (status) {
+    tui.log(`Quick Loop (${status.stage || 'no planning'})`);
   } else {
     tui.log('No spec for this branch. Use Switch Spec to select one.');
   }
@@ -198,10 +201,10 @@ async function spawnAgentsForAction(
     return false; // No profiles for this action
   }
 
-  // Check if any profile requires spec
+  // Check if any profile requires spec (or active planning context)
   const requiresSpec = profiles.some((p) => p.tuiRequiresSpec);
-  if (requiresSpec && !currentSpec) {
-    tui.log('Error: No spec for this branch. Checkout a spec branch first.');
+  if (requiresSpec && !currentSpec && !status) {
+    tui.log('Error: No active plan for this branch. Set up a spec or quick loop first.');
     return true; // Handled, but with error
   }
 
@@ -314,6 +317,13 @@ async function handleAction(
     }
   }
 
+  if (action === 'quick-loop') {
+    contextOverrides = {
+      WORKFLOW_DOMAIN_PATH: join(cwd, '.allhands', 'workflows', 'quick-loop.md'),
+      BRANCH: branch,
+    };
+  }
+
   // Pre-spawn gate: sync with origin/main before compounding
   if (action === 'compound') {
     const syncResult = syncWithOriginMain(cwd);
@@ -345,8 +355,8 @@ async function handleAction(
   // Handle non-agent actions
   switch (action) {
     case 'create-pr': {
-      if (!currentSpec || !planningKey) {
-        tui.log('Error: No spec for this branch. Checkout a spec branch first.');
+      if (!planningKey || (!currentSpec && !status)) {
+        tui.log('Error: No active plan for this branch. Set up a spec or quick loop first.');
         return;
       }
 
@@ -379,7 +389,7 @@ async function handleAction(
           tui.log(`Error: ${result.body}`);
           tui.log('You may need to push your branch first or check gh auth status.');
           logTuiError('create-pr', result.body || 'PR creation failed', {
-            spec: currentSpec.id,
+            spec: currentSpec?.id,
             branch,
           }, cwd);
         }
@@ -776,6 +786,13 @@ async function handleAction(
       break;
     }
 
+    case 'toggle-emergent': {
+      const enabled = data?.enabled as boolean;
+      // Not persisted — always starts enabled on restart (matches loop toggle pattern)
+      tui.log(`Emergent: ${enabled ? 'Enabled' : 'Disabled'}`);
+      break;
+    }
+
     case 'select-prompt': {
       const prompt = data?.prompt as { number: number; title: string } | undefined;
       if (prompt) {
@@ -918,7 +935,7 @@ function spawnExecutorForPrompt(tui: TUI, prompt: PromptFile, branch: string, sp
   }
 }
 
-function spawnEmergentPlanningAgent(tui: TUI, branch: string, specId: string): void {
+function spawnEmergentPlanningAgent(tui: TUI, branch: string, specId: string, emergentEnabled: boolean): void {
   const cwd = process.cwd();
   const planningKey = sanitizeBranchForDir(branch);
 
@@ -935,6 +952,7 @@ function spawnEmergentPlanningAgent(tui: TUI, branch: string, specId: string): v
       undefined,
       cwd
     );
+    context.EMERGENT_TOGGLE = emergentEnabled ? 'on' : 'off';
 
     const result = spawnAgentFromProfile(
       {

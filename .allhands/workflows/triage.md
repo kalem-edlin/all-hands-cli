@@ -23,7 +23,7 @@ Triage specs are driven by external signals that demand attention. Signal types 
 | **Support tickets** | User complaints, feature requests, confusion patterns |
 | **Alerts** | Monitoring alerts, SLA breaches, resource exhaustion warnings |
 
-> **Note**: Full external source integration (PostHog, Sentry, PagerDuty) is deferred. This domain uses manually provided signal data.
+> **Integrated sources**: Sentry (error tracking) and PostHog (product analytics) are available via MCP tools. PagerDuty integration is deferred. Use `ah tools sentry` and `ah tools posthog` to query production data directly.
 
 ### Impact/Urgency Framework
 
@@ -61,13 +61,46 @@ Per **Context is Precious**, triage needs external data to ground decisions in r
 Spec body sections for triage domain:
 - **Motivation**: External signals and their impact
 - **Goals**: Desired triage outcome
-- **Technical Considerations**: Manually provided signal data
+- **Technical Considerations**: Signal data from Sentry/PostHog MCP tools and engineer-provided context
 
 ## Planning Considerations
 
+### MCP Tool Reference
+
+Triage prompts should use these MCP tools to gather production data before diagnosis:
+
+#### Error Visibility (Sentry)
+
+| Question Pattern | Tool | Example |
+|-----------------|------|---------|
+| What errors are happening? | `ah tools sentry:search_issues "crash on launch"` | Common errors, error rate spikes |
+| What's the root cause? | `ah tools sentry:get_issue_details <issue_id>` | Stack traces, tags, frequency |
+| What's fixable right now? | `ah tools sentry:analyze_issue_with_seer <issue_id>` | AI root cause analysis, fix suggestions |
+| Did a deploy break something? | `ah tools sentry:find_releases` | Release-correlated error spikes |
+| Who is affected? | `ah tools sentry:get_issue_tag_values <issue_id> <tag>` | Device, OS, browser distribution |
+
+#### Product Analytics (PostHog)
+
+| Question Pattern | Tool | Example |
+|-----------------|------|---------|
+| How is a flow performing? | `ah tools posthog:query-run` | Funnel conversion, trend queries |
+| Complex analytics question | `ah tools posthog:query-generate-hogql-from-question` | Natural language to HogQL SQL |
+| What events exist? | `ah tools posthog:event-definitions-list` | Discover trackable events first |
+| What are users saying? | `ah tools posthog:surveys-global-stats` | Aggregated survey/feedback responses |
+| Specific survey feedback | `ah tools posthog:survey-stats <survey_id>` | Per-survey response data |
+| Existing analytics | `ah tools posthog:insights-get-all` | Pre-built dashboards and insights |
+| PostHog error tracking | `ah tools posthog:list-errors` | Errors tracked via PostHog |
+
+#### Recommended Workflow
+
+1. **Discover context**: `ah tools sentry:find_organizations` / `ah tools posthog:projects-get` to identify org/project
+2. **Gather signals**: Run relevant query tools above based on the engineer's question
+3. **Correlate**: Cross-reference Sentry errors with PostHog analytics to understand user impact
+4. **Diagnose**: Use `analyze_issue_with_seer` for AI-assisted root cause on specific issues
+
 ### External Signal Integration (Deferred)
 
-Full integration with external signal sources (PostHog, Sentry, PagerDuty) is deferred to a future spec. Current planning relies on engineer-provided signal data.
+PagerDuty integration is deferred to a future spec. Sentry and PostHog are now available via MCP tools (see above).
 
 ### Urgency-Driven Prioritization
 

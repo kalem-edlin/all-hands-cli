@@ -11,6 +11,7 @@ message_template: |
   Prompts folder: ${PROMPTS_FOLDER}
   Workflow domain config: ${WORKFLOW_DOMAIN_PATH}
   Branch: ${BRANCH}
+  Emergent toggle: ${EMERGENT_TOGGLE}
 
   Available hypothesis domains for this workflow:
   ${HYPOTHESIS_DOMAINS}
@@ -20,3 +21,4 @@ template_vars:
   - WORKFLOW_DOMAIN_PATH
   - HYPOTHESIS_DOMAINS
   - BRANCH
+  - EMERGENT_TOGGLE

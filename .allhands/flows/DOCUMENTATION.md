@@ -200,7 +200,7 @@ Per **Knowledge Compounding**, write README.md files that expose cross-domain re
 
 README.md files MUST use plain backtick relative paths (e.g., `docs/harness/README.md`) instead of `[ref:...]` references when linking to other docs. Per **Knowledge Compounding**, the knowledge index would recursively include referenced docs inside READMEs, inflating search results with duplicate content.
 
-All README.md files MUST have frontmatter with `description` (per `ah schema documentation`) for semantic indexing.
+README.md files MUST NOT have frontmatter — they are excluded from frontmatter validation. Start directly with the heading or content.
 
 #### Finalize and Validate
 

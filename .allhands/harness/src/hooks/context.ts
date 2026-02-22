@@ -815,7 +815,8 @@ function tldrReadEnforcer(input: HookInput): void {
 
   // Get TLDR extract for the file
   const extract = extractDaemon(filePath, projectDir);
-  if (!extract || extract.functions.length === 0) {
+  const hasSymbols = extract && (extract.functions.length > 0 || (extract.classes || []).length > 0);
+  if (!hasSymbols) {
     return allowTool(HOOK_READ_ENFORCER);
   }
 
@@ -841,18 +842,28 @@ function tldrReadEnforcer(input: HookInput): void {
     parts.push('');
   }
 
-  // Classes (from separate array)
+  // Classes with methods
   const classes = extract!.classes || [];
   if (classes.length > 0) {
     parts.push('### Classes');
     for (const cls of classes) {
       const doc = cls.docstring ? ` - ${cls.docstring.slice(0, 60)}...` : '';
       parts.push(`- **${cls.name}** (line ${cls.line_number})${doc}`);
+      if (cls.methods && cls.methods.length > 0) {
+        for (const m of cls.methods.slice(0, 25)) {
+          const sig = m.signature ? ` ${m.signature}` : '';
+          const mDoc = m.docstring ? ` - ${m.docstring.split('\n')[0].trim().slice(0, 60)}` : '';
+          parts.push(`  - \`.${m.name}\` (line ${m.line_number})${sig}${mDoc}`);
+        }
+        if (cls.methods.length > 25) {
+          parts.push(`  - ... and ${cls.methods.length - 25} more methods`);
+        }
+      }
     }
     parts.push('');
   }
 
-  // Functions
+  // Top-level functions (not class methods)
   const functions = extract!.functions;
   if (functions.length > 0) {
     parts.push('### Functions');

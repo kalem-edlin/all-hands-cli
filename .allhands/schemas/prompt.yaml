@@ -15,9 +15,9 @@ frontmatter:
   type:
     type: enum
     required: true
-    values: [planned, emergent, user-patch, review-fix ]
+    values: [planned, emergent, user-patch, review-fix, ci-fix]
     default: planned
-    description: "Type of prompt (planned, emergent, user-patch, review-fix)"
+    description: "Type of prompt (planned, emergent, user-patch, review-fix, ci-fix)"
 
   status:
     type: enum
@@ -43,17 +43,12 @@ frontmatter:
     default: []
     description: "Git commit hashes for work done on this prompt (chronological order, includes failed attempts)"
 
-  validation_suites:
-    type: array
-    items: string
-    default: []
-    description: "Paths to validation suite files elected for this prompt (e.g., .allhands/validation/typescript-typecheck.md)"
-
   skills:
     type: array
     items: string
+    required: true
     default: []
-    description: "Paths to skill files for domain expertise (e.g., .allhands/skills/building-expo-ui/SKILL.md)"
+    description: "Paths to skill files for domain expertise (e.g., .allhands/skills/building-expo-ui/SKILL.md). Required — use empty array [] if no skills apply."
 
   patches_prompts:
     type: array
