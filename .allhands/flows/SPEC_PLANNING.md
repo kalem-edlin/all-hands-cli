@@ -19,7 +19,6 @@ Transform the spec into executable prompts with domain-appropriate planning dept
 - NEVER read jury review files (`.allhands/flows/shared/jury/*`) directly — subtasks load their own flows per **Context is Precious**
 - Focused planning domains MUST document unresolved questions in alignment doc for emergent planner consumption
 - Prompts MUST be fully autonomous — no human intervention during execution
-- Testing is NOT a prompt — validation happens via validation_suites attached to prompts
 </constraints>
 
 ## Context Gathering
@@ -51,10 +50,10 @@ Per **Knowledge Compounding**, detect existing planning artifacts and offer mode
 
 Per **Frontier Models are Capable**, the domain config's `planning_depth` determines the planning path — deduce appropriate behavior:
 
-| Planning Depth | Planning Path | Research | Interview | Jury | Output |
-|----------------|--------------|----------|-----------|------|--------|
-| `deep` (or fallback) | Deep Planning | 1-4 deep subtasks | Full decision interview | Gated by `jury_required` | 5-15 prompts + detailed alignment doc |
-| `focused` | Focused Planning | 1-2 focused subtasks | Open questions only (skippable) | No | 0-3 seed prompts + problem-focused alignment doc |
+| Planning Depth       | Planning Path    | Research             | Interview                       | Jury                     | Output                                           |
+| -------------------- | ---------------- | -------------------- | ------------------------------- | ------------------------ | ------------------------------------------------ |
+| `deep` (or fallback) | Deep Planning    | 1-4 deep subtasks    | Full decision interview         | Gated by `jury_required` | 5-15 prompts + detailed alignment doc            |
+| `focused`            | Focused Planning | 1-2 focused subtasks | Open questions only (skippable) | No                       | 0-3 seed prompts + problem-focused alignment doc |
 
 The domain config's **Planning Considerations** section drives domain-specific behavior within each path — surface its constraints, limitations, and edge cases during research and interview phases.
 
@@ -63,6 +62,7 @@ The domain config's **Planning Considerations** section drives domain-specific b
 ### Deep Research
 
 Spawn parallel subtasks to ground recommendations before the engineer interview:
+
 - 1-4 Tasks: Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` to understand relevant implementation approaches
 - 0-3 Tasks: Tell them to read `.allhands/flows/shared/RESEARCH_GUIDANCE.md` to isolate optimal solutions (if necessary)
 - Apply domain config's Planning Considerations to focus research scope and priorities
@@ -89,6 +89,7 @@ Keep interview concise and actionable.
 ### Disposable Variant Architecture
 
 When engineer selects multiple approaches:
+
 - Create variant prompts that can execute in parallel
 - Each variant hidden behind feature flag
 - Variants are cheap to implement and test
@@ -98,6 +99,7 @@ When engineer selects multiple approaches:
 ### External Technology Implementation Usage Research
 
 Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
+
 - Typically run after understanding the implementation approach and the external technology required
 - Can inform the engineer interview where beneficial
 - Consolidate approach against actual documentation
@@ -107,9 +109,6 @@ Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
 
 - Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt creation guidance
 - Transform researched approaches into executable prompts
-- Read `.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md` to discover and assign existing validation suites to prompts
-- For high-risk domains (auth, payments, data), note TDD approach requirement in prompt
-  - Reference `.allhands/flows/shared/TDD_WORKFLOW.md` for TDD execution guidance
 
 ### Deep Alignment Doc
 
@@ -125,13 +124,12 @@ Spawn subtasks to read `.allhands/flows/shared/EXTERNAL_TECH_GUIDANCE.md`:
 
 Before jury review (if applicable), self-verify plans achieve goals:
 
-| Dimension | Check |
-|-----------|-------|
-| Requirement Coverage | Every spec requirement has task(s)? |
-| Task Completeness | Every prompt has clear acceptance criteria? |
-| Key Links Planned | Components wire together (API → UI)? |
-| Scope Sanity | 2-3 tasks per prompt? <7 files per prompt? |
-| Validation Coverage | Prompts reference available validation suites where applicable? |
+| Dimension            | Check                                       |
+| -------------------- | ------------------------------------------- |
+| Requirement Coverage | Every spec requirement has task(s)?         |
+| Task Completeness    | Every prompt has clear acceptance criteria? |
+| Key Links Planned    | Components wire together (API → UI)?        |
+| Scope Sanity         | 2-3 tasks per prompt? <7 files per prompt?  |
 
 Fix issues before proceeding.
 
@@ -141,14 +139,15 @@ Fix issues before proceeding.
 
 Spawn parallel review subtasks (provide alignment doc, spec doc, prompts folder paths):
 
-| Jury Member | Flow | Focus |
-|-------------|------|-------|
-| Expectations Fit | `.allhands/flows/shared/jury/PROMPTS_EXPECTATIONS_FIT.md` | Alignment + prompts fit spec expectations |
-| Flow Analysis | `.allhands/flows/shared/jury/PROMPTS_FLOW_ANALYSIS.md` | Prompt dependencies, variant ordering, importance |
-| YAGNI | `.allhands/flows/shared/jury/PROMPTS_YAGNI.md` | Holistic over-engineering check |
-| Premortem | `.allhands/flows/shared/jury/PROMPT_PREMORTEM.md` | Risk analysis — Tigers, Elephants, failure modes |
+| Jury Member      | Flow                                                      | Focus                                             |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------------- |
+| Expectations Fit | `.allhands/flows/shared/jury/PROMPTS_EXPECTATIONS_FIT.md` | Alignment + prompts fit spec expectations         |
+| Flow Analysis    | `.allhands/flows/shared/jury/PROMPTS_FLOW_ANALYSIS.md`    | Prompt dependencies, variant ordering, importance |
+| YAGNI            | `.allhands/flows/shared/jury/PROMPTS_YAGNI.md`            | Holistic over-engineering check                   |
+| Premortem        | `.allhands/flows/shared/jury/PROMPT_PREMORTEM.md`         | Risk analysis — Tigers, Elephants, failure modes  |
 
 After jury returns:
+
 - Read `.allhands/flows/shared/REVIEW_OPTIONS_BREAKDOWN.md` for feedback synthesis
 - Premortem Tigers become P1/P2 review items; Elephants become discussion points
 - Present actionable options to engineer (including risk acceptance decisions)
@@ -165,6 +164,7 @@ Per **Knowledge Compounding**, offer to deepen the plan:
 Ask engineer: "Would you like to deepen this plan with comprehensive research?"
 
 If yes:
+
 - Read `.allhands/flows/shared/PLAN_DEEPENING.md` and follow instructions
 - Applies available skills to each plan section
 - Searches solutions for relevant past learnings
@@ -178,6 +178,7 @@ Recommended for complex architectural decisions, high-risk domains, novel techno
 ### Focused Research
 
 Spawn 1-2 targeted research subtasks grounded in the problem area:
+
 - Tell them to read `.allhands/flows/shared/CODEBASE_UNDERSTANDING.md` focused on the specific problem domain
 - Only spawn external research (`.allhands/flows/shared/RESEARCH_GUIDANCE.md`) if the spec references external tools or novel approaches
 - Apply domain config's Planning Considerations to focus research direction
@@ -185,6 +186,7 @@ Spawn 1-2 targeted research subtasks grounded in the problem area:
 ### Engineer Scope Narrowing
 
 Present spec open questions and concerns to the engineer using `AskUserQuestion`:
+
 - Each open question becomes a question — engineer can answer to narrow scope or skip
 - For each question, present what research revealed and your recommended resolution — the engineer should be responding to an informed proposal, not an open-ended prompt
 - Skipped/unanswered questions remain open for hypothesis-driven discovery
@@ -194,7 +196,6 @@ Present spec open questions and concerns to the engineer using `AskUserQuestion`
 
 - Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt creation guidance
 - Create 0-3 seed prompts as testable hypotheses grounded in research findings
-- Read `.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md` to discover and assign validation suites
 - Seed prompts target the most concrete, immediately actionable aspects of the spec
 - Remaining open questions are left for the emergent planner to design experiments around
 

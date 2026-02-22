@@ -44,6 +44,9 @@ export const TemplateVars = {
   HYPOTHESIS_DOMAINS: z
     .string()
     .describe('Comma-separated list of hypothesis domains from settings.json'),
+  EMERGENT_TOGGLE: z
+    .string()
+    .describe('Whether emergent toggle is enabled at spawn time (on/off)'),
 } as const;
 
 /**

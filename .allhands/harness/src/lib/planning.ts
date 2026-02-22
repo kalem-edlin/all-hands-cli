@@ -103,10 +103,11 @@ export interface StatusFile {
 }
 
 export interface AlignmentFrontmatter {
-  name: string;           // Spec name
-  spec: string;           // Path to spec file
+  name: string;           // Spec name or derived name (quick-loop)
+  spec?: string;          // Path to spec file (empty/absent for quick-loop)
   created: string;
   updated: string;
+  core_consolidation?: 'pending' | 'complete';
 }
 
 export interface DecisionEntry {

@@ -935,11 +935,19 @@ export function buildTemplateContext(
       const content = readFileSync(paths.status, 'utf-8');
       const specMatch = content.match(/^spec:\s*(.+)/m);
       if (specMatch) {
-        context.SPEC_PATH = specMatch[1].trim();
+        const rawSpec = specMatch[1].trim().replace(/^['"]|['"]$/g, '');
+        if (rawSpec) {
+          context.SPEC_PATH = rawSpec;
+        }
       }
     } catch {
       // Ignore parse errors
     }
+  }
+
+  // Fall back to alignment doc for specless plans (e.g., quick loop)
+  if (!context.SPEC_PATH) {
+    context.SPEC_PATH = context.ALIGNMENT_PATH;
   }
 
   // Resolve WORKFLOW_DOMAIN_PATH from spec's initial_workflow_domain frontmatter

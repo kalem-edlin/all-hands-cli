@@ -16,6 +16,7 @@ import { Command } from 'commander';
 import {
   initializeStatus,
   readStatus,
+  updateStatus,
   getPlanningPaths,
   planningDirExists,
   getCurrentBranch,
@@ -23,6 +24,7 @@ import {
   ensurePlanningDir,
   listPlanningDirs,
   resetPlanningArtifacts,
+  type StatusFile,
 } from '../lib/planning.js';
 import { getSpecForBranch } from '../lib/specs.js';
 import { tracedAction } from '../lib/base-command.js';
@@ -146,14 +148,16 @@ export function register(program: Command): void {
     .command('ensure')
     .description('Ensure planning directory exists for current branch')
     .option('--json', 'Output as JSON')
-    .action(tracedAction('planning ensure', async (options: { json?: boolean }) => {
+    .option('--no-spec', 'Allow specless planning directory (for quick-loop)')
+    .action(tracedAction('planning ensure', async (options: { json?: boolean; spec?: boolean }) => {
       const cwd = process.cwd();
       const branch = getCurrentBranch(cwd);
+      const noSpec = options.spec === false; // commander negates --no-spec into spec: false
 
-      // Find spec for this branch
-      const spec = getSpecForBranch(branch, cwd);
+      // Find spec for this branch (skip if --no-spec)
+      const spec = noSpec ? null : getSpecForBranch(branch, cwd);
 
-      if (!spec) {
+      if (!spec && !noSpec) {
         if (options.json) {
           console.log(JSON.stringify({
             success: false,
@@ -162,7 +166,7 @@ export function register(program: Command): void {
           }, null, 2));
         } else {
           console.error(`No spec found for branch: ${branch}`);
-          console.error('Use "ah specs current" to check branch-spec mapping.');
+          console.error('Use "ah specs current" to check branch-spec mapping, or --no-spec for specless planning.');
         }
         process.exit(1);
       }
@@ -176,7 +180,7 @@ export function register(program: Command): void {
         ensurePlanningDir(dirKey, cwd);
 
         // Initialize status file with original branch for collision detection
-        initializeStatus(dirKey, spec.path, branch, cwd);
+        initializeStatus(dirKey, spec?.path ?? '', branch, cwd);
       }
 
       const status = readStatus(dirKey, cwd);
@@ -185,8 +189,8 @@ export function register(program: Command): void {
         console.log(JSON.stringify({
           success: true,
           branch,
-          specId: spec.id,
-          specPath: spec.path,
+          specId: spec?.id ?? null,
+          specPath: spec?.path ?? null,
           planningDir: `.planning/${dirKey}/`,
           created: !alreadyExists,
           status,
@@ -198,7 +202,11 @@ export function register(program: Command): void {
           console.log(`Created planning directory: .planning/${dirKey}/`);
         }
         console.log(`  Branch: ${branch}`);
-        console.log(`  Spec: ${spec.id} (${spec.path})`);
+        if (spec) {
+          console.log(`  Spec: ${spec.id} (${spec.path})`);
+        } else {
+          console.log(`  Spec: (none)`);
+        }
         console.log(`  Stage: ${status?.stage || 'planning'}`);
       }
     }));
@@ -240,6 +248,47 @@ export function register(program: Command): void {
         console.log(`  Branch: ${branch}`);
         console.log(`  Planning: .planning/${dirKey}/`);
         console.log(`  Stage: planning`);
+      }
+    }));
+
+  // ah planning enable
+  cmd
+    .command('enable')
+    .description('Set planning stage to executing for current branch (activates the loop)')
+    .option('--json', 'Output as JSON')
+    .action(tracedAction('planning enable', async (options: { json?: boolean }) => {
+      const cwd = process.cwd();
+      const branch = getCurrentBranch(cwd);
+      const dirKey = sanitizeBranchForDir(branch);
+
+      if (!planningDirExists(dirKey, cwd)) {
+        if (options.json) {
+          console.log(JSON.stringify({
+            success: false,
+            error: `No planning directory for branch: ${branch}`,
+            branch,
+          }, null, 2));
+        } else {
+          console.error(`No planning directory for branch: ${branch}`);
+          console.error('Run "ah planning ensure" first.');
+        }
+        process.exit(1);
+      }
+
+      updateStatus({ stage: 'executing' as StatusFile['stage'] }, dirKey, cwd);
+      const status = readStatus(dirKey, cwd);
+
+      if (options.json) {
+        console.log(JSON.stringify({
+          success: true,
+          branch,
+          planningDir: `.planning/${dirKey}/`,
+          stage: status?.stage,
+        }, null, 2));
+      } else {
+        console.log(`Planning enabled for branch: ${branch}`);
+        console.log(`  Planning: .planning/${dirKey}/`);
+        console.log(`  Stage: ${status?.stage}`);
       }
     }));
 }

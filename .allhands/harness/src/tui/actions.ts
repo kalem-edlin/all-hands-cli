@@ -7,9 +7,9 @@
  * [1] Coordinator     [2] New Initiative  [3] Planner
  * [4] Review Jury     [5] E2E Test Plan   [6] PR Action
  * [7] Address PR Review  [8] Compound     [9] Complete
- * [0] Switch Workspace  [-] Custom Flow
+ * [0] Switch Workspace  [-] Custom Flow    [`] Quick Loop
  * ━━ Toggles ━━
- * [O] Loop            [P] Parallel
+ * [O] Loop            [P] Parallel        [E] Emergent
  * ━━ Controls ━━
  * [V] View Logs       [C] Clear Logs      [R] Refresh
  * [Q] Quit
@@ -30,6 +30,7 @@ export interface ActionItem {
 export interface ToggleState {
   loopEnabled: boolean;
   parallelEnabled: boolean;
+  emergentEnabled: boolean;
   prActionState: PRActionState;
 }
 
@@ -167,11 +168,13 @@ export function buildActionItems(toggleState: ToggleState): ActionItem[] {
     { id: 'switch-spec', label: 'Switch Workspace', key: '0', type: 'action' },
     { id: 'custom-flow', label: 'Custom Flow', key: '-', type: 'action' },
     { id: 'initiative-steering', label: 'Steer Initiative', key: '=', type: 'action' },
+    { id: 'quick-loop', label: 'Quick Loop', key: '`', type: 'action' },
     // Spacing before toggles
     { id: 'spacer-1', label: '', type: 'separator' },
     { id: 'separator-toggles', label: '━━ Toggles ━━', type: 'separator' },
     { id: 'toggle-loop', label: 'Loop', key: 'O', type: 'toggle', checked: toggleState.loopEnabled },
     { id: 'toggle-parallel', label: 'Parallel', key: 'P', type: 'toggle', checked: toggleState.parallelEnabled },
+    { id: 'toggle-emergent', label: 'Emergent', key: 'E', type: 'toggle', checked: toggleState.emergentEnabled },
     // Spacing before controls
     { id: 'spacer-2', label: '', type: 'separator' },
     { id: 'separator-bottom', label: '━━ Controls ━━', type: 'separator' },

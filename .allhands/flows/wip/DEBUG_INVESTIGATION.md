@@ -1,5 +1,5 @@
 <goal>
-Structured investigation for complex bugs with unclear root causes. Per **Agentic Validation Tooling**, systematic debugging beats random exploration.
+Structured investigation for complex bugs with unclear root causes. Systematic debugging beats random exploration.
 </goal>
 
 <inputs>
@@ -25,6 +25,7 @@ Structured investigation for complex bugs with unclear root causes. Per **Agenti
 This flow is under development. Integration points with milestone workflow TBD.
 
 Potential integration approaches:
+
 1. Patch prompt type: `type: debug` prompts following this flow
 2. Pre-implementation phase: When initial execution fails
 3. Emergent debug: When emergent refinement hits blockers
@@ -36,13 +37,13 @@ Potential integration approaches:
 
 Collect all observable evidence:
 
-| Evidence Type | How to Gather |
-|---------------|---------------|
-| Error messages | Exact text, stack traces |
-| Reproduction steps | Minimal sequence to trigger |
-| When it started | Recent commits, config changes |
-| What changed | Git diff, dependency updates |
-| Frequency | Always, intermittent, specific conditions |
+| Evidence Type      | How to Gather                             |
+| ------------------ | ----------------------------------------- |
+| Error messages     | Exact text, stack traces                  |
+| Reproduction steps | Minimal sequence to trigger               |
+| When it started    | Recent commits, config changes            |
+| What changed       | Git diff, dependency updates              |
+| Frequency          | Always, intermittent, specific conditions |
 
 ```yaml
 symptoms:
@@ -97,6 +98,7 @@ investigation:
 ### 3.3 Iteration
 
 If inconclusive:
+
 - Refine hypothesis with new evidence
 - Move to next hypothesis
 - Expand search scope
@@ -133,6 +135,7 @@ fix:
 For knowledge compounding:
 
 ### Investigation Summary (for prompt file)
+
 ```markdown
 ## Debug Investigation
 
@@ -144,19 +147,19 @@ For knowledge compounding:
 
 ## Common Debug Patterns
 
-| Symptom Pattern | Likely Cause | First Check |
-|-----------------|--------------|-------------|
-| "Works locally, fails in CI" | Environment diff | Env vars, paths, deps |
-| "Intermittent failures" | Race condition | Async timing, shared state |
-| "Started after deploy" | Recent changes | Git diff from last working |
-| "Only affects some users" | Data-dependent | User data differences |
-| "Works sometimes on refresh" | Caching | Cache invalidation logic |
+| Symptom Pattern              | Likely Cause     | First Check                |
+| ---------------------------- | ---------------- | -------------------------- |
+| "Works locally, fails in CI" | Environment diff | Env vars, paths, deps      |
+| "Intermittent failures"      | Race condition   | Async timing, shared state |
+| "Started after deploy"       | Recent changes   | Git diff from last working |
+| "Only affects some users"    | Data-dependent   | User data differences      |
+| "Works sometimes on refresh" | Caching          | Cache invalidation logic   |
 
 ## Anti-Patterns to Avoid
 
-| Anti-Pattern | Why It's Bad | Instead |
-|--------------|--------------|---------|
-| Shotgun debugging | Wastes time, creates noise | Form hypothesis first |
-| Assuming error message is cause | Often symptom, not root | Trace back to origin |
-| Skipping reproduction | Can't verify fix | Always reproduce first |
-| Fixing without understanding | Creates new bugs | Understand before changing |
+| Anti-Pattern                    | Why It's Bad               | Instead                    |
+| ------------------------------- | -------------------------- | -------------------------- |
+| Shotgun debugging               | Wastes time, creates noise | Form hypothesis first      |
+| Assuming error message is cause | Often symptom, not root    | Trace back to origin       |
+| Skipping reproduction           | Can't verify fix           | Always reproduce first     |
+| Fixing without understanding    | Creates new bugs           | Understand before changing |

@@ -1,5 +1,5 @@
 <goal>
-Add a new MCP server integration to the harness. Per **Agentic Validation Tooling**, MCP servers extend the harness with external tool capabilities that enable programmatic validation.
+Add a new MCP server integration to the harness. MCP servers extend the harness with external tool capabilities that enable programmatic validation.
 </goal>
 
 <inputs>
@@ -25,13 +25,16 @@ Add a new MCP server integration to the harness. Per **Agentic Validation Toolin
 Investigate the MCP package requirements:
 
 **Find the package**:
+
 - Run `ah tavily search "<mcp_name> MCP server npm"` for package details
 
 **Read documentation**:
+
 - Run `ah context7 search "<mcp_name>"` for official docs
 - Run `ah tavily extract "<doc_url>"` for specific pages
 
 **Identify requirements**:
+
 - Transport type (stdio, http, sse)
 - Command/args for stdio
 - URL for http/sse
@@ -43,6 +46,7 @@ Investigate the MCP package requirements:
 - Copy template: `cp .allhands/harness/src/mcp/_template.ts .allhands/harness/src/mcp/<server-name>.ts`
 
 Edit the config file with researched values:
+
 - `name`: Short identifier (used in `ah tools <name>:tool`)
 - `description`: What the server does
 - `type`: Transport type ('stdio', 'http', 'sse')
@@ -76,6 +80,7 @@ If call fails due to missing auth, document and proceed.
 ## Completion
 
 Report back with:
+
 - Config file created: `.allhands/harness/src/mcp/<server-name>.ts`
 - Available tools: List with brief descriptions
 - Environment requirements (if any)

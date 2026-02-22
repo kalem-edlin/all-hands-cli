@@ -6,7 +6,7 @@ Execute prompt tasks with full context, validate thoroughly, and document your w
 - MUST read prompt file and alignment doc before implementation
 - MUST pass validation before committing
 - MUST append summary to prompt file on completion
-- NEVER commit without passing validation review
+- MUST document validation pain-points via threshold-based routing (see Validation Learnings Documentation)
 </constraints>
 
 ## Context Gathering
@@ -22,30 +22,42 @@ Execute prompt tasks with full context, validate thoroughly, and document your w
 ## Implementation
 
 - Follow tasks and break them down into Todos if necessary
-- After implementation,
-  - Read `validation_suites` frontmatter entries. During implementation, follow the **Stochastic Validation** section for exploratory validation — use model intuition to probe edge cases, test user flows, and verify quality beyond what deterministic checks cover.
-  - Use validation tooling to acquire test data meeting acceptance criteria
 
 ### Deviation Handling
 
 Per **Frontier Models are Capable**, handle deviations automatically without engineer steering:
 
-| Deviation Type | Action |
-|----------------|--------|
-| Bugs/errors | Fix immediately, document in summary |
-| Missing critical functionality (validation, error handling, security) | Add immediately, document in summary |
-| Blocking issues (missing deps, broken imports, config errors) | Fix to unblock, document in summary |
+| Deviation Type                                                            | Action                                          |
+| ------------------------------------------------------------------------- | ----------------------------------------------- |
+| Bugs/errors                                                               | Fix immediately, document in summary            |
+| Missing critical functionality (validation, error handling, security)     | Add immediately, document in summary            |
+| Blocking issues (missing deps, broken imports, config errors)             | Fix to unblock, document in summary             |
 | Architectural changes (new DB tables, major schema changes, new services) | Stop and document in prompt - requires planning |
 
 If architectural deviation is needed, document the blocker and set `status: blocked` rather than proceeding.
 
-## Validation
+### Threshold-Based Routing
 
-- Acceptance criteria validation uses the **Deterministic Integration** section of referenced suites — these are binary pass/fail commands that gate completion. Stochastic exploration during implementation informs quality but does not replace deterministic acceptance criteria.
-- Spawn subtask to read `.allhands/flows/shared/PROMPT_VALIDATION_REVIEW.md` and follow its instructions
-  - Include validation results and `validation_suites` file paths in subtask inputs
-- Act on feedback until it passes
-- If at prompt attempt > 2 with real limitations, communicate compromises - reviewer may still reject
+Apply this routing for every validation learning, pain-point, blocker, or non-obvious pattern discovered during execution:
+
+| Signal                       | Destination               | Criteria                                                                                                                  |
+| ---------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Cross-domain learning**    | Update skill doc directly | Would this help future agents in different prompts/domains? (e.g., a missing command, incorrect flag, better ENV pattern) |
+| **Prompt-specific learning** | Annotate prompt summary   | Relevant only to this task's context? (e.g., specific edge case behavior, one-off workaround)                             |
+
+**Cross-domain examples** (update the suite):
+
+- A missing ENV variable or setup step that any executor would hit
+- A better pattern for running tests that supersedes what the suite documents
+- A gap in the decision tree that caused wasted exploration time
+
+**Prompt-specific examples** (annotate the summary):
+
+- An endpoint returned unexpected data for this specific test case
+- A workaround needed for this feature's particular data shape
+- Timing-dependent behavior specific to this implementation
+
+When in doubt about which destination, prefer updating the suite — improvements there compound for all future executors. Suite updates should be included in the same commit as implementation changes.
 
 ## Completion
 

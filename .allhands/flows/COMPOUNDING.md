@@ -1,5 +1,5 @@
 <goal>
-Extract learnings from completed specs to improve the harness, skills, and validation tooling. Per **Knowledge Compounding**, everything feeds forward - decisions, pivots, limitations, and realizations become persistent improvements.
+Extract learnings from completed specs to improve the harness, skills, and software validation practices. Per **Knowledge Compounding**, everything feeds forward - decisions, pivots, limitations, and realizations become persistent improvements.
 </goal>
 
 <constraints>
@@ -16,6 +16,7 @@ Extract learnings from completed specs to improve the harness, skills, and valid
 ## Context Gathering
 
 Read these spec artifacts to understand what happened:
+
 - Read the alignment doc at `.planning/<spec>/alignment.md`
 - Read the spec doc at `.planning/<spec>/spec.md`
 - Read all prompt files in `.planning/<spec>/prompts/`
@@ -33,6 +34,7 @@ Per **Frontier Models are Capable**, assess completion differently based on spec
 Identify patterns that indicate harness improvement opportunities:
 
 **Prompt Signals**:
+
 - Failed prompts (multiple attempts) → execution or planning issues
 - Patch prompts → check `patches_prompts` field to find root cause
 - Emergent refinement inclusions/exclusions → engineer intent signals
@@ -40,25 +42,24 @@ Identify patterns that indicate harness improvement opportunities:
 - Blocker learnings in summaries → planning gaps that required engineer steering
 
 **Tooling Signals**:
-- Read ALL prompt files' `skills` and `validation_suites` frontmatter - not just patches
-- Cross-reference each prompt's summary (Limitations, Decisions, Learnings, Validation results) against the specific skills and validation suites it used
+
+- Read ALL prompt files' `skills` frontmatter and acceptance criteria summaries - not just patches
+- Cross-reference each prompt's summary (Limitations, Decisions, Learnings, Validation results) against the specific skills it used
+- **Read every prompt's `## Validation Assessment` section** — these document curation-time confidence levels and gaps. Aggregate across prompts to identify systematic patterns: which domains consistently show low confidence? Which suites are referenced but never provide useful guidance?
+- **Read executor annotations** in prompt summaries — these document execution-time pain-points and blockers. Cross-domain learnings that executors already applied to suite docs will appear in `git diff` files; prompt-specific learnings stay in summaries.
+- **Check `git diff` files** — executors may have updated suite docs directly during execution (per threshold-based routing in PROMPT_TASK_EXECUTION). These changes are urgent signals that should be reviewed for quality and consistency.
 - Build a per-tool impact map:
   - **Per skill**: What did it catch? What did it miss? Did limitations or decisions reveal guidance gaps?
-  - **Per validation suite**: What issues did it surface? What escaped to review? Did it produce false positives?
-  - **Per validation suite — crystallization**: For each suite used during execution, evaluate:
-    - What stochastic patterns were discovered during exploratory validation?
-    - Which patterns are stable and repeatable enough to crystallize into deterministic checks?
-    - Should any new deterministic tests be added to the suite's Deterministic Integration section?
-    - Are there stochastic exploration patterns that should be documented in the suite's Stochastic Validation section for future agents?
-  - **Absent tooling**: What validation needs did prompts reveal that no existing suite covers?
-- Per **Agentic Validation Tooling**, this impact map feeds directly into harness improvement specs as evidence (not stored separately)
+  - **Per validation means**: What issues did it surface? What escaped to review? Did it produce false positives?
 
 **Decision Signals**:
+
 - Design decisions made given limitations
 - Engineer rejections and preference overrides (the preference itself is a compoundable learning)
 - Compromises between agentic suggestions and engineer preferences
 
 **Emergent Work Signals**:
+
 - Per **Quality Engineering**, emergent prompts are disposable extensions that discover which variants are valuable - they are not scope violations
 - Non-goal matches in emergent work are "non-goal violations" (specific exclusion was breached), never "scope creep" (scope was not changed - emergent work extends by design)
 - Reverted emergent work is expected quality control, not waste - per **Software is Cheap**, the cost of a revert is a valid cost of experimentation
@@ -67,10 +68,11 @@ Identify patterns that indicate harness improvement opportunities:
 ## Memory Extraction
 
 Per **Knowledge Compounding**, capture learnings as memories:
+
 - Run `ah solutions search "<relevant terms>"` to check for existing similar memories before writing duplicates
 - Write to `docs/memories.md`
 - Format: `[Name] | [Domain] | [Source] | [Description]`
-  - Domains: `planning`, `validation`, `implementation`, `harness-tooling`, `ideation`
+  - Domains: `planning`, `implementation`, `harness-tooling`, `ideation`
   - Sources: `user-steering`, `agent-inferred`
   - Description: 1-3 sentences of self-contained learning
 
@@ -80,7 +82,7 @@ Ensure these categories are represented when signals exist:
 
 - **Technical learnings**: Patterns, anti-patterns, and solutions discovered during implementation
 - **Engineer preference memories**: When engineer overrides agent recommendation, capture the preference itself as a memory (the override is a signal of values and priorities)
-- **Systemic validation signals**: When review catches issues that implementation missed, capture as a validation coverage gap (e.g., "Review caught 6 issues no validation suite flagged")
+- **Systemic validation signals**: When review catches issues that implementation missed, capture as a validation coverage gap
 - **Harness behavior patterns**: Document specific thresholds, behaviors, and failure modes with concrete data - not just symptoms (e.g., "7 compaction continuations at >8 files touched" not just "context loss on long prompts")
 
 ## Solution Documentation
@@ -90,12 +92,14 @@ Per **Knowledge Compounding**, document non-trivial solved problems for institut
 ### Identify Documentable Solutions
 
 From the signal analysis, identify problems that:
+
 - Required multiple investigation attempts
 - Had non-obvious solutions
 - Would benefit future sessions (similar issues likely to recur)
 - Involve agentic anti-patterns (hallucinations, duplications, miscommunications)
 
 Skip documentation for:
+
 - Simple typos or obvious syntax errors
 - Trivial fixes immediately resolved
 - One-off environment issues
@@ -103,6 +107,7 @@ Skip documentation for:
 ### Write Solution Files
 
 For each documentable solution:
+
 - Run `ah schema solution` for frontmatter and body section format
 - Determine `problem_type` and corresponding category directory
 - Generate filename: `<sanitized-symptom>-<component>-<YYYYMMDD>.md`
@@ -113,6 +118,7 @@ For each documentable solution:
 ### Cross-Reference Solutions
 
 After all solutions are written, cross-reference related solutions:
+
 - Run `ah solutions search` with terms from each new solution to find related solutions
 - For solutions sharing components, tags, or thematic overlap: add "## Related" section with links
 - Update existing similar solutions with cross-reference back to new solutions
@@ -136,36 +142,27 @@ After all solutions are written, cross-reference related solutions:
 
 Classify issues from Signal Analysis:
 
-| Signal Pattern | Action |
-|----------------|--------|
+| Signal Pattern                      | Action                                 |
+| ----------------------------------- | -------------------------------------- |
 | Skill guidance gaps or inaccuracies | Update skill file inline with approval |
-| Validation suite missed issues or needs strengthening | Update suite file inline with approval |
-| Missing validation suite for discovered need | Create via spec |
-| Flow/command/hook/planning issues | Structural - create spec |
+| Flow/command/hook/planning issues   | Structural - create spec               |
 
 **MUST interview engineer before proceeding** - the compounding summary MUST NOT be finalized without engineer sign-off on classified issues:
+
 - Present all classified issues together
-- Walk through the per-tool impact map from Tooling Signals - for each skill and validation suite used, highlight where prompt-level learnings (limitations, decisions, workarounds) apply back to the tool itself
-- Per **Knowledge Compounding**, ask whether discoveries should be reflected in the skills or validation suites that were used, so future executions benefit
+- Walk through the per-tool impact map from Tooling Signals - for each skill used, highlight where prompt-level learnings (limitations, decisions, workarounds) apply back to the tool itself
 - Ask about additional painpoints
 - Validate against `.allhands/principles.md`
 
 ### Apply Changes
 
 **Skill refinements** (inline with approval):
+
 - Update skill body with learnings discovered during execution (new patterns, anti-patterns, missing reference material)
 - Add or correct guidance that would have prevented prompt failures or engineer steering
 
-**Validation suite refinements** (inline with approval):
-- Strengthen existing suites with newly discovered check patterns or edge cases
-- Update Stochastic Validation and Deterministic Integration sections with failure modes encountered during execution
-- **Crystallization**: Stable stochastic patterns discovered during execution should be promoted into deterministic checks in the suite's Deterministic Integration section, shifting stochastic exploration to the frontier
-
-**New validation suites**: Per **Agentic Validation Tooling**, if execution revealed validation gaps no existing suite covers:
-- **(A) Create spec** → Invoke `.allhands/flows/shared/CREATE_HARNESS_SPEC.md` with `domain_name: harness`
-- **(B) Defer** → Document in `docs/memories.md` under "Deferred Harness Improvements"
-
 **Structural changes** (flows, commands, hooks, planning):
+
 - Present all detected structural issues to the engineer
 - Ask which issues to include in a single harness improvement spec (multi-select)
 - Per **Frontier Models are Capable**, assume all engineer-confirmed issues belong in one spec - don't force individual scoping
@@ -176,27 +173,32 @@ Classify issues from Signal Analysis:
 ## Completion
 
 Write `.planning/<spec>/compounding_summary.md`:
+
 ```markdown
 # Compounding Summary
 
 ## Detected Issues
+
 - [Patterns from patches, failures, feedback]
 
 ## Tooling Refinements
+
 - [Skill file changes with rationale from prompt learnings]
-- [Validation suite changes with rationale from execution gaps]
-- [New validation suites created or deferred]
 
 ## Flow Updates
+
 - [Flow file adjustments]
 
 ## Memories Added
+
 - [References to docs/memories.md entries]
 
 ## Solutions Documented
+
 - [docs/solutions/<category>/<filename>.md - brief description]
 
 ## Engineer Feedback Addressed
+
 - [Specific concerns resolved]
 ```
 

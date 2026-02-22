@@ -13,7 +13,7 @@
  * - No separate "active spec" tracking needed
  */
 
-import { getCurrentBranch, updatePRReviewStatus, sanitizeBranchForDir, readStatus } from './planning.js';
+import { getCurrentBranch, updatePRReviewStatus, sanitizeBranchForDir, readStatus, readAlignmentFrontmatter } from './planning.js';
 import { loadProjectSettings } from '../hooks/shared.js';
 import { listWindows, SESSION_NAME, sessionExists, getCurrentSession, getSpawnedAgentRegistry, unregisterSpawnedAgent } from './tmux.js';
 import { pickNextPrompt, markPromptInProgress, loadAllPrompts, type PromptFile } from './prompts.js';
@@ -49,6 +49,7 @@ export interface EventLoopState {
   lastCheckTime: number;
   loopEnabled: boolean;
   parallelEnabled: boolean;  // Parallel execution mode
+  emergentEnabled: boolean;  // Emergent exploration toggle (blocks tangential when off)
   /** Active executor prompt numbers (supports parallel execution) */
   activeExecutorPrompts: number[];
   /** Timestamp of last executor spawn (for race condition protection) */
@@ -69,7 +70,7 @@ export interface EventLoopCallbacks {
   onAgentsChange?: (agents: string[]) => void;
   onSpawnExecutor?: (prompt: PromptFile) => void;
   /** Called when emergent planner should be spawned (no pending + no in_progress) */
-  onSpawnEmergentPlanning?: () => void;
+  onSpawnEmergentPlanning?: (emergentEnabled: boolean) => void;
   onLoopStatus?: (message: string) => void;
   /** Called when prompts are added, removed, or their status changes */
   onPromptsChange?: (prompts: PromptFile[], snapshot: PromptSnapshot) => void;
@@ -125,6 +126,7 @@ export class EventLoop {
       lastCheckTime: Date.now(),
       loopEnabled: false,
       parallelEnabled: false,
+      emergentEnabled: true,
       activeExecutorPrompts: [],
       lastExecutorSpawnTime: null,
       promptSnapshot: null,
@@ -189,6 +191,13 @@ export class EventLoop {
    */
   setParallelEnabled(enabled: boolean): void {
     this.state.parallelEnabled = enabled;
+  }
+
+  /**
+   * Enable or disable emergent exploration (blocks tangential phase when off)
+   */
+  setEmergentEnabled(enabled: boolean): void {
+    this.state.emergentEnabled = enabled;
   }
 
   /**
@@ -619,6 +628,16 @@ export class EventLoop {
         result.stats.pending === 0 &&
         result.stats.inProgress === 0
       ) {
+        // Check emergent toggle — only blocks tangential (Phase 2)
+        if (!this.state.emergentEnabled) {
+          const frontmatter = readAlignmentFrontmatter(this.state.planningKey, this.cwd);
+          if (frontmatter?.core_consolidation === 'complete') {
+            this.callbacks.onLoopStatus?.('Emergent toggle OFF — tangential exploration blocked');
+            return;
+          }
+          // core_consolidation is pending — allow emergent spawn for core work
+        }
+
         // Track whether prior emergent planner spawn was productive (created new prompts)
         const currentPromptCount = this.state.promptSnapshot?.count ?? 0;
         if (currentPromptCount <= this.state.emergentLastPromptCount) {
@@ -648,7 +667,7 @@ export class EventLoop {
         this.callbacks.onLoopStatus?.(
           `Spawning emergent planner (attempt ${this.state.emergentSpawnCount + 1})`
         );
-        this.callbacks.onSpawnEmergentPlanning?.();
+        this.callbacks.onSpawnEmergentPlanning?.(this.state.emergentEnabled);
         return;
       }
 

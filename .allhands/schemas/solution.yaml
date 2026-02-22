@@ -87,7 +87,7 @@ frontmatter:
   source:
     type: enum
     required: false
-    values: [user-steering, agent-inferred, review-fix]
+    values: [user-steering, agent-inferred, review-fix, ci-fix]
     default: agent-inferred
     description: "How this learning was discovered"
 

@@ -64,6 +64,7 @@ describe('WORKFLOW_DOMAIN_PATH resolution', () => {
     const items = buildActionItems({
       loopEnabled: false,
       parallelEnabled: false,
+      emergentEnabled: true,
       prActionState: 'create-pr',
     });
     const steering = items.find((item) => item.id === 'initiative-steering');
@@ -85,6 +86,7 @@ describe('buildActionItems always-visible guarantee', () => {
         toggleCombinations.push({
           loopEnabled: loop,
           parallelEnabled: parallel,
+          emergentEnabled: true,
           prActionState: pr,
         });
       }
@@ -116,6 +118,7 @@ describe('buildActionItems always-visible guarantee', () => {
     const items = buildActionItems({
       loopEnabled: false,
       parallelEnabled: false,
+      emergentEnabled: true,
       prActionState: 'create-pr',
     });
 

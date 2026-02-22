@@ -63,7 +63,6 @@ Based on interview outcomes, produce prompt insertions, modifications, and/or de
 ### Creating New Prompts
 
 - Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt creation guidance
-- Read `.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md` to assign validation suites to new prompts
 - Assign the next available prompt number — append-only, NEVER renumber existing prompts
   - Use `getNextPromptNumber()` or derive from highest existing prompt number + 1
 
@@ -81,6 +80,7 @@ Based on interview outcomes, produce prompt insertions, modifications, and/or de
 ### Dependency Patching
 
 When inserting between existing prompts, patch the dependency graph:
+
 - New prompt's `dependencies` = the "run after" prompt numbers
 - Patch each "run before" prompt's `dependencies` to include the new prompt number
 - Verify the resulting execution order is consistent and acyclic

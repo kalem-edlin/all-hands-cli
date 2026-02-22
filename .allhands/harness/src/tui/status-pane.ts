@@ -88,10 +88,10 @@ export function getSelectableItems(
   if (spec) {
     items.push({ type: 'spec' });
   }
-  if (spec && fileStates?.alignment) {
+  if (fileStates?.alignment) {
     items.push({ type: 'alignment' });
   }
-  if (spec && fileStates?.e2eTestPlan) {
+  if (fileStates?.e2eTestPlan) {
     items.push({ type: 'e2e' });
   }
 
@@ -201,6 +201,16 @@ export function createStatusPane(
     specBox.on('click', () => options?.onViewSpec?.());
     currentY += DOC_BOX_HEIGHT;
     currentSelectableIndex++;
+  } else if (fileStates?.alignment) {
+    // Specless planning dir (quick-loop) — show mode indicator instead of warning
+    blessed.text({
+      parent: pane,
+      top: currentY,
+      left: 1,
+      content: '{#818cf8-fg}Quick Loop{/#818cf8-fg} {#5c6370-fg}(specless){/#5c6370-fg}',
+      tags: true,
+    });
+    currentY += 1;
   } else {
     blessed.text({
       parent: pane,
@@ -213,7 +223,7 @@ export function createStatusPane(
   }
 
   // Alignment Doc box (only if file exists)
-  if (spec && fileStates?.alignment) {
+  if (fileStates?.alignment) {
     const isSelected = selectedIndex === currentSelectableIndex;
     const alignBox = blessed.box({
       parent: pane,
@@ -245,7 +255,7 @@ export function createStatusPane(
   }
 
   // E2E Test Plan box (only if file exists)
-  if (spec && fileStates?.e2eTestPlan) {
+  if (fileStates?.e2eTestPlan) {
     const isSelected = selectedIndex === currentSelectableIndex;
     const e2eBox = blessed.box({
       parent: pane,

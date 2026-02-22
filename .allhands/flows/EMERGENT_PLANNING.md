@@ -24,18 +24,22 @@ Plan hypotheses as prompt files for executors to implement. Per **Quality Engine
 Per **Quality Engineering**, core goals must be convincingly met before exploring adjacent work.
 
 **Phase 1 — Core Consolidation** (`core_consolidation: pending`):
+
 - Focus hypotheses exclusively on verifying, solidifying, and compounding the implementation to meet core initiative goals
 - Assess gaps between current implementation state (prompt summaries, completed work) and the alignment doc's stated goals and expectations
 - Do NOT pursue tangential exploration — all hypotheses must directly address spec goals, acceptance criteria, or known gaps
 - After each hypothesis round, assess whether all core goals are convincingly met based on: alignment doc goals, prompt summaries, implementation state
 
 **Phase 2 — Tangential Exploration** (`core_consolidation: complete`):
+
 - Hypotheses extend the implementation with ideas adjacent to but not explicitly requested in initial goals
 - Feature ideas, consolidation, future-proofing, edge case coverage
 - Track tangential hypothesis count across rounds — enforce `max_tangential_hypotheses` cap from the workflow domain config
 - If cap is reached, stop — no further emergent work
 
 **Transition**: When core consolidation is convincingly met, set `core_consolidation: complete` in the alignment doc frontmatter. This is a judgment call based on alignment doc goals, prompt summaries, and implementation state. Subsequent runs enter Phase 2.
+
+**Self-Gate**: After transitioning `core_consolidation` to `complete`, check the emergent toggle value from context. If the toggle is `off`, STOP immediately — do not create any Phase 2 prompts. The toggle being off means the user has disabled tangential exploration. The harness allowed this spawn only for core consolidation work, which is now complete.
 
 ## Hypothesis Formation
 
@@ -47,11 +51,9 @@ Per **Quality Engineering**, core goals must be convincingly met before explorin
 
 ## Prompt Creation
 
-- Read `.allhands/flows/shared/UTILIZE_VALIDATION_TOOLING.md` to discover validation suites for hypothesis domains
 - Read `.allhands/flows/shared/PROMPT_TASKS_CURATION.md` for prompt structure and guidance
 - Create 1-N prompt files in the prompts folder:
   - Set `type: emergent` in frontmatter
   - Target 2-5 tasks per prompt, each a non-overlapping hypothesis
-  - Add discovered validation suites to `validation_suites` frontmatter
   - If Phase 2: note feature flag requirement in tasks
 - Stop — executors pick up prompts via the loop
